@@ -417,3 +417,4 @@ FodyWeavers.xsd
 *.msm
 *.msp
 /src/Inventory.Web/appsettings.Development.json
+/src/Inventory.Api/appsettings.Development.json
