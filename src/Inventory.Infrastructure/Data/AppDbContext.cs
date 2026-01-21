@@ -75,7 +75,6 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.Name).HasMaxLength(200).IsRequired();
                 b.Property(x => x.Phone).HasMaxLength(50);
                 b.Property(x => x.Email).HasMaxLength(200);
-                b.Property(x => x.Address).HasMaxLength(500);
                 b.HasIndex(x => x.Name);
             });
 
