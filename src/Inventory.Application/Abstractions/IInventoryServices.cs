@@ -1,0 +1,49 @@
+using Inventory.Application.DTOs;
+using Inventory.Application.DTOs.StockSnapshot;
+using Inventory.Application.DTOs.Transaction;
+
+namespace Inventory.Application.Abstractions
+{
+    public interface IInventoryServices
+    {
+        /// <summary>
+        /// Returns the on-hand quantity for a product right now
+        /// </summary>
+        Task<decimal> GetOnHandAsync(int productId, CancellationToken ct = default);
+
+        /// <summary>
+        /// Retrieves the latest stock snapshot for a specific product
+        /// </summary>
+        Task<StockSnapshotResponseDto?> GetStockAsync(int productId, CancellationToken ct = default);
+
+        /// <summary>
+        /// Lists stock snapshots for all products
+        /// </summary>
+        Task<IReadOnlyList<StockSnapshotResponseDto>> GetAllStockAsync(CancellationToken ct = default);
+
+        /// <summary>
+        /// Records incoming stock and attributes it to the requesting user
+        /// </summary>
+        Task ReceiveAsync(StockReceiveRequest req, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Adjusts stock counts for a product, capturing who made the change
+        /// </summary>
+        Task UpdateStockAsync(UpdateStockRequest req, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Creates a detailed inventory transaction entry for auditing and history
+        /// </summary>
+        Task<long> CreateTransactionAsync(CreateInventoryTransactionRequest req, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Gets the latest inventory transactions
+        /// </summary>
+        Task<IReadOnlyList<InventoryTransactionResponseDto>> GetRecentTransactionsAsync(int take = 50, CancellationToken ct = default);
+
+        /// <summary>
+        /// Retrieves all transactions associated with a specific product
+        /// </summary>
+        Task<IReadOnlyList<InventoryTransactionResponseDto>> GetProductTransactionsAsync(int productId, CancellationToken ct = default);
+    }
+}

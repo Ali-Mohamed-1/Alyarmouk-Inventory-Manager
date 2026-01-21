@@ -1,6 +1,6 @@
 namespace Inventory.Domain.Entities;
 
-public sealed class StockSnapshot
+public class StockSnapshot
 {
     public int ProductId { get; set; }
     public Product? Product { get; set; }
@@ -10,5 +10,3 @@ public sealed class StockSnapshot
     // Optimistic concurrency for stock updates
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 }
-
-
