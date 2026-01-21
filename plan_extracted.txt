@@ -1,0 +1,1647 @@
+Complete Inventory Management System - Comprehensive Build Plan Complete Inventory Management System - Comprehensive Build Plan
+Project Overview
+Project Overview
+Build a full-featured inventory management system with:
+Product and Category management
+Customers and Orders (customer saving + suggestions + order history)
+Inventory transactions (Receive, Issue, Adjust)
+Stock tracking with snapshots
+User authentication + Separation of Duties (fine-grained permissions per account)
+Dashboard and reporting
+Complete audit logging
+Web UI and REST API
+Phase 1: Project Setup and Architecture
+Phase 1: Project Setup and Architecture
+Step 1.1: Create Solution Structure
+Step 1.1: Create Solution Structure
+Action:
+Action:
+ Create a .NET solution with Clean Architecture layers
+1
+. 
+Create solution file:
+dotnet new sln -n Inventory
+2
+. 
+Create projects in order:
+# Domain Layer (no dependencies)
+dotnet new classlib -n Inventory.Domain -o src/Inventory.Domain
+# Application Layer (depends on Domain)
+dotnet new classlib -n Inventory.Application -o src/Inventory.Application
+# Infrastructure Layer (depends on Domain, Application)
+dotnet new classlib -n Inventory.Infrastructure -o src/Inventory.Infrastructure
+# Web UI (depends on Application, Infrastructure)
+dotnet new mvc -n Inventory.Web -o src/Inventory.Web
+# API (depends on Application, Infrastructure)
+dotnet new webapi -n Inventory.Api -o src/Inventory.Api
+# Test Projects
+dotnet new xunit -n Inventory.UnitTests -o tests/Inventory.UnitTests
+dotnet new xunit -n Inventory.IntegrationTests -o tests/Inventory.IntegrationTests
+3
+. 
+Add projects to solution:
+dotnet sln add src/Inventory.Domain/Inventory.Domain.csproj
+dotnet sln add src/Inventory.Application/Inventory.Application.csproj
+dotnet sln add src/Inventory.Infrastructure/Inventory.Infrastructure.csproj
+dotnet sln add src/Inventory.Web/Inventory.Web.csproj
+dotnet sln add src/Inventory.Api/Inventory.Api.csproj
+dotnet sln add tests/Inventory.UnitTests/Inventory.UnitTests.csproj
+dotnet sln add tests/Inventory.IntegrationTests/Inventory.IntegrationTests.csproj
+4
+. 
+Add project references:
+
+# Application references Domain
+dotnet add src/Inventory.Application reference src/Inventory.Domain
+# Infrastructure references Domain and Application
+dotnet add src/Inventory.Infrastructure reference src/Inventory.Domain
+dotnet add src/Inventory.Infrastructure reference src/Inventory.Application
+# Web references Application and Infrastructure
+dotnet add src/Inventory.Web reference src/Inventory.Application
+dotnet add src/Inventory.Web reference src/Inventory.Infrastructure
+# API references Application and Infrastructure
+dotnet add src/Inventory.Api reference src/Inventory.Application
+dotnet add src/Inventory.Api reference src/Inventory.Infrastructure
+# Tests reference projects
+dotnet add tests/Inventory.UnitTests reference src/Inventory.Domain
+dotnet add tests/Inventory.UnitTests reference src/Inventory.Application
+dotnet add tests/Inventory.IntegrationTests reference src/Inventory.Web
+5
+. 
+Add NuGet packages:
+# Infrastructure - EF Core
+dotnet add src/Inventory.Infrastructure package Microsoft.EntityFrameworkCore.SqlServer
+dotnet add src/Inventory.Infrastructure package Microsoft.EntityFrameworkCore.Design
+dotnet add src/Inventory.Infrastructure package Microsoft.AspNetCore.Identity.EntityFrameworkCore
+# Web - Identity
+dotnet add src/Inventory.Web package Microsoft.AspNetCore.Identity.UI
+# API - JWT
+dotnet add src/Inventory.Api package Microsoft.AspNetCore.Authentication.JwtBearer
+dotnet add src/Inventory.Api package Swashbuckle.AspNetCore
+Step 1.2: Configure .gitignore
+Step 1.2: Configure .gitignore
+File:
+File:
+ 
+.gitignore
+Add standard .NET gitignore patterns
+Exclude 
+appsettings.Development.json
+ (keep 
+appsettings.json
+ template)
+Phase 2: Domain Layer
+Phase 2: Domain Layer
+Step 2.1: Create Domain Entities
+Step 2.1: Create Domain Entities
+File:
+File:
+ 
+src/Inventory.Domain/Entities/Category.cs
+namespace Inventory.Domain.Entities;
+public sealed class Category
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+}
+File:
+File:
+ 
+src/Inventory.Domain/Entities/Product.cs
+
+namespace Inventory.Domain.Entities;
+public sealed class Product
+{
+    public int Id { get; set; }
+    public string Sku { get; set; } = "";
+    public string Name { get; set; } = "";
+    public int CategoryId { get; set; }
+    public Category? Category { get; set; }
+    public string Unit { get; set; } = "pcs";
+    public decimal ReorderPoint { get; set; }
+    public bool IsActive { get; set; } = true;
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+}
+File:
+File:
+ 
+src/Inventory.Domain/Entities/StockSnapshot.cs
+namespace Inventory.Domain.Entities;
+public sealed class StockSnapshot
+{
+    public int ProductId { get; set; }
+    public Product? Product { get; set; }
+    public decimal OnHand { get; set; }
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+}
+File:
+File:
+ 
+src/Inventory.Domain/Entities/InventoryTransaction.cs
+namespace Inventory.Domain.Entities;
+public enum InventoryTransactionType
+{
+    Receive = 1,
+    Issue = 2,
+    Adjust = 3
+}
+public sealed class InventoryTransaction
+{
+    public long Id { get; set; }
+    public int ProductId { get; set; }
+    public Product? Product { get; set; }
+    public decimal QuantityDelta { get; set; }
+    public InventoryTransactionType Type { get; set; }
+    public DateTimeOffset TimestampUtc { get; set; }
+    public string UserId { get; set; } = "";
+    public string UserDisplayName { get; set; } = "";
+    public string? Note { get; set; }
+}
+File:
+File:
+ 
+src/Inventory.Domain/Entities/AuditLog.cs
+
+namespace Inventory.Domain.Entities;
+public enum AuditAction
+{
+    Create = 1,
+    Update = 2,
+    Delete = 3
+}
+public sealed class AuditLog
+{
+    public long Id { get; set; }
+    public string EntityType { get; set; } = "";
+    public string EntityId { get; set; } = "";
+    public AuditAction Action { get; set; }
+    public DateTimeOffset TimestampUtc { get; set; }
+    public string UserId { get; set; } = "";
+    public string UserDisplayName { get; set; } = "";
+    public string? ChangesJson { get; set; }
+}
+Step 2.2: Add Customers + Orders domain entities (NEW)
+Step 2.2: Add Customers + Orders domain entities (NEW)
+Goal:
+Goal:
+ Persist customers, store orders (with line items), and enable an order-history tab per customer.
+Step 2.2.1: Create 
+Step 2.2.1: Create 
+Customer
+Customer
+File:
+File:
+ 
+src/Inventory.Domain/Entities/Customer.cs
+namespace Inventory.Domain.Entities;
+public sealed class Customer
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+    public string? Address { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
+}
+Step 2.2.2: Create 
+Step 2.2.2: Create 
+SalesOrder
+SalesOrder
+ + 
+ + 
+SalesOrderLine
+SalesOrderLine
+File:
+File:
+ 
+src/Inventory.Domain/Entities/SalesOrder.cs
+
+namespace Inventory.Domain.Entities;
+public sealed class SalesOrder
+{
+    public long Id { get; set; }
+    public string OrderNumber { get; set; } = "";
+    public int CustomerId { get; set; }
+    public Customer? Customer { get; set; }
+    public string CustomerNameSnapshot { get; set; } = "";
+    public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
+    public string CreatedByUserId { get; set; } = "";
+    public string CreatedByUserDisplayName { get; set; } = "";
+    public string? Note { get; set; }
+    public List<SalesOrderLine> Lines { get; set; } = new();
+}
+public sealed class SalesOrderLine
+{
+    public long Id { get; set; }
+    public long SalesOrderId { get; set; }
+    public SalesOrder? SalesOrder { get; set; }
+    public int ProductId { get; set; }
+    public Product? Product { get; set; }
+    public string ProductNameSnapshot { get; set; } = "";
+    public decimal Quantity { get; set; }
+    public string UnitSnapshot { get; set; } = "";
+}
+Step 2.3: Remove Default Class Files
+Step 2.3: Remove Default Class Files
+Delete 
+Class1.cs
+ from all projects
+Phase 3: Application Layer
+Phase 3: Application Layer
+Step 3.1: Create DTOs
+Step 3.1: Create DTOs
+File:
+File:
+ 
+src/Inventory.Application/Models/CategoryDto.cs
+namespace Inventory.Application;
+public sealed record CategoryDto(int Id, string Name);
+File:
+File:
+ 
+src/Inventory.Application/Models/ProductDto.cs
+
+namespace Inventory.Application;
+public sealed record ProductDto(
+    int Id,
+    string Sku,
+    string Name,
+    int CategoryId,
+    string CategoryName,
+    string Unit,
+    decimal ReorderPoint,
+    bool IsActive
+);
+File:
+File:
+ 
+src/Inventory.Application/Models/InventoryTransactionDto.cs
+namespace Inventory.Application;
+public enum InventoryTransactionType
+{
+    Receive = 1,
+    Issue = 2,
+    Adjust = 3
+}
+public sealed record InventoryTransactionDto(
+    long Id,
+    int ProductId,
+    string ProductName,
+    InventoryTransactionType Type,
+    decimal QuantityDelta,
+    DateTimeOffset TimestampUtc,
+    string UserDisplayName,
+    string? Note
+);
+File:
+File:
+ 
+src/Inventory.Application/Models/AuditLogDto.cs
+using Inventory.Domain.Entities;
+namespace Inventory.Application;
+public sealed record AuditLogDto(
+    long Id,
+    string EntityType,
+    string EntityId,
+    AuditAction Action,
+    DateTimeOffset TimestampUtc,
+    string UserId,
+    string UserDisplayName,
+    string? ChangesJson
+);
+File:
+File:
+ 
+src/Inventory.Application/Models/DashboardDto.cs
+
+namespace Inventory.Application;
+public sealed record DashboardDto(
+    int TotalProducts,
+    decimal TotalOnHand,
+    int LowStockCount,
+    IReadOnlyList<DashboardStockByCategoryPointDto> StockByCategory
+);
+public sealed record DashboardStockByCategoryPointDto(string CategoryName, decimal OnHand);
+File:
+File:
+ 
+src/Inventory.Application/Models/LowStockItemDto.cs
+namespace Inventory.Application;
+public sealed record LowStockItemDto(
+    int ProductId,
+    string ProductName,
+    string CategoryName,
+    decimal OnHand,
+    string Unit,
+    decimal ReorderPoint
+);
+File:
+File:
+ 
+src/Inventory.Application/Models/UserContext.cs
+namespace Inventory.Application;
+public sealed record UserContext(string UserId, string UserDisplayName);
+File:
+File:
+ 
+src/Inventory.Application/Models/Requests.cs
+namespace Inventory.Application;
+public sealed record UpsertCategoryRequest(string Name);
+public sealed record UpsertProductRequest(
+    string Sku,
+    string Name,
+    int CategoryId,
+    string Unit,
+    decimal ReorderPoint,
+    bool IsActive
+);
+public sealed record InventoryAdjustRequest(int ProductId, decimal Quantity, string? Note);
+Step 3.3: Add Customers + Orders DTOs + Requests (NEW)
+Step 3.3: Add Customers + Orders DTOs + Requests (NEW)
+Step 3.3.1: DTOs
+Step 3.3.1: DTOs
+File:
+File:
+ 
+src/Inventory.Application/Models/CustomerDto.cs
+namespace Inventory.Application;
+public sealed record CustomerDto(
+    int Id,
+    string Name,
+    string? Phone,
+    string? Email,
+    string? Address,
+    bool IsActive
+);
+
+File:
+File:
+ 
+src/Inventory.Application/Models/SalesOrderDto.cs
+namespace Inventory.Application;
+public sealed record SalesOrderLineDto(
+    long Id,
+    int ProductId,
+    string ProductName,
+    decimal Quantity,
+    string Unit
+);
+public sealed record SalesOrderDto(
+    long Id,
+    string OrderNumber,
+    int CustomerId,
+    string CustomerName,
+    DateTimeOffset CreatedUtc,
+    string CreatedByUserDisplayName,
+    string? Note,
+    IReadOnlyList<SalesOrderLineDto> Lines
+);
+Step 3.3.2: Requests
+Step 3.3.2: Requests
+File:
+File:
+ 
+src/Inventory.Application/Models/Requests.cs
+ (append)
+namespace Inventory.Application;
+public sealed record UpsertCustomerRequest(
+    string Name,
+    string? Phone,
+    string? Email,
+    string? Address,
+    bool IsActive
+);
+public sealed record CreateSalesOrderLineRequest(
+    int ProductId,
+    decimal Quantity
+);
+public sealed record CreateSalesOrderRequest(
+    int CustomerId,
+    string? Note,
+    IReadOnlyList<CreateSalesOrderLineRequest> Lines
+);
+Step 3.2: Create Service Interfaces
+Step 3.2: Create Service Interfaces
+File:
+File:
+ 
+src/Inventory.Application/Abstractions/ICategoryService.cs
+namespace Inventory.Application.Abstractions;
+public interface ICategoryService
+{
+    Task<IReadOnlyList<CategoryDto>> GetAllAsync(CancellationToken ct = default);
+    Task<CategoryDto?> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<int> CreateAsync(UpsertCategoryRequest req, UserContext user, CancellationToken ct = default);
+    Task UpdateAsync(int id, UpsertCategoryRequest req, UserContext user, CancellationToken ct = default);
+}
+File:
+File:
+ 
+src/Inventory.Application/Abstractions/IProductService.cs
+
+namespace Inventory.Application.Abstractions;
+public interface IProductService
+{
+    Task<IReadOnlyList<ProductDto>> GetAllAsync(CancellationToken ct = default);
+    Task<ProductDto?> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<int> CreateAsync(UpsertProductRequest req, UserContext user, CancellationToken ct = default);
+    Task UpdateAsync(int id, UpsertProductRequest req, UserContext user, CancellationToken ct = default);
+    Task SetActiveAsync(int id, bool isActive, UserContext user, CancellationToken ct = default);
+}
+File:
+File:
+ 
+src/Inventory.Application/Abstractions/IInventoryService.cs
+namespace Inventory.Application.Abstractions;
+public interface IInventoryService
+{
+    Task<decimal> GetOnHandAsync(int productId, CancellationToken ct = default);
+    Task<IReadOnlyList<InventoryTransactionDto>> GetRecentTransactionsAsync(int take = 50, CancellationToken ct = default);
+    Task<IReadOnlyList<InventoryTransactionDto>> GetProductTransactionsAsync(int productId, CancellationToken ct = default);
+    Task ReceiveAsync(InventoryAdjustRequest req, UserContext user, CancellationToken ct = default);
+    Task IssueAsync(InventoryAdjustRequest req, UserContext user, bool allowNegative = false, CancellationToken ct = default);
+    Task AdjustAsync(InventoryAdjustRequest req, UserContext user, CancellationToken ct = default);
+}
+File:
+File:
+ 
+src/Inventory.Application/Abstractions/IReportingService.cs
+namespace Inventory.Application.Abstractions;
+public interface IReportingService
+{
+    Task<DashboardDto> GetDashboardAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<LowStockItemDto>> GetLowStockAsync(CancellationToken ct = default);
+}
+File:
+File:
+ 
+src/Inventory.Application/Abstractions/IAuditLogService.cs
+namespace Inventory.Application.Abstractions;
+public interface IAuditLogService
+{
+    Task<IReadOnlyList<AuditLogDto>> GetRecentAsync(int take = 50, CancellationToken ct = default);
+    Task<IReadOnlyList<AuditLogDto>> GetByEntityTypeAsync(string entityType, CancellationToken ct = default);
+    Task<IReadOnlyList<AuditLogDto>> GetByEntityAsync(string entityType, string entityId, CancellationToken ct = default);
+    Task<IReadOnlyList<AuditLogDto>> GetByUserAsync(string userId, CancellationToken ct = default);
+    Task<IReadOnlyList<AuditLogDto>> GetByDateRangeAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken ct = default);
+}
+Step 3.4: Add Customers + Orders service abstractions (NEW)
+Step 3.4: Add Customers + Orders service abstractions (NEW)
+Step 3.4.1: 
+Step 3.4.1: 
+ICustomerService
+ICustomerService
+File:
+File:
+ 
+src/Inventory.Application/Abstractions/ICustomerService.cs
+
+namespace Inventory.Application.Abstractions;
+public interface ICustomerService
+{
+    // For customer suggestion/autocomplete when creating an order
+    Task<IReadOnlyList<CustomerDto>> SearchAsync(string query, int take = 10, CancellationToken ct = default);
+    Task<IReadOnlyList<CustomerDto>> GetAllAsync(CancellationToken ct = default);
+    Task<CustomerDto?> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<int> CreateAsync(UpsertCustomerRequest req, UserContext user, CancellationToken ct = default);
+    Task UpdateAsync(int id, UpsertCustomerRequest req, UserContext user, CancellationToken ct = default);
+    Task SetActiveAsync(int id, bool isActive, UserContext user, CancellationToken ct = default);
+}
+Step 3.4.2: 
+Step 3.4.2: 
+IOrderService
+IOrderService
+File:
+File:
+ 
+src/Inventory.Application/Abstractions/IOrderService.cs
+namespace Inventory.Application.Abstractions;
+public interface IOrderService
+{
+    Task<long> CreateAsync(CreateSalesOrderRequest req, UserContext user, CancellationToken ct = default);
+    Task<SalesOrderDto?> GetByIdAsync(long id, CancellationToken ct = default);
+    // Used by the Customers tab (order history)
+    Task<IReadOnlyList<SalesOrderDto>> GetCustomerOrdersAsync(int customerId, int take = 100, CancellationToken ct = default);
+    // Used by Orders/Index (recent orders)
+    Task<IReadOnlyList<SalesOrderDto>> GetRecentAsync(int take = 50, CancellationToken ct = default);
+}
+Phase 4: Infrastructure Layer - Database
+Phase 4: Infrastructure Layer - Database
+Step 4.1: Create DbContext
+Step 4.1: Create DbContext
+File:
+File:
+ 
+src/Inventory.Infrastructure/Data/AppUser.cs
+using Microsoft.AspNetCore.Identity;
+namespace Inventory.Infrastructure.Data;
+public sealed class AppUser : IdentityUser
+{
+}
+File:
+File:
+ 
+src/Inventory.Infrastructure/Data/AppDbContext.cs
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using Inventory.Domain.Entities;
+namespace Inventory.Infrastructure.Data;
+public sealed class AppDbContext : IdentityDbContext<AppUser, IdentityRole, string>
+{
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<Category> Categories => Set<Category>();
+
+    public DbSet<Category> Categories => Set<Category>();
+    public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+    public DbSet<StockSnapshot> StockSnapshots => Set<StockSnapshot>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<SalesOrder> SalesOrders => Set<SalesOrder>();
+    public DbSet<SalesOrderLine> SalesOrderLines => Set<SalesOrderLine>();
+    protected override void OnModelCreating(ModelBuilder builder)
+    {
+        base.OnModelCreating(builder);
+        builder.Entity<Category>(b =>
+        {
+            b.Property(x => x.Name).HasMaxLength(200).IsRequired();
+        });
+        builder.Entity<Product>(b =>
+        {
+            b.Property(x => x.Sku).HasMaxLength(64).IsRequired();
+            b.HasIndex(x => x.Sku).IsUnique();
+            b.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Unit).HasMaxLength(32).IsRequired();
+            b.Property(x => x.ReorderPoint).HasPrecision(18, 2);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<StockSnapshot>(b =>
+        {
+            b.HasKey(x => x.ProductId);
+            b.Property(x => x.OnHand).HasPrecision(18, 2);
+            b.Property(x => x.RowVersion).IsRowVersion();
+            b.HasOne(x => x.Product).WithOne().HasForeignKey<StockSnapshot>(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
+        });
+        builder.Entity<InventoryTransaction>(b =>
+        {
+            b.Property(x => x.QuantityDelta).HasPrecision(18, 2);
+            b.Property(x => x.UserId).HasMaxLength(450).IsRequired();
+            b.Property(x => x.UserDisplayName).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Note).HasMaxLength(500);
+            b.HasIndex(x => x.TimestampUtc);
+            b.HasIndex(x => x.ProductId);
+            b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<AuditLog>(b =>
+        {
+            b.Property(x => x.EntityType).HasMaxLength(100).IsRequired();
+            b.Property(x => x.EntityId).HasMaxLength(100).IsRequired();
+            b.Property(x => x.UserId).HasMaxLength(450).IsRequired();
+            b.Property(x => x.UserDisplayName).HasMaxLength(200).IsRequired();
+            b.Property(x => x.ChangesJson).HasMaxLength(4000);
+            b.HasIndex(x => x.TimestampUtc);
+            b.HasIndex(x => new { x.EntityType, x.EntityId });
+        });
+        builder.Entity<Customer>(b =>
+        {
+            b.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Phone).HasMaxLength(50);
+            b.Property(x => x.Email).HasMaxLength(200);
+            b.Property(x => x.Address).HasMaxLength(500);
+            b.HasIndex(x => x.Name);
+        });
+
+        });
+        builder.Entity<SalesOrder>(b =>
+        {
+            b.Property(x => x.OrderNumber).HasMaxLength(50).IsRequired();
+            b.HasIndex(x => x.OrderNumber).IsUnique();
+            b.Property(x => x.CustomerNameSnapshot).HasMaxLength(200).IsRequired();
+            b.Property(x => x.CreatedByUserId).HasMaxLength(450).IsRequired();
+            b.Property(x => x.CreatedByUserDisplayName).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Note).HasMaxLength(500);
+            b.HasIndex(x => x.CreatedUtc);
+            b.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<SalesOrderLine>(b =>
+        {
+            b.Property(x => x.ProductNameSnapshot).HasMaxLength(200).IsRequired();
+            b.Property(x => x.UnitSnapshot).HasMaxLength(32).IsRequired();
+            b.Property(x => x.Quantity).HasPrecision(18, 2);
+            b.HasIndex(x => x.SalesOrderId);
+            b.HasOne(x => x.SalesOrder).WithMany(o => o.Lines).HasForeignKey(x => x.SalesOrderId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+}
+Step 4.2: Create Design-Time Factory
+Step 4.2: Create Design-Time Factory
+File:
+File:
+ 
+src/Inventory.Infrastructure/Data/DesignTimeDbContextFactory.cs
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
+namespace Inventory.Infrastructure.Data;
+public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
+{
+    public AppDbContext CreateDbContext(string[] args)
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
+        optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=InventoryDb;Trusted_Connection=True;MultipleActiveResultSets=true");
+        return new AppDbContext(optionsBuilder.Options);
+    }
+}
+Step 4.3: Create Dependency Injection Extension
+Step 4.3: Create Dependency Injection Extension
+File:
+File:
+ 
+src/Inventory.Infrastructure/DependencyInjection.cs
+
+using Inventory.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+namespace Inventory.Infrastructure;
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+        return services;
+    }
+}
+Step 4.4: Create Initial Migration
+Step 4.4: Create Initial Migration
+dotnet ef migrations add InitialInventory --project src/Inventory.Infrastructure --startup-project src/Inventory.Web
+Step 4.5: Create Customers + Orders migration (NEW)
+Step 4.5: Create Customers + Orders migration (NEW)
+dotnet ef migrations add AddCustomersAndOrders --project src/Inventory.Infrastructure --startup-project src/Inventory.Web
+Phase 5: Infrastructure Layer - Services
+Phase 5: Infrastructure Layer - Services
+Step 5.1: Implement Category Service
+Step 5.1: Implement Category Service
+File:
+File:
+ 
+src/Inventory.Infrastructure/Services/EfCategoryService.cs
+Implement 
+ICategoryService
+Use 
+AppDbContext
+ for data access
+Add audit logging in 
+CreateAsync
+ and 
+UpdateAsync
+Map entities to DTOs using LINQ projections
+Use 
+AsNoTracking()
+ for read operations
+Key Implementation Points:
+Key Implementation Points:
+CreateAsync
+: Create category, save, create audit log with 
+AuditAction.Create
+UpdateAsync
+: Load entity, capture before state, update, save, create audit log with 
+AuditAction.Update
+ and before/after JSON
+Use 
+System.Text.Json.JsonSerializer
+ for audit log JSON
+Step 5.2: Implement Product Service
+Step 5.2: Implement Product Service
+File:
+File:
+ 
+src/Inventory.Infrastructure/Services/EfProductService.cs
+Implement 
+IProductService
+Similar pattern to Category Service
+CreateAsync
+: Also create initial 
+StockSnapshot
+ with 
+OnHand = 0
+UpdateAsync
+: Capture all product fields in before/after state
+SetActiveAsync
+: Log only the 
+IsActive
+ field change
+Step 5.3: Implement Inventory Service
+Step 5.3: Implement Inventory Service
+File:
+File:
+ 
+src/Inventory.Infrastructure/Services/EfInventoryService.cs
+Implement 
+IInventoryService
+Use database transactions for 
+ReceiveAsync
+, 
+IssueAsync
+, 
+AdjustAsync
+Update 
+StockSnapshot.OnHand
+ atomically
+Create 
+InventoryTransaction
+ record
+Create 
+AuditLog
+ entry for transaction
+Handle concurrency conflicts with 
+DbUpdateConcurrencyException
+Validate negative stock (unless 
+allowNegative = true
+)
+
+Step 5.4: Implement Reporting Service
+Step 5.4: Implement Reporting Service
+File:
+File:
+ 
+src/Inventory.Infrastructure/Services/EfReportingService.cs
+Implement 
+IReportingService
+GetDashboardAsync
+: Aggregate statistics using LINQ
+GetLowStockAsync
+: Join Products with StockSnapshots, filter by 
+OnHand <= ReorderPoint
+Step 5.5: Implement Audit Log Service
+Step 5.5: Implement Audit Log Service
+File:
+File:
+ 
+src/Inventory.Infrastructure/Services/EfAuditLogService.cs
+Implement 
+IAuditLogService
+All methods use 
+AsNoTracking()
+Order by 
+TimestampUtc DESC
+ for recent logs
+Apply filters using LINQ 
+Where
+ clauses
+Map 
+AuditLog
+ entities to 
+AuditLogDto
+Step 5.6: Implement Customers + Orders services (NEW)
+Step 5.6: Implement Customers + Orders services (NEW)
+Step 5.6.1: 
+Step 5.6.1: 
+EfCustomerService
+EfCustomerService
+File:
+File:
+ 
+src/Inventory.Infrastructure/Services/EfCustomerService.cs
+Implement 
+ICustomerService
+Read methods use 
+AsNoTracking()
+Write methods must add 
+AuditLog
+ entries
+CreateAsync(UpsertCustomerRequest req, UserContext user):
+CreateAsync(UpsertCustomerRequest req, UserContext user):
+Validate 
+Name
+ not empty
+Trim/normalize strings
+Create 
+Customer
+ and save
+Audit:
+EntityType = "Customer"
+EntityId = customer.Id.ToString()
+Action = AuditAction.Create
+ChangesJson
+ = JSON snapshot of the new customer
+UpdateAsync(id, req, user):
+UpdateAsync(id, req, user):
+Load existing customer
+Capture before snapshot (
+Name/Phone/Email/Address/IsActive
+)
+Apply updates + save
+Audit:
+Action = AuditAction.Update
+ChangesJson
+ = 
+{ "Before": {...}, "After": {...} }
+SearchAsync(query, take=10):
+SearchAsync(query, take=10):
+Clamp 
+take
+ (1..50)
+If query empty/whitespace: return empty list OR last N active customers (pick one and keep consistent)
+Else:
+Filter by 
+Name
+, 
+Phone
+, 
+Email
+ contains query
+Order by 
+Name
+Take 
+take
+Step 5.6.2: 
+Step 5.6.2: 
+EfOrderService
+EfOrderService
+File:
+File:
+ 
+src/Inventory.Infrastructure/Services/EfOrderService.cs
+Implement 
+IOrderService
+Must create:
+SalesOrder
+ row
+SalesOrderLine
+ rows
+Related stock updates (recommended: issue stock through inventory logic)
+Audit log entry
+CreateAsync(CreateSalesOrderRequest req, UserContext user):
+CreateAsync(CreateSalesOrderRequest req, UserContext user):
+Validate:
+Customer exists and is active
+Lines.Count > 0
+All quantities > 0
+All products exist and are active
+Generate 
+OrderNumber
+ (example approach):
+SO-YYYYMMDD-####
+ (increment 
+####
+ daily)
+Transaction boundary (required):
+Begin DB transaction
+Insert order + lines with snapshots:
+
+CustomerNameSnapshot = customer.Name
+ProductNameSnapshot = product.Name
+UnitSnapshot = product.Unit
+Decrease stock (two acceptable options):
+Option A (preferred):
+Option A (preferred):
+ call into a shared “apply inventory delta” method used by 
+EfInventoryService
+ and create 
+InventoryTransaction
+entries of type 
+Issue
+Option B:
+Option B:
+ directly update 
+StockSnapshot
+ and create 
+InventoryTransaction
+ records in this service
+Audit:
+EntityType = "SalesOrder"
+EntityId = order.Id.ToString()
+Action = AuditAction.Create
+ChangesJson
+ includes order header + line items
+Commit
+GetCustomerOrdersAsync(customerId):
+GetCustomerOrdersAsync(customerId):
+Return last N orders by 
+CreatedUtc DESC
+Include lines
+Phase 6: Web UI - Setup and Configuration
+Phase 6: Web UI - Setup and Configuration
+Step 6.1: Configure Program.cs
+Step 6.1: Configure Program.cs
+File:
+File:
+ 
+src/Inventory.Web/Program.cs
+Add Infrastructure services
+Configure Identity with 
+AppUser
+ and 
+IdentityRole
+Set up Cookie Authentication
+Define authorization policies:
+"InventoryWrite"
+: Admin, Manager, Clerk
+"CatalogWrite"
+: Admin, Manager
+"UserAdmin"
+: Admin
+"AuditLogView"
+: Admin, Manager
+Register application services (Category, Product, Inventory, Reporting, AuditLog)
+Apply migrations and seed database on startup
+Step 6.2: Create Database Initializer
+Step 6.2: Create Database Initializer
+File:
+File:
+ 
+src/Inventory.Infrastructure/Data/DbInitializer.cs
+Create default roles: Admin, Manager, Clerk
+Create default admin user (email/password from config)
+Assign Admin role to admin user
+Seed sample categories and products (optional)
+Step 6.3: Configure appsettings.json
+Step 6.3: Configure appsettings.json
+File:
+File:
+ 
+src/Inventory.Web/appsettings.json
+Add 
+ConnectionStrings:DefaultConnection
+Add 
+AdminUser:Email
+ and 
+AdminUser:Password
+Add 
+Demo:Enabled
+ flag (false for production)
+Step 6.4: Separation of Duties (permissions per account) (NEW)
+Step 6.4: Separation of Duties (permissions per account) (NEW)
+Goal:
+Goal:
+ Each account has its own 
+permissions
+permissions
+, not just a broad role. Users can only do what they are explicitly allowed to do.\n\nThis is still “per-user credentials”
+(Identity user + password), but authorization is 
+permission-based
+permission-based
+.
+Step 6.4.1: Define a permission list (start small)
+Step 6.4.1: Define a permission list (start small)
+Create a list of permission keys (strings), for example:
+Catalog.Read
+, 
+Catalog.Write
+Inventory.Read
+, 
+Inventory.Write
+, 
+Inventory.AllowNegative
+Customers.Read
+, 
+Customers.Write
+Orders.Read
+, 
+Orders.Create
+Reports.Read
+AuditLogs.Read
+Users.Read
+, 
+Users.Manage
+Step 6.4.2: Implement permission claims + policies
+Step 6.4.2: Implement permission claims + policies
+Use claims like: 
+permission=Catalog.Write
+Add authorization policies in 
+Program.cs
+ that check 
+RequireClaim("permission", "...")
+Update controllers to use these permission policies (instead of only role policies)
+
+Step 6.4.3: Store permissions (recommended DB-backed model)
+Step 6.4.3: Store permissions (recommended DB-backed model)
+Add tables:
+Permissions
+ (Key, Description)
+RolePermissions
+ (RoleId, PermissionKey/PermissionId)
+UserPermissions
+ (UserId, PermissionKey/PermissionId, IsGranted) for per-user overrides
+Create a migration: 
+AddPermissionsModel
+.
+Step 6.4.4: Load permissions on login
+Step 6.4.4: Load permissions on login
+For Web (cookie auth): use a custom 
+IUserClaimsPrincipalFactory<AppUser>
+ to attach permission claims at sign-in
+For API (JWT): include permission claims when issuing the token
+Step 6.4.5: Admin UI to manage permissions
+Step 6.4.5: Admin UI to manage permissions
+Add admin-only screens:
+Manage permissions per role (checkbox list)
+Manage permissions per user (checkbox list; user overrides role defaults)
+Audit every permission change via 
+AuditLog
+Phase 7: Web UI - Controllers
+Phase 7: Web UI - Controllers
+Step 7.1: Home Controller
+Step 7.1: Home Controller
+File:
+File:
+ 
+src/Inventory.Web/Controllers/HomeController.cs
+Index
+: Display dashboard using 
+IReportingService.GetDashboardAsync()
+Create dashboard view with statistics cards and charts
+Step 7.2: Account Controller
+Step 7.2: Account Controller
+File:
+File:
+ 
+src/Inventory.Web/Controllers/AccountController.cs
+Login
+ (GET/POST): Display login form, authenticate user
+Logout
+ (POST): Sign out user
+AccessDenied
+: Display access denied page
+Use 
+SignInManager<AppUser>
+ for authentication
+Step 7.3: Categories Controller
+Step 7.3: Categories Controller
+File:
+File:
+ 
+src/Inventory.Web/Controllers/CategoriesController.cs
+Index
+: List all categories
+Create
+ (GET/POST): Create new category
+Edit
+ (GET/POST): Edit existing category
+Use 
+[Authorize(Policy = "CatalogWrite")]
+ for write operations
+Get 
+UserContext
+ using helper method (similar to InventoryController)
+Pass 
+UserContext
+ to service methods
+Step 7.4: Products Controller
+Step 7.4: Products Controller
+File:
+File:
+ 
+src/Inventory.Web/Controllers/ProductsController.cs
+Index
+: List products with stock levels and low stock indicators
+Create
+ (GET/POST): Create new product
+Edit
+ (GET/POST): Edit existing product
+Transactions
+: View transaction history for a product
+Use 
+[Authorize(Policy = "CatalogWrite")]
+ for write operations
+Get 
+UserContext
+ and pass to service methods
+Step 7.5: Inventory Controller
+Step 7.5: Inventory Controller
+File:
+File:
+ 
+src/Inventory.Web/Controllers/InventoryController.cs
+Index
+: Display products and recent transactions
+Receive
+ (GET/POST): Receive stock
+Issue
+ (GET/POST): Issue stock
+Adjust
+ (GET/POST): Adjust stock
+Use 
+[Authorize(Policy = "InventoryWrite")]
+ for all actions
+Helper method 
+GetUserContextAsync()
+ to get current user
+
+Step 7.6: Reports Controller
+Step 7.6: Reports Controller
+File:
+File:
+ 
+src/Inventory.Web/Controllers/ReportsController.cs
+Index
+: Display low stock report
+Use 
+IReportingService.GetLowStockAsync()
+Step 7.7: Admin Controller
+Step 7.7: Admin Controller
+File:
+File:
+ 
+src/Inventory.Web/Controllers/AdminController.cs
+Users
+: List all users with their roles
+UpdateUserRoles
+ (POST): Update user roles
+Use 
+[Authorize(Policy = "UserAdmin")]
+Step 7.8: Audit Log Controller
+Step 7.8: Audit Log Controller
+File:
+File:
+ 
+src/Inventory.Web/Controllers/AuditLogController.cs
+Index
+ (GET): Display audit logs with filtering
+Accept query parameters: 
+entityType
+, 
+entityId
+, 
+userId
+, 
+startDate
+, 
+endDate
+, 
+take
+Use 
+IAuditLogService
+ to fetch filtered logs
+Use 
+[Authorize(Policy = "AuditLogView")]
+Step 7.9: Customers Controller (NEW)
+Step 7.9: Customers Controller (NEW)
+File:
+File:
+ 
+src/Inventory.Web/Controllers/CustomersController.cs
+Permissions (recommended):
+Permissions (recommended):
+View/search: 
+Customers.Read
+Create/edit/deactivate: 
+Customers.Write
+Actions (minimum):
+Actions (minimum):
+Index
+ (GET): list + search UI
+Create
+ (GET/POST): create customer
+Edit
+ (GET/POST): edit customer
+History(int id)
+ (GET): show order history for customer
+Suggest(string q)
+ (GET): JSON suggestions for autocomplete (top 10)
+Implementation detail:
+Implementation detail:
+ 
+Suggest
+ should call 
+ICustomerService.SearchAsync(q, take: 10)
+ and return minimal fields: 
+Id
+, 
+Name
+, 
+Phone
+/
+Email
+.
+Step 7.10: Orders Controller (NEW)
+Step 7.10: Orders Controller (NEW)
+File:
+File:
+ 
+src/Inventory.Web/Controllers/OrdersController.cs
+Permissions (recommended):
+Permissions (recommended):
+Create: 
+Orders.Create
+View: 
+Orders.Read
+Actions (minimum):
+Actions (minimum):
+Index
+ (GET): recent orders list
+Create
+ (GET): order form (customer picker + line items)
+Create
+ (POST): validate request, create order via 
+IOrderService
+, then redirect to Details
+Details(long id)
+ (GET): order details page
+Phase 8: Web UI - Views
+Phase 8: Web UI - Views
+Step 8.1: Layout and Navigation
+Step 8.1: Layout and Navigation
+File:
+File:
+ 
+src/Inventory.Web/Views/Shared/_Layout.cshtml
+Bootstrap 5 navigation bar
+Links: Dashboard, Products, Categories, Inventory, Reports
+User dropdown with "Manage Users" (Admin only) and "Audit Logs" (Admin/Manager)
+Logout button
+Step 8.2: Create All Views
+Step 8.2: Create All Views
+For each controller action, create corresponding Razor views:
+Home/Index.cshtml
+: Dashboard with statistics
+
+Account/Login.cshtml
+: Login form
+Account/AccessDenied.cshtml
+: Access denied message
+Categories/Index.cshtml
+: Category list table
+Categories/Edit.cshtml
+: Category create/edit form
+Products/Index.cshtml
+: Product list with stock levels
+Products/Edit.cshtml
+: Product create/edit form
+Products/Transactions.cshtml
+: Transaction history for product
+Inventory/Index.cshtml
+: Products and recent transactions
+Inventory/Adjust.cshtml
+: Receive/Issue/Adjust form
+Reports/Index.cshtml
+: Low stock report table
+Admin/Users.cshtml
+: User management with role checkboxes
+AuditLog/Index.cshtml
+: Audit log table with filters
+Step 8.3: Customers + Orders UI (NEW)
+Step 8.3: Customers + Orders UI (NEW)
+Step 8.3.1: Customers tab
+Step 8.3.1: Customers tab
+Files:
+Files:
+src/Inventory.Web/Views/Customers/Index.cshtml
+src/Inventory.Web/Views/Customers/Edit.cshtml
+src/Inventory.Web/Views/Customers/History.cshtml
+Customers/Index UX requirements:
+Customers/Index UX requirements:
+Search input (name/phone/email)
+Results table: Name, Phone, Email, Active, Actions (Edit, History)
+“New Customer” button
+Step 8.3.2: Customer suggestions when creating an order
+Step 8.3.2: Customer suggestions when creating an order
+Goal:
+Goal:
+ While creating an order, the system should suggest existing customers as you type.\n\n
+Simple implementation:
+Simple implementation:
+In 
+Orders/Create.cshtml
+, create a text input for searching customers
+Debounce (250–400ms), call 
+GET /Customers/Suggest?q=...
+Show a dropdown with top 10 matches
+When user selects a suggestion, store its 
+CustomerId
+ in a hidden input
+Step 8.3.3: What if a NEW customer orders? (required flow)
+Step 8.3.3: What if a NEW customer orders? (required flow)
+Required behavior (add this exactly to your UI):
+Required behavior (add this exactly to your UI):
+If the typed customer text does not match any suggestion:
+show an action: 
+“Create new customer”
+“Create new customer”
+Clicking it opens an inline form or modal:
+Name (prefill from typed text)
+Phone
+Email
+Address
+When user saves:
+call server to create the customer (and audit it)
+server returns new 
+CustomerId
+UI auto-selects that new customer and continues order creation
+Hard rules:
+Hard rules:
+Do not allow submitting an order without a valid 
+CustomerId
+Always save the customer first, then save the order
+Audit both actions
+Step 8.3.4: Orders UI
+Step 8.3.4: Orders UI
+Files:
+Files:
+src/Inventory.Web/Views/Orders/Index.cshtml
+src/Inventory.Web/Views/Orders/Create.cshtml
+src/Inventory.Web/Views/Orders/Details.cshtml
+Orders/Create minimum UX:
+Orders/Create minimum UX:
+Customer picker with suggest + create-new flow (above)
+Line items section:
+Product selector
+Quantity input
+Add/remove line buttons
+Optional note
+Submit button
+View Guidelines:
+View Guidelines:
+Use Bootstrap 5 for styling
+Consistent card-based layout
+
+Responsive tables with 
+table-responsive
+Form validation with 
+asp-validation-summary
+Flash messages using 
+TempData
+Format dates and numbers appropriately
+Display JSON in audit logs using 
+<pre>
+ tag with formatting
+Phase 9: API Project
+Phase 9: API Project
+Step 9.1: Configure Program.cs
+Step 9.1: Configure Program.cs
+File:
+File:
+ 
+src/Inventory.Api/Program.cs
+Add Infrastructure services
+Configure Identity
+Set up JWT Bearer Authentication
+Register application services
+Apply migrations on startup
+Step 9.2: Create API Controllers
+Step 9.2: Create API Controllers
+File:
+File:
+ 
+src/Inventory.Api/Controllers/AuthController.cs
+Login
+ (POST): Authenticate and return JWT token
+Register
+ (POST): Register new user (optional)
+File:
+File:
+ 
+src/Inventory.Api/Controllers/CategoriesController.cs
+RESTful endpoints: GET, POST, PUT for categories
+Use 
+[Authorize]
+ attribute
+Return appropriate HTTP status codes
+File:
+File:
+ 
+src/Inventory.Api/Controllers/ProductsController.cs
+RESTful endpoints for products
+Include stock levels in responses
+File:
+File:
+ 
+src/Inventory.Api/Controllers/InventoryController.cs
+POST endpoints for Receive, Issue, Adjust
+GET endpoints for transactions
+Step 9.3: Configure Swagger
+Step 9.3: Configure Swagger
+Enable Swagger UI in development
+Add JWT authentication to Swagger
+Document API endpoints
+Step 9.4: Customers + Orders API (NEW)
+Step 9.4: Customers + Orders API (NEW)
+Customers endpoints:
+Customers endpoints:
+GET /api/customers?query=...
+ (search/suggest)
+GET /api/customers/{id}
+POST /api/customers
+PUT /api/customers/{id}
+Orders endpoints:
+Orders endpoints:
+GET /api/orders?take=...
+ (recent)
+GET /api/orders/{id}
+GET /api/customers/{id}/orders
+ (history)
+POST /api/orders
+ (create order)
+Security:
+Security:
+ protect all endpoints with permission claims, same model as Web (Separation of Duties).\n\n
+New-customer order flow:
+New-customer order flow:
+ client should create customer first
+(recommended). If you later add a single endpoint that can create customer+order together, do it in one DB transaction and audit it as a composite operation.
+Phase 10: Testing
+Phase 10: Testing
+Step 10.1: Unit Tests
+Step 10.1: Unit Tests
+File:
+File:
+ 
+tests/Inventory.UnitTests/Services/ProductServiceTests.cs
+Test service methods with mocked DbContext
+Test validation logic
+
+Test audit logging
+Step 10.2: Integration Tests
+Step 10.2: Integration Tests
+File:
+File:
+ 
+tests/Inventory.IntegrationTests/InventoryTests.cs
+Test full request/response cycle
+Use in-memory database
+Test authentication and authorization
+Step 10.3: Tests for Separation of Duties + Customers/Orders (NEW)
+Step 10.3: Tests for Separation of Duties + Customers/Orders (NEW)
+Separation of Duties (permissions) tests:
+Separation of Duties (permissions) tests:
+A user without 
+Customers.Read
+ cannot open 
+Customers/Index
+A user without 
+Orders.Create
+ cannot access 
+Orders/Create
+ (GET and POST)
+A user without 
+Inventory.Write
+ cannot issue stock (Inventory endpoints)
+A user with 
+Inventory.Write
+ but without 
+Inventory.AllowNegative
+ cannot issue below zero
+Customers/Orders flow tests:
+Customers/Orders flow tests:
+Customers/Suggest?q=
+ returns top N matches by name/phone/email
+Creating a new customer works and writes an audit log entry
+Creating an order:
+saves order + lines
+decreases stock
+writes inventory transactions
+writes an audit log entry
+Customer History page returns correct orders in reverse chronological order
+Phase 11: Final Steps
+Phase 11: Final Steps
+Step 11.1: Apply Migrations
+Step 11.1: Apply Migrations
+dotnet ef database update --project src/Inventory.Infrastructure --startup-project src/Inventory.Web
+Step 11.2: Test All Features
+Step 11.2: Test All Features
+Create categories and products
+Perform inventory transactions
+View reports and dashboard
+Test user management
+View audit logs
+Test API endpoints
+Step 11.3: Documentation
+Step 11.3: Documentation
+Update README.md with setup instructions
+Document API endpoints
+Add code comments where needed
+Implementation Order Summary
+Implementation Order Summary
+1
+. 
+Phase 1
+Phase 1
+: Project setup (1-2 hours)
+2
+. 
+Phase 2
+Phase 2
+: Domain entities (30 minutes)
+3
+. 
+Phase 3
+Phase 3
+: Application layer (DTOs, interfaces) (1 hour)
+4
+. 
+Phase 4
+Phase 4
+: Database setup (1 hour)
+5
+. 
+Phase 5
+Phase 5
+: Service implementations (3-4 hours)
+6
+. 
+Phase 6
+Phase 6
+: Web UI configuration (1 hour)
+7
+. 
+Phase 7
+Phase 7
+: Controllers (2-3 hours)
+8
+. 
+Phase 8
+Phase 8
+: Views (3-4 hours)
+9
+. 
+Phase 9
+Phase 9
+: API (2 hours)
+10
+. 
+Phase 10
+Phase 10
+: Testing (2-3 hours)
+11
+. 
+Phase 11
+Phase 11
+: Finalization (1 hour)
+Total Estimated Time: 18-22 hours
+Total Estimated Time: 18-22 hours
+Key Implementation Details
+Key Implementation Details
+
+Audit Logging Pattern
+Audit Logging Pattern
+Every write operation should:
+1
+. 
+Capture "before" state (for updates)
+2
+. 
+Perform the operation
+3
+. 
+Create 
+AuditLog
+ entry with:
+Entity type and ID
+Action (Create/Update/Delete)
+User information
+JSON serialized changes
+4
+. 
+Save audit log in same transaction
+UserContext Helper
+UserContext Helper
+private async Task<UserContext> GetUserContextAsync()
+{
+    var user = await _userManager.GetUserAsync(User);
+    if (user is null) throw new InvalidOperationException("User not found.");
+    return new UserContext(user.Id, user.UserName ?? user.Email ?? user.Id);
+}
+Transaction Safety
+Transaction Safety
+Use 
+BeginTransactionAsync()
+ for operations that modify multiple entities (e.g., inventory transactions that update stock and create transaction record).
+Error Handling
+Error Handling
+Use try-catch in controllers
+Return appropriate HTTP status codes
+Display user-friendly error messages
+Log exceptions for debugging
+Files to Create (Complete List)
+Files to Create (Complete List)
+Domain (5 files):
+Domain (5 files):
+Category.cs
+Product.cs
+StockSnapshot.cs
+InventoryTransaction.cs
+AuditLog.cs
+Application (12 files):
+Application (12 files):
+Models: CategoryDto, ProductDto, InventoryTransactionDto, AuditLogDto, DashboardDto, LowStockItemDto, UserContext, Requests
+Abstractions: ICategoryService, IProductService, IInventoryService, IReportingService, IAuditLogService
+Infrastructure (10 files):
+Infrastructure (10 files):
+Data: AppUser, AppDbContext, DesignTimeDbContextFactory, DbInitializer
+Services: EfCategoryService, EfProductService, EfInventoryService, EfReportingService, EfAuditLogService
+DependencyInjection.cs
+Web Controllers (8 files):
+Web Controllers (8 files):
+HomeController, AccountController, CategoriesController, ProductsController, InventoryController, ReportsController, AdminController, AuditLogController
+Web Views (15+ files):
+Web Views (15+ files):
+All corresponding views for controllers
+API (4+ files):
+API (4+ files):
+AuthController, CategoriesController, ProductsController, InventoryController
+This plan provides a complete roadmap to build the entire system from scratch.

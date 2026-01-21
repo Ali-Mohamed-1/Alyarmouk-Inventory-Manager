@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Inventory.Application.DTOs;
 
 public record UpdateCategoryRequest

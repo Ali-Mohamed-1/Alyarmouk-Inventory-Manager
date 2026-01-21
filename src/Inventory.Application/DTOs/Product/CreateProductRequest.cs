@@ -19,5 +19,7 @@ namespace Inventory.Application.DTOs.Product
 
         [Range(0, 1000000)]
         public decimal ReorderPoint { get; init; }
+        public bool isActive { get; init; }
+        public string RowVersion { get; init; } = string.Empty;
     }
 }
