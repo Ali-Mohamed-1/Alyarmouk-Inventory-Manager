@@ -21,6 +21,8 @@ public sealed class InventoryTransaction
 
     public DateTimeOffset TimestampUtc { get; set; }
     public string UserId { get; set; } = "";
+    public int clientId { get; set; }
+    public Customer? Customer { get; set; }
     public string UserDisplayName { get; set; } = "";
     public string? Note { get; set; }
 }
