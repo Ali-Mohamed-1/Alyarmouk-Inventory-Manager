@@ -13,6 +13,7 @@ namespace Inventory.Infrastructure.Services
 {
     public class CategoryServices : ICategoryServices
     {
+        private const int MaxName = 100;
         private readonly AppDbContext _db;
         public CategoryServices(AppDbContext db)
         {
@@ -107,8 +108,8 @@ namespace Inventory.Infrastructure.Services
             if (normalized.Length < 2)
                 throw new ValidationException("Category name must be at least 2 characters.");
 
-            if (normalized.Length > 100)
-                throw new ValidationException($"Category name must be <= 100 characters.");
+            if (normalized.Length > MaxName)
+                throw new ValidationException($"Category name must be <= {MaxName} characters.");
 
             return normalized;
         }
