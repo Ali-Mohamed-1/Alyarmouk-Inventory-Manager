@@ -1,3 +1,5 @@
+using Inventory.Domain.Entities;
+
 namespace Inventory.Application.DTOs;
 
 public record AuditLogResponseDto
@@ -7,7 +9,7 @@ public record AuditLogResponseDto
     public string EntityType { get; init; } = string.Empty;
     public string EntityId { get; init; } = string.Empty;
 
-    public string Action { get; init; } = string.Empty;
+    public string Action { get; init; }
 
     public DateTimeOffset TimestampUtc { get; init; }
 
