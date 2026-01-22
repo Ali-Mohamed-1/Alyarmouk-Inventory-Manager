@@ -15,9 +15,11 @@ namespace Inventory.Infrastructure.Services
     {
         private const int MaxName = 100;
         private readonly AppDbContext _db;
-        public CategoryServices(AppDbContext db)
+        private readonly IAuditLogWriter _auditWriter;
+        public CategoryServices(AppDbContext db, IAuditLogWriter auditWriter)
         {
             _db = db;
+            _auditWriter = auditWriter;
         }
         public async Task<int> CreateAsync(CreateCategoryRequest req, UserContext user, CancellationToken ct = default)
         {
@@ -36,6 +38,23 @@ namespace Inventory.Infrastructure.Services
             var category = new Domain.Entities.Category { Name = normalizedName };
             
             _db.categories.Add(category);
+
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex)
+            {
+                throw new ConflictException("Could not update category due to a database conflict.", ex);
+            }
+
+            await _auditWriter.LogCreateAsync<Inventory.Domain.Entities.Category>(
+                category.Id,
+                user,
+                afterState: new { Name = category.Name },
+                ct
+            );
+
             await _db.SaveChangesAsync(ct);
 
             return category.Id;
@@ -69,25 +88,49 @@ namespace Inventory.Infrastructure.Services
 
         public async Task UpdateAsync(int id, UpdateCategoryRequest req, UserContext user, CancellationToken ct = default)
         {
+            if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id), "Id must be positive.");
             if (req is null) throw new ArgumentNullException(nameof(req));
             ValidateUser(user);
 
-            var entity = await _db.categories.FirstOrDefaultAsync(c => c.Id == id, ct);
+            if (req.Id != 0 && req.Id != id)
+                throw new ArgumentException("Route id does not match request id.", nameof(req));
+
+            var normalizedName = NormalizeAndValidateName(req.Name);
+
+            var entity = await _db.categories
+                .SingleOrDefaultAsync(c => c.Id == id, ct);
+
             if (entity is null)
-                throw new KeyNotFoundException($"Category with id '{id}' was not found.");
+                throw new NotFoundException($"Category id {id} was not found.");
 
-            string normalizedName = NormalizeAndValidateName(req.Name);
+            var beforeState = new { Name = entity.Name };
 
-            if (entity.Name != normalizedName)
+            var duplicateName = await _db.categories
+                .AsNoTracking()
+                .AnyAsync(c => c.Id != id && c.Name.ToUpper() == normalizedName.ToUpper(), ct);
+
+            if (duplicateName)
+                throw new ConflictException($"Category name '{normalizedName}' already exists.");
+
+            entity.Name = normalizedName;
+
+            var afterState = new { Name = entity.Name };
+
+            try
             {
-                var duplicateName = await _db.categories
-                    .AnyAsync(c => c.Id != id && c.Name.ToLower() == normalizedName.ToLower(), ct);
-
-                if (duplicateName)
-                    throw new ValidationException($"A category with the name '{normalizedName}' already exists.");
-
-                entity.Name = normalizedName;
+                await _db.SaveChangesAsync(ct);
             }
+            catch (DbUpdateException ex)
+            {
+                throw new ConflictException("Could not update category due to a database conflict.", ex);
+            }
+
+            await _auditWriter.LogUpdateAsync<Inventory.Domain.Entities.Category>(
+                entity.Id,
+                user,
+                beforeState: beforeState,
+                afterState: afterState,
+                ct);
 
             await _db.SaveChangesAsync(ct);
         }
@@ -115,5 +158,21 @@ namespace Inventory.Infrastructure.Services
         }
 
         #endregion
+    }
+
+    public sealed class NotFoundException : Exception
+    {
+        public NotFoundException(string message) : base(message) { }
+    }
+
+    public sealed class ConflictException : Exception
+    {
+        public ConflictException(string message) : base(message) { }
+        public ConflictException(string message, Exception inner) : base(message, inner) { }
+    }
+
+    public sealed class ValidationException : Exception
+    {
+        public ValidationException(string message) : base(message) { }
     }
 }
