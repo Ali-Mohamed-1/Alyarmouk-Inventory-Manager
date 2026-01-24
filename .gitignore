@@ -419,3 +419,4 @@ FodyWeavers.xsd
 /src/Inventory.Web/appsettings.Development.json
 /src/Inventory.Api/appsettings.Development.json
 /plan_extracted.txt
+/src/Inventory.Infrastructure/Migrations
