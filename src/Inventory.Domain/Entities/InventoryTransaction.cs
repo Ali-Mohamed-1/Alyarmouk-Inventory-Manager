@@ -16,6 +16,9 @@ public sealed class InventoryTransaction
 
     // Signed delta: Receive(+), Issue(-), Adjust(+/-)
     public decimal QuantityDelta { get; set; }
+    
+    // Cost per unit at time of transaction (for financial tracking)
+    public decimal? UnitCost { get; set; }
 
     public InventoryTransactionType Type { get; set; }
 

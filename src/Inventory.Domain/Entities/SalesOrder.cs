@@ -2,11 +2,10 @@ namespace Inventory.Domain.Entities;
 
 public enum SalesOrderStatus
 {
-    Pending,
-    Completed,
-    Cancelled
+    Pending = 0,
+    Completed = 1,
+    Cancelled = 2
 }
-
 public  class SalesOrder
 {
     public long Id { get; set; }
@@ -32,4 +31,5 @@ public class SalesOrderLine
     public string ProductNameSnapshot { get; set; } = "";
     public decimal Quantity { get; set; }
     public string UnitSnapshot { get; set; } = "";
+    public decimal UnitPrice { get; set; } // Price per unit at time of order (snapshot)
 }

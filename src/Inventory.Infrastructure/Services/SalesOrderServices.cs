@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Inventory.Application.Abstractions;
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.SalesOrder;
@@ -88,21 +93,19 @@ namespace Inventory.Infrastructure.Services
                 .Where(s => productIdsList.Contains(s.ProductId))
                 .ToListAsync(ct);
 
-            // Verify sufficient available stock for all products (OnHand - Reserved)
+            // Verify sufficient stock for all products
             foreach (var kvp in lineItems)
             {
                 var productId = kvp.Key;
                 var quantity = kvp.Value;
 
                 var snapshot = stockSnapshots.FirstOrDefault(s => s.ProductId == productId);
-                var availableStock = snapshot != null ? (snapshot.OnHand - snapshot.Reserved) : 0;
+                var availableStock = snapshot?.OnHand ?? 0;
 
                 if (availableStock < quantity)
                 {
                     var product = products.First(p => p.Id == productId);
-                    var onHand = snapshot?.OnHand ?? 0;
-                    var reserved = snapshot?.Reserved ?? 0;
-                    throw new ValidationException($"Insufficient stock for product '{product.Name}'. Available: {availableStock} (OnHand: {onHand}, Reserved: {reserved}), Requested: {quantity}");
+                    throw new ValidationException($"Insufficient stock for product '{product.Name}'. Available: {availableStock}, Requested: {quantity}");
                 }
             }
 
@@ -119,7 +122,6 @@ namespace Inventory.Infrastructure.Services
                     OrderNumber = orderNumber,
                     CustomerId = req.CustomerId,
                     CustomerNameSnapshot = customer.Name,
-                    Status = SalesOrderStatus.Pending,
                     CreatedUtc = DateTimeOffset.UtcNow,
                     CreatedByUserId = user.UserId,
                     CreatedByUserDisplayName = user.UserDisplayName,
@@ -129,6 +131,8 @@ namespace Inventory.Infrastructure.Services
                 _db.SalesOrders.Add(salesOrder);
                 await _db.SaveChangesAsync(ct); // Save to get the ID
 
+                var inventoryTransactions = new List<InventoryTransaction>();
+
                 // Create order lines and update stock
                 foreach (var kvp in lineItems)
                 {
@@ -136,32 +140,77 @@ namespace Inventory.Infrastructure.Services
                     var quantity = kvp.Value;
                     var product = products.First(p => p.Id == productId);
 
-                    // Create order line
+                    // Create order line with price snapshot
                     var orderLine = new SalesOrderLine
                     {
                         SalesOrderId = salesOrder.Id,
                         ProductId = productId,
                         ProductNameSnapshot = product.Name,
                         UnitSnapshot = product.Unit,
-                        Quantity = quantity
+                        Quantity = quantity,
+                        UnitPrice = product.Price // Snapshot price at time of order
                     };
 
                     _db.SalesOrderLines.Add(orderLine);
 
-                    // Reserve stock (increase Reserved, OnHand stays the same)
+                    // Update stock snapshot
                     var snapshot = stockSnapshots.FirstOrDefault(s => s.ProductId == productId);
                     if (snapshot is null)
                     {
                         snapshot = new StockSnapshot
                         {
                             ProductId = productId,
-                            OnHand = 0,
-                            Reserved = 0
+                            OnHand = 0
                         };
                         _db.StockSnapshots.Add(snapshot);
                     }
 
-                    snapshot.Reserved += quantity; // Reserve stock for pending order
+                    snapshot.OnHand -= quantity; // Decrease stock for sale
+
+                    // Create inventory transaction (Issue) with cost tracking
+                    var inventoryTransaction = new InventoryTransaction
+                    {
+                        ProductId = productId,
+                        QuantityDelta = -quantity, // Negative for Issue
+                        UnitCost = product.Cost, // Cost for COGS calculation
+                        Type = InventoryTransactionType.Issue,
+                        TimestampUtc = DateTimeOffset.UtcNow,
+                        UserId = user.UserId,
+                        UserDisplayName = user.UserDisplayName,
+                        clientId = req.CustomerId,
+                        Note = $"Sales order {orderNumber}"
+                    };
+
+                    _db.InventoryTransactions.Add(inventoryTransaction);
+                    inventoryTransactions.Add(inventoryTransaction);
+                }
+
+                await _db.SaveChangesAsync(ct); // Save to get inventory transaction IDs
+
+                // Create financial transactions for COGS (Cost of Goods Sold) for each line
+                for (int i = 0; i < inventoryTransactions.Count; i++)
+                {
+                    var inventoryTransaction = inventoryTransactions[i];
+                    var productId = inventoryTransaction.ProductId;
+                    var product = products.First(p => p.Id == productId);
+                    var quantity = lineItems[productId];
+                    var cogsAmount = product.Cost * quantity;
+
+                    var cogsTransaction = new FinancialTransaction
+                    {
+                        Type = FinancialTransactionType.Expense, // Money going out (COGS)
+                        Amount = cogsAmount,
+                        InventoryTransactionId = inventoryTransaction.Id,
+                        SalesOrderId = salesOrder.Id,
+                        ProductId = productId,
+                        CustomerId = req.CustomerId,
+                        TimestampUtc = DateTimeOffset.UtcNow,
+                        UserId = user.UserId,
+                        UserDisplayName = user.UserDisplayName,
+                        Note = $"COGS for sales order {orderNumber} - {product.Name}"
+                    };
+
+                    _db.FinancialTransactions.Add(cogsTransaction);
                 }
 
                 await _db.SaveChangesAsync(ct);
@@ -175,7 +224,6 @@ namespace Inventory.Infrastructure.Services
                         OrderNumber = salesOrder.OrderNumber,
                         CustomerId = salesOrder.CustomerId,
                         CustomerName = salesOrder.CustomerNameSnapshot,
-                        Status = salesOrder.Status,
                         LineCount = lineItems.Count,
                         Note = salesOrder.Note
                     },
@@ -207,8 +255,8 @@ namespace Inventory.Infrastructure.Services
                     OrderNumber = o.OrderNumber,
                     CustomerId = o.CustomerId,
                     CustomerName = o.CustomerNameSnapshot,
-                    Status = o.Status,
                     CreatedUtc = o.CreatedUtc,
+                    Status = o.Status,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
@@ -217,7 +265,8 @@ namespace Inventory.Infrastructure.Services
                         ProductId = l.ProductId,
                         ProductName = l.ProductNameSnapshot,
                         Quantity = l.Quantity,
-                        Unit = l.UnitSnapshot
+                        Unit = l.UnitSnapshot,
+                        UnitPrice = l.UnitPrice
                     }).ToList()
                 })
                 .SingleOrDefaultAsync(ct);
@@ -240,8 +289,8 @@ namespace Inventory.Infrastructure.Services
                     OrderNumber = o.OrderNumber,
                     CustomerId = o.CustomerId,
                     CustomerName = o.CustomerNameSnapshot,
-                    Status = o.Status,
                     CreatedUtc = o.CreatedUtc,
+                    Status = o.Status,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
@@ -250,7 +299,8 @@ namespace Inventory.Infrastructure.Services
                         ProductId = l.ProductId,
                         ProductName = l.ProductNameSnapshot,
                         Quantity = l.Quantity,
-                        Unit = l.UnitSnapshot
+                        Unit = l.UnitSnapshot,
+                        UnitPrice = l.UnitPrice
                     }).ToList()
                 })
                 .ToListAsync(ct);
@@ -271,8 +321,8 @@ namespace Inventory.Infrastructure.Services
                     OrderNumber = o.OrderNumber,
                     CustomerId = o.CustomerId,
                     CustomerName = o.CustomerNameSnapshot,
-                    Status = o.Status,
                     CreatedUtc = o.CreatedUtc,
+                    Status = o.Status,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
@@ -281,15 +331,15 @@ namespace Inventory.Infrastructure.Services
                         ProductId = l.ProductId,
                         ProductName = l.ProductNameSnapshot,
                         Quantity = l.Quantity,
-                        Unit = l.UnitSnapshot
+                        Unit = l.UnitSnapshot,
+                        UnitPrice = l.UnitPrice
                     }).ToList()
                 })
                 .ToListAsync(ct);
         }
 
-        public async Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default)
+        public async Task CompleteOrderAsync(long orderId, UserContext user, CancellationToken ct = default)
         {
-            if (req is null) throw new ArgumentNullException(nameof(req));
             ValidateUser(user);
 
             if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
@@ -302,39 +352,55 @@ namespace Inventory.Infrastructure.Services
             if (salesOrder is null)
                 throw new NotFoundException($"Sales order id {orderId} was not found.");
 
-            var oldStatus = salesOrder.Status;
-            var newStatus = req.Status;
+            if (salesOrder.Status == SalesOrderStatus.Completed)
+                throw new ValidationException($"Sales order {orderId} is already completed.");
 
-            // If status hasn't changed, nothing to do
-            if (oldStatus == newStatus)
-                return;
-
-            // Validate status transitions
-            ValidateStatusTransition(oldStatus, newStatus);
+            if (salesOrder.Status == SalesOrderStatus.Cancelled)
+                throw new ValidationException($"Cannot complete a cancelled sales order {orderId}.");
 
             // Use transaction to ensure all operations are atomic
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
             {
-                // Handle stock changes based on status transition
-                await HandleStatusTransitionAsync(salesOrder, oldStatus, newStatus, user, ct);
+                decimal totalRevenue = 0;
 
-                // Update order status
-                salesOrder.Status = newStatus;
+                // Create financial transactions for revenue (money coming in)
+                foreach (var line in salesOrder.Lines)
+                {
+                    var lineRevenue = line.UnitPrice * line.Quantity;
+                    totalRevenue += lineRevenue;
+
+                    var revenueTransaction = new FinancialTransaction
+                    {
+                        Type = FinancialTransactionType.Revenue, // Money coming in
+                        Amount = lineRevenue,
+                        SalesOrderId = salesOrder.Id,
+                        ProductId = line.ProductId,
+                        CustomerId = salesOrder.CustomerId,
+                        TimestampUtc = DateTimeOffset.UtcNow,
+                        UserId = user.UserId,
+                        UserDisplayName = user.UserDisplayName,
+                        Note = $"Revenue from sales order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
+                    };
+
+                    _db.FinancialTransactions.Add(revenueTransaction);
+                }
+
+                // Update order status to Completed
+                var previousStatus = salesOrder.Status;
+                salesOrder.Status = SalesOrderStatus.Completed;
 
                 await _db.SaveChangesAsync(ct);
 
-                // AUDIT LOG: Record the status change
+                // AUDIT LOG: Record the order completion
                 await _auditWriter.LogUpdateAsync<SalesOrder>(
                     salesOrder.Id,
                     user,
-                    beforeState: new
-                    {
-                        Status = oldStatus.ToString()
-                    },
+                    beforeState: new { Status = previousStatus.ToString() },
                     afterState: new
                     {
-                        Status = newStatus.ToString()
+                        Status = SalesOrderStatus.Completed.ToString(),
+                        TotalRevenue = totalRevenue
                     },
                     ct);
 
@@ -344,107 +410,52 @@ namespace Inventory.Infrastructure.Services
             catch (DbUpdateException ex)
             {
                 await transaction.RollbackAsync(ct);
-                throw new ConflictException("Could not update order status due to a database conflict.", ex);
+                throw new ConflictException("Could not complete order due to a database conflict.", ex);
             }
         }
 
-        private static void ValidateStatusTransition(SalesOrderStatus oldStatus, SalesOrderStatus newStatus)
+        public async Task UpdateOrderStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default)
         {
-            // Define valid transitions
-            var validTransitions = new Dictionary<SalesOrderStatus, HashSet<SalesOrderStatus>>
+            ValidateUser(user);
+
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+            if (req is null) throw new ArgumentNullException(nameof(req));
+
+            // Load the order
+            var salesOrder = await _db.SalesOrders
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (salesOrder is null)
+                throw new NotFoundException($"Sales order id {orderId} was not found.");
+
+            // Validate status transition
+            if (salesOrder.Status == req.Status)
+                throw new ValidationException($"Sales order {orderId} is already in status {req.Status}.");
+
+            // Use transaction to ensure all operations are atomic
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
             {
-                { SalesOrderStatus.Pending, new HashSet<SalesOrderStatus> { SalesOrderStatus.Completed, SalesOrderStatus.Cancelled } },
-                { SalesOrderStatus.Completed, new HashSet<SalesOrderStatus> { SalesOrderStatus.Cancelled } },
-                { SalesOrderStatus.Cancelled, new HashSet<SalesOrderStatus>() } // Cannot transition from cancelled
-            };
+                var previousStatus = salesOrder.Status;
+                salesOrder.Status = req.Status;
 
-            if (!validTransitions.ContainsKey(oldStatus))
-                throw new ValidationException($"Invalid current status: {oldStatus}");
+                await _db.SaveChangesAsync(ct);
 
-            if (!validTransitions[oldStatus].Contains(newStatus))
-                throw new ValidationException($"Invalid status transition from {oldStatus} to {newStatus}.");
-        }
+                // AUDIT LOG: Record the status update
+                await _auditWriter.LogUpdateAsync<SalesOrder>(
+                    salesOrder.Id,
+                    user,
+                    beforeState: new { Status = previousStatus.ToString() },
+                    afterState: new { Status = req.Status.ToString() },
+                    ct);
 
-        private async Task HandleStatusTransitionAsync(
-            SalesOrder salesOrder,
-            SalesOrderStatus oldStatus,
-            SalesOrderStatus newStatus,
-            UserContext user,
-            CancellationToken ct)
-        {
-            // Load all stock snapshots for products in this order
-            var productIds = salesOrder.Lines.Select(l => l.ProductId).ToList();
-            var stockSnapshots = await _db.StockSnapshots
-                .Where(s => productIds.Contains(s.ProductId))
-                .ToListAsync(ct);
-
-            foreach (var line in salesOrder.Lines)
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateException ex)
             {
-                var snapshot = stockSnapshots.FirstOrDefault(s => s.ProductId == line.ProductId);
-                if (snapshot is null)
-                {
-                    snapshot = new StockSnapshot
-                    {
-                        ProductId = line.ProductId,
-                        OnHand = 0,
-                        Reserved = 0
-                    };
-                    _db.StockSnapshots.Add(snapshot);
-                }
-
-                // Handle transitions
-                if (oldStatus == SalesOrderStatus.Pending && newStatus == SalesOrderStatus.Completed)
-                {
-                    // Pending → Completed: Convert reserved stock to actual issue
-                    // Decrease Reserved and OnHand, create Issue transaction
-                    snapshot.Reserved -= line.Quantity;
-                    snapshot.OnHand -= line.Quantity;
-
-                    var inventoryTransaction = new InventoryTransaction
-                    {
-                        ProductId = line.ProductId,
-                        QuantityDelta = -line.Quantity, // Negative for Issue
-                        Type = InventoryTransactionType.Issue,
-                        TimestampUtc = DateTimeOffset.UtcNow,
-                        UserId = user.UserId,
-                        UserDisplayName = user.UserDisplayName,
-                        clientId = salesOrder.CustomerId,
-                        Note = $"Sales order {salesOrder.OrderNumber} - Status changed to Completed"
-                    };
-
-                    _db.InventoryTransactions.Add(inventoryTransaction);
-                }
-                else if (oldStatus == SalesOrderStatus.Pending && newStatus == SalesOrderStatus.Cancelled)
-                {
-                    // Pending → Cancelled: Release reservation
-                    // Decrease Reserved only, OnHand stays the same
-                    snapshot.Reserved -= line.Quantity;
-                }
-                else if (oldStatus == SalesOrderStatus.Completed && newStatus == SalesOrderStatus.Cancelled)
-                {
-                    // Completed → Cancelled: Return stock to inventory
-                    // Increase OnHand, decrease Reserved (if any was still reserved)
-                    snapshot.OnHand += line.Quantity;
-                    // Note: Reserved should already be 0 for completed orders, but handle edge cases
-                    if (snapshot.Reserved > 0)
-                    {
-                        snapshot.Reserved = Math.Max(0, snapshot.Reserved - line.Quantity);
-                    }
-
-                    var inventoryTransaction = new InventoryTransaction
-                    {
-                        ProductId = line.ProductId,
-                        QuantityDelta = line.Quantity, // Positive for Receive (return)
-                        Type = InventoryTransactionType.Receive,
-                        TimestampUtc = DateTimeOffset.UtcNow,
-                        UserId = user.UserId,
-                        UserDisplayName = user.UserDisplayName,
-                        clientId = salesOrder.CustomerId,
-                        Note = $"Sales order {salesOrder.OrderNumber} - Status changed to Cancelled (stock return)"
-                    };
-
-                    _db.InventoryTransactions.Add(inventoryTransaction);
-                }
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not update order status due to a database conflict.", ex);
             }
         }
 
