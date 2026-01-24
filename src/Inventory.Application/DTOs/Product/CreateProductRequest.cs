@@ -15,6 +15,10 @@ namespace Inventory.Application.DTOs.Product
         [Required]
         public int CategoryId { get; init; }
 
+        [Range(0, 100000)]
+        [Required]
+        public decimal Price { get; init; }
+
         public string Unit { get; init; } = "pcs";
 
         [Range(0, 1000000)]
