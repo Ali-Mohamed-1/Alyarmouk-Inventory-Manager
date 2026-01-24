@@ -24,5 +24,10 @@ namespace Inventory.Application.Abstractions
         /// Fetches the most recent orders
         /// </summary>
         Task<IReadOnlyList<SalesOrderResponseDto>> GetRecentAsync(int take = 50, CancellationToken ct = default);
+
+        /// <summary>
+        /// Updates the status of a sales order and handles stock accordingly
+        /// </summary>
+        Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default);
     }
 }

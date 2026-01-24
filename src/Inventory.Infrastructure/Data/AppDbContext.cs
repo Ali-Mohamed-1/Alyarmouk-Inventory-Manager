@@ -1,4 +1,4 @@
-﻿using Inventory.Domain.Entities;
+using Inventory.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +34,7 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.Sku).HasMaxLength(64).IsRequired();
                 b.HasIndex(x => x.Sku).IsUnique();
                 b.Property(x => x.Name).HasMaxLength(200).IsRequired();
+                b.Property(x => x.Price).HasPrecision(18, 2);
                 b.Property(x => x.Unit).HasMaxLength(32).IsRequired();
                 b.Property(x => x.ReorderPoint).HasPrecision(18, 2);
                 b.Property(x => x.RowVersion).IsRowVersion();
@@ -44,6 +45,7 @@ namespace Inventory.Infrastructure.Data
             {
                 b.HasKey(x => x.ProductId);
                 b.Property(x => x.OnHand).HasPrecision(18, 2);
+                b.Property(x => x.Reserved).HasPrecision(18, 2);
                 b.Property(x => x.RowVersion).IsRowVersion();
                 b.HasOne(x => x.Product).WithOne().HasForeignKey<StockSnapshot>(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
             });
@@ -82,11 +84,16 @@ namespace Inventory.Infrastructure.Data
             {
                 b.Property(x => x.OrderNumber).HasMaxLength(50).IsRequired();
                 b.HasIndex(x => x.OrderNumber).IsUnique();
+                b.Property(x => x.Status)
+                    .HasConversion<string>()
+                    .HasMaxLength(20)
+                    .IsRequired();
                 b.Property(x => x.CustomerNameSnapshot).HasMaxLength(200).IsRequired();
                 b.Property(x => x.CreatedByUserId).HasMaxLength(450).IsRequired();
                 b.Property(x => x.CreatedByUserDisplayName).HasMaxLength(200).IsRequired();
                 b.Property(x => x.Note).HasMaxLength(500);
                 b.HasIndex(x => x.CreatedUtc);
+                b.HasIndex(x => x.Status);
                 b.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
             });
 

@@ -79,16 +79,18 @@ namespace Inventory.Infrastructure.Services
                     snapshot = new StockSnapshot
                     {
                         ProductId = req.ProductId,
-                        OnHand = 0
+                        OnHand = 0,
+                        Reserved = 0
                     };
                     _db.StockSnapshots.Add(snapshot);
                 }
 
-                // For Issue transactions, ensure we have enough stock
+                // For Issue transactions, ensure we have enough available stock (OnHand - Reserved)
                 if (req.Type == InventoryTransactionType.Issue)
                 {
-                    if (snapshot.OnHand + quantityDelta < 0)
-                        throw new ValidationException($"Insufficient stock. Available: {snapshot.OnHand}, Requested: {req.Quantity}");
+                    var availableStock = snapshot.OnHand - snapshot.Reserved;
+                    if (availableStock < req.Quantity)
+                        throw new ValidationException($"Insufficient stock. Available: {availableStock} (OnHand: {snapshot.OnHand}, Reserved: {snapshot.Reserved}), Requested: {req.Quantity}");
                 }
 
                 // Update stock snapshot

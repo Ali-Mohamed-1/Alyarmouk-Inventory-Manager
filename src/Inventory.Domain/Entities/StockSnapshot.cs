@@ -6,6 +6,10 @@ public class StockSnapshot
     public Product? Product { get; set; }
 
     public decimal OnHand { get; set; }
+    public decimal Reserved { get; set; }
+
+    // Calculated property: Available = OnHand - Reserved
+    public decimal Available => OnHand - Reserved;
 
     // Optimistic concurrency for stock updates
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
