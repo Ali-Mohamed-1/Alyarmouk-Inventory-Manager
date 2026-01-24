@@ -1,4 +1,6 @@
-﻿namespace Inventory.Application.DTOs.SalesOrder
+﻿using Inventory.Domain.Entities;
+
+namespace Inventory.Application.DTOs.SalesOrder
 {
     public record SalesOrderResponseDto
     {
@@ -8,6 +10,7 @@
         public string CustomerName { get; init; } = string.Empty; // Mapped from CustomerNameSnapshot
 
         public DateTimeOffset CreatedUtc { get; init; }
+        public SalesOrderStatus Status { get; init; }
         public string CreatedByUserDisplayName { get; init; } = string.Empty;
         public string? Note { get; init; }
 

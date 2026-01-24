@@ -1,5 +1,12 @@
 namespace Inventory.Domain.Entities;
 
+public enum SalesOrderStatus
+{
+    Pending,
+    Completed,
+    Cancelled
+}
+
 public  class SalesOrder
 {
     public long Id { get; set; }
@@ -7,6 +14,7 @@ public  class SalesOrder
     public int CustomerId { get; set; }
     public Customer? Customer { get; set; }
     public string CustomerNameSnapshot { get; set; } = "";
+    public SalesOrderStatus Status { get; set; } = SalesOrderStatus.Pending;
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public string CreatedByUserId { get; set; } = "";
     public string CreatedByUserDisplayName { get; set; } = "";
