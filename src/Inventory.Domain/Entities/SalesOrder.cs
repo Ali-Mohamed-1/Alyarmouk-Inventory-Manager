@@ -12,6 +12,12 @@ public  class SalesOrder
     public string CreatedByUserDisplayName { get; set; } = "";
     public string? Note { get; set; }
     public List<SalesOrderLine> Lines { get; set; } = new();
+
+    public bool IsTaxInclusive { get; set; } = true; // Sales always include tax
+    public decimal Subtotal { get; set; } // Base amount before taxes
+    public decimal VatAmount { get; set; } // VAT amount (14%)
+    public decimal ManufacturingTaxAmount { get; set; } // Manufacturing tax amount (1%)
+    public decimal TotalAmount { get; set; } // Final total including all taxes
 }
 
 public class SalesOrderLine
@@ -25,5 +31,9 @@ public class SalesOrderLine
     public decimal Quantity { get; set; }
     public string UnitSnapshot { get; set; } = "";
     public decimal UnitPrice { get; set; }
-    public decimal LineTotal => Quantity * UnitPrice;
+    public bool IsTaxInclusive { get; set; } = true; // Inherited from order
+    public decimal LineSubtotal { get; set; } // Base amount for this line
+    public decimal LineVatAmount { get; set; } // VAT for this line
+    public decimal LineManufacturingTaxAmount { get; set; } // Manufacturing tax for this line
+    public decimal LineTotal { get; set; } // Total for this line including taxes
 }
