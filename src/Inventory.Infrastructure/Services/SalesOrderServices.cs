@@ -46,7 +46,8 @@ namespace Inventory.Infrastructure.Services
                 throw new NotFoundException($"Customer id {req.CustomerId} was not found.");
 
             // Validate and group line items by product (combine quantities if duplicate products)
-            var lineItems = new Dictionary<int, decimal>();
+            // Store both quantity and unit price (use first price if product appears multiple times)
+            var lineItems = new Dictionary<int, (decimal Quantity, decimal UnitPrice)>();
             var productIds = new HashSet<int>();
 
             foreach (var line in req.Lines)
@@ -57,13 +58,17 @@ namespace Inventory.Infrastructure.Services
                 if (line.Quantity <= 0)
                     throw new ValidationException("Quantity must be greater than zero for all line items.");
 
+                if (line.UnitPrice < 0)
+                    throw new ValidationException("Unit price cannot be negative.");
+
                 if (lineItems.ContainsKey(line.ProductId))
                 {
-                    lineItems[line.ProductId] += line.Quantity;
+                    var existing = lineItems[line.ProductId];
+                    lineItems[line.ProductId] = (existing.Quantity + line.Quantity, existing.UnitPrice);
                 }
                 else
                 {
-                    lineItems[line.ProductId] = line.Quantity;
+                    lineItems[line.ProductId] = (line.Quantity, line.UnitPrice);
                     productIds.Add(line.ProductId);
                 }
             }
@@ -93,14 +98,14 @@ namespace Inventory.Infrastructure.Services
                 .Where(s => productIdsList.Contains(s.ProductId))
                 .ToListAsync(ct);
 
-            // Verify sufficient stock for all products
+            // Verify sufficient available stock for all products
             foreach (var kvp in lineItems)
             {
                 var productId = kvp.Key;
-                var quantity = kvp.Value;
+                var quantity = kvp.Value.Quantity;
 
                 var snapshot = stockSnapshots.FirstOrDefault(s => s.ProductId == productId);
-                var availableStock = snapshot?.OnHand ?? 0;
+                var availableStock = snapshot?.Available ?? 0;
 
                 if (availableStock < quantity)
                 {
@@ -135,7 +140,8 @@ namespace Inventory.Infrastructure.Services
                 foreach (var kvp in lineItems)
                 {
                     var productId = kvp.Key;
-                    var quantity = kvp.Value;
+                    var quantity = kvp.Value.Quantity;
+                    var unitPrice = kvp.Value.UnitPrice;
                     var product = products.First(p => p.Id == productId);
 
                     // Create order line
@@ -145,24 +151,33 @@ namespace Inventory.Infrastructure.Services
                         ProductId = productId,
                         ProductNameSnapshot = product.Name,
                         UnitSnapshot = product.Unit,
-                        Quantity = quantity
+                        Quantity = quantity,
+                        UnitPrice = unitPrice
                     };
 
                     _db.SalesOrderLines.Add(orderLine);
 
-                    // Update stock snapshot
+                    // Update stock snapshot - preserve quantity for the order
+                    // In a real system, you would preserve when order is created, then fulfill later
+                    // For this demo, we'll preserve the stock to show the feature
                     var snapshot = stockSnapshots.FirstOrDefault(s => s.ProductId == productId);
                     if (snapshot is null)
                     {
                         snapshot = new StockSnapshot
                         {
                             ProductId = productId,
-                            OnHand = 0
+                            OnHand = 0,
+                            Preserved = 0
                         };
                         _db.StockSnapshots.Add(snapshot);
                     }
 
-                    snapshot.OnHand -= quantity; // Decrease stock for sale
+                    // Reserve stock for the order (preserve it)
+                    snapshot.Preserved += quantity;
+                    
+                    // For demo purposes, we'll also decrease OnHand to simulate fulfillment
+                    // In production, you'd decrease OnHand only when order is fulfilled
+                    snapshot.OnHand -= quantity;
 
                     // Create inventory transaction (Issue) directly in the same transaction
                     var inventoryTransaction = new InventoryTransaction
@@ -231,7 +246,9 @@ namespace Inventory.Infrastructure.Services
                         ProductId = l.ProductId,
                         ProductName = l.ProductNameSnapshot,
                         Quantity = l.Quantity,
-                        Unit = l.UnitSnapshot
+                        Unit = l.UnitSnapshot,
+                        UnitPrice = l.UnitPrice,
+                        LineTotal = l.LineTotal
                     }).ToList()
                 })
                 .SingleOrDefaultAsync(ct);
@@ -263,7 +280,9 @@ namespace Inventory.Infrastructure.Services
                         ProductId = l.ProductId,
                         ProductName = l.ProductNameSnapshot,
                         Quantity = l.Quantity,
-                        Unit = l.UnitSnapshot
+                        Unit = l.UnitSnapshot,
+                        UnitPrice = l.UnitPrice,
+                        LineTotal = l.LineTotal
                     }).ToList()
                 })
                 .ToListAsync(ct);
@@ -293,7 +312,9 @@ namespace Inventory.Infrastructure.Services
                         ProductId = l.ProductId,
                         ProductName = l.ProductNameSnapshot,
                         Quantity = l.Quantity,
-                        Unit = l.UnitSnapshot
+                        Unit = l.UnitSnapshot,
+                        UnitPrice = l.UnitPrice,
+                        LineTotal = l.LineTotal
                     }).ToList()
                 })
                 .ToListAsync(ct);

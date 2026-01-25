@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Inventory.Application.DTOs.SalesOrder
 {
@@ -10,5 +10,9 @@ namespace Inventory.Application.DTOs.SalesOrder
         [Required]
         [Range(0.001, 1000000, ErrorMessage = "Quantity must be greater than zero.")]
         public decimal Quantity { get; init; }
+
+        [Required]
+        [Range(0, 10000000, ErrorMessage = "Unit price must be greater than or equal to zero.")]
+        public decimal UnitPrice { get; init; }
     }
 }

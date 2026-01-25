@@ -1,4 +1,6 @@
-﻿namespace Inventory.Application.DTOs.SalesOrder
+using System.Linq;
+
+namespace Inventory.Application.DTOs.SalesOrder
 {
     public record SalesOrderResponseDto
     {
@@ -13,5 +15,8 @@
 
         // Nested list of order items
         public List<SalesOrderLineResponseDto> Lines { get; init; } = new();
+        
+        // Calculated total
+        public decimal TotalAmount => Lines.Sum(l => l.LineTotal);
     }
 }

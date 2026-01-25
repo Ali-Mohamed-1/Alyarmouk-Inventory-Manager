@@ -1,4 +1,4 @@
-﻿using Inventory.Domain.Entities;
+using Inventory.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +44,7 @@ namespace Inventory.Infrastructure.Data
             {
                 b.HasKey(x => x.ProductId);
                 b.Property(x => x.OnHand).HasPrecision(18, 2);
+                b.Property(x => x.Preserved).HasPrecision(18, 2);
                 b.Property(x => x.RowVersion).IsRowVersion();
                 b.HasOne(x => x.Product).WithOne().HasForeignKey<StockSnapshot>(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
             });
@@ -95,6 +96,7 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.ProductNameSnapshot).HasMaxLength(200).IsRequired();
                 b.Property(x => x.UnitSnapshot).HasMaxLength(32).IsRequired();
                 b.Property(x => x.Quantity).HasPrecision(18, 2);
+                b.Property(x => x.UnitPrice).HasPrecision(18, 2);
                 b.HasIndex(x => x.SalesOrderId);
                 b.HasOne(x => x.SalesOrder).WithMany(o => o.Lines).HasForeignKey(x => x.SalesOrderId).OnDelete(DeleteBehavior.Cascade);
                 b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);

@@ -24,4 +24,6 @@ public class SalesOrderLine
     public string ProductNameSnapshot { get; set; } = "";
     public decimal Quantity { get; set; }
     public string UnitSnapshot { get; set; } = "";
+    public decimal UnitPrice { get; set; }
+    public decimal LineTotal => Quantity * UnitPrice;
 }

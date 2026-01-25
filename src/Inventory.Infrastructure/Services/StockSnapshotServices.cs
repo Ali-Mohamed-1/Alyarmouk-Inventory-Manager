@@ -34,6 +34,8 @@ namespace Inventory.Infrastructure.Services
                     ProductName = s.Product != null ? s.Product.Name : string.Empty,
                     Sku = s.Product != null ? s.Product.Sku : string.Empty,
                     OnHand = s.OnHand,
+                    Preserved = s.Preserved,
+                    Available = s.OnHand - s.Preserved, // Calculate Available (OnHand - Preserved)
                     RowVersion = Convert.ToBase64String(s.RowVersion)
                 })
                 .ToListAsync(ct);
@@ -53,6 +55,8 @@ namespace Inventory.Infrastructure.Services
                     ProductName = s.Product != null ? s.Product.Name : string.Empty,
                     Sku = s.Product != null ? s.Product.Sku : string.Empty,
                     OnHand = s.OnHand,
+                    Preserved = s.Preserved,
+                    Available = s.OnHand - s.Preserved, // Calculate Available (OnHand - Preserved)
                     RowVersion = Convert.ToBase64String(s.RowVersion)
                 })
                 .SingleOrDefaultAsync(ct);

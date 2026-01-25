@@ -1,8 +1,910 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@{
+    ViewData["Title"] = "Al-Yarmouk Inventory";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="demo-container">
+    <!-- Header Section -->
+    <div class="mb-4">
+        <h1>Inventory Management System</h1>
+        <p class="text-muted">Comprehensive inventory tracking with money management and stock preservation</p>
+    </div>
+
+    <!-- Tabs Navigation -->
+    <div class="tabs-container">
+        <div class="tabs-nav">
+            <button class="tab-btn active" onclick="switchTab('dashboard')">
+                <span>📊</span> Dashboard
+            </button>
+            <button class="tab-btn" onclick="switchTab('orders')">
+                <span>📦</span> Orders
+            </button>
+            <button class="tab-btn" onclick="switchTab('customers')">
+                <span>👥</span> Customers
+            </button>
+            <button class="tab-btn" onclick="switchTab('suppliers')">
+                <span>🏭</span> Suppliers
+            </button>
+            <button class="tab-btn" onclick="switchTab('transactions')">
+                <span>🔄</span> Transactions
+            </button>
+            <button class="tab-btn" onclick="switchTab('categories')">
+                <span>🏷️</span> Categories
+            </button>
+            <button class="tab-btn" onclick="switchTab('audit')">
+                <span>📋</span> Audit Trails
+            </button>
+            <button class="tab-btn" onclick="switchTab('financial')">
+                <span>💰</span> Financial Tracking
+            </button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="tab-dashboard" class="tab-content active">
+            <!-- Stats Overview -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Products</div>
+                    <div class="stat-value" id="totalProducts">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Sales Orders</div>
+                    <div class="stat-value" id="totalOrders">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Low Stock Items</div>
+                    <div class="stat-value" id="lowStockCount">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Purchase Orders</div>
+                    <div class="stat-value" id="totalPurchaseOrders">-</div>
+                </div>
+            </div>
+
+            <!-- Stock Operations -->
+            <div class="section">
+                <h2 class="section-title">Stock Operations</h2>
+                <div class="stock-operations">
+                    <button class="btn btn-primary btn-stock-operation" onclick="showReceiveStockModal()">
+                        <span>📥</span> Receive Stock
+                    </button>
+                    <button class="btn btn-danger btn-stock-operation" onclick="showIssueStockModal()">
+                        <span>📤</span> Issue Stock
+                    </button>
+                    <button class="btn btn-warning btn-stock-operation" onclick="showAdjustStockModal()">
+                        <span>⚖️</span> Adjust Stock
+                    </button>
+                </div>
+            </div>
+
+            <!-- Products & Stock Section -->
+            <div class="section">
+                <h2 class="section-title">Products & Stock Levels</h2>
+                <div class="card">
+                    <div class="card-header">
+                        Product Inventory
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table" id="productsTable">
+                                <thead>
+                                    <tr>
+                                        <th>SKU</th>
+                                        <th>Product Name</th>
+                                        <th>Category</th>
+                                        <th>On Hand</th>
+                                        <th>Preserved</th>
+                                        <th>Available</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted">Loading products...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Orders Tab -->
+        <div id="tab-orders" class="tab-content">
+            <div class="section-header">
+                <h2 class="section-title">Sales Orders</h2>
+                <button class="btn btn-primary" onclick="showCreateOrderModal()">
+                    <span>➕</span> Create New Order
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    Recent Sales Orders
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table" id="ordersTable">
+                            <thead>
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Customer</th>
+                                    <th>Date</th>
+                                    <th>Items</th>
+                                    <th>Total Amount</th>
+                                    <th>Payment Status</th>
+                                    <th>Created By</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted">Loading orders...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Details Section -->
+            <div class="section mt-3">
+                <h2 class="section-title">Order Details</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <div id="orderDetails">
+                            <p class="text-muted text-center">Select an order to view details</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Customers Tab -->
+        <div id="tab-customers" class="tab-content">
+            <div class="section-header">
+                <h2 class="section-title">Customers</h2>
+                <button class="btn btn-primary" onclick="showCreateCustomerModal()">
+                    <span>➕</span> Add Customer
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    Customer List
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table" id="customersTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Email</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Loading customers...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customer History Section -->
+            <div class="section mt-3">
+                <h2 class="section-title">Customer History</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <div id="customerHistory">
+                            <p class="text-muted text-center">Select a customer to view their order history</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Suppliers Tab -->
+        <div id="tab-suppliers" class="tab-content">
+            <div class="section-header">
+                <h2 class="section-title">Suppliers</h2>
+                <button class="btn btn-primary" onclick="showCreateSupplierModal()">
+                    <span>➕</span> Add Supplier
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    Supplier List
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table" id="suppliersTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Email</th>
+                                    <th>Address</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted">Loading suppliers...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Supplier History Section -->
+            <div class="section mt-3">
+                <h2 class="section-title">Supplier History</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <div id="supplierHistory">
+                            <p class="text-muted text-center">Select a supplier to view their purchase order history</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions Tab -->
+        <div id="tab-transactions" class="tab-content">
+            <h2 class="section-title">Inventory Transactions</h2>
+            <div class="card">
+                <div class="card-header">
+                    Recent Transactions
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table" id="transactionsTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Product</th>
+                                    <th>Type</th>
+                                    <th>Quantity</th>
+                                    <th>Customer</th>
+                                    <th>User</th>
+                                    <th>Date</th>
+                                    <th>Note</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted">Loading transactions...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories Tab -->
+        <div id="tab-categories" class="tab-content">
+            <div class="section-header">
+                <h2 class="section-title">Categories</h2>
+                <button class="btn btn-primary" onclick="showCreateCategoryModal()">
+                    <span>➕</span> Add Category
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    Category List
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table" id="categoriesTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Category Name</th>
+                                    <th>Products Count</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">Loading categories...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audit Trails Tab -->
+        <div id="tab-audit" class="tab-content">
+            <h2 class="section-title">Audit Trails</h2>
+            <div class="card">
+                <div class="card-header">
+                    Recent Audit Logs
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table" id="auditTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Entity Type</th>
+                                    <th>Entity ID</th>
+                                    <th>Action</th>
+                                    <th>User</th>
+                                    <th>Timestamp</th>
+                                    <th>Changes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted">Loading audit logs...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Financial Tracking Tab -->
+        <div id="tab-financial" class="tab-content">
+            <div class="section-header">
+                <h2 class="section-title">Financial Tracking</h2>
+            </div>
+
+            <!-- Period Selector -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Period</label>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                            <select id="periodPreset" class="form-control" style="width: auto; min-width: 150px;" onchange="updatePeriodFromPreset()">
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month" selected>This Month</option>
+                                <option value="quarter">This Quarter</option>
+                                <option value="year">This Year</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                            <input type="date" id="periodFromDate" class="form-control" style="width: auto;">
+                            <span>to</span>
+                            <input type="date" id="periodToDate" class="form-control" style="width: auto;">
+                            <button class="btn btn-primary" onclick="updateFinancialData()">Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profit Cards -->
+            <div class="stats-grid" style="margin-bottom: 2rem;">
+                <div class="stat-card">
+                    <div class="stat-label">Gross Profit</div>
+                    <div class="stat-value currency" id="grossProfit">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Net Profit</div>
+                    <div class="stat-value currency" id="netProfit">$0.00</div>
+                </div>
+            </div>
+
+            <!-- Tax Liabilities -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 style="margin: 0;">Tax Liabilities</h3>
+                </div>
+                <div class="card-body">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                        <div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">VAT Payable</div>
+                            <div class="stat-value currency" id="vatPayable" style="color: var(--danger);">$0.00</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Manufacturing Tax Payable</div>
+                            <div class="stat-value currency" id="manufacturingTaxPayable" style="color: var(--danger);">$0.00</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Total Tax Liability</div>
+                            <div class="stat-value currency" id="totalTaxLiability" style="color: var(--danger); font-weight: bold;">$0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Internal Expenses -->
+            <div class="card mb-3">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0;">Internal Expenses</h3>
+                    <button class="btn btn-primary btn-sm" onclick="showAddExpenseModal()">
+                        <span>➕</span> Add Expense
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table" id="expensesTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                    <th>Created By</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Loading expenses...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profitability Breakdown -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 style="margin: 0;">Profitability Breakdown</h3>
+                </div>
+                <div class="card-body">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+                        <div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Revenue (Sales)</div>
+                            <div class="stat-value currency" id="revenue">$0.00</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Cost of Goods Sold</div>
+                            <div class="stat-value currency" id="costOfGoodsSold">$0.00</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Gross Profit</div>
+                            <div class="stat-value currency" id="grossProfitDetail">$0.00</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Internal Expenses</div>
+                            <div class="stat-value currency" id="internalExpensesTotal">$0.00</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Net Profit</div>
+                            <div class="stat-value currency" id="netProfitDetail">$0.00</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Profit Margin</div>
+                            <div class="stat-value" id="profitMargin" style="font-weight: bold;">0.00%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Create Order Modal -->
+<div id="createOrderModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create New Sales Order</h3>
+            <button class="modal-close" onclick="closeCreateOrderModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="createOrderForm">
+                <div class="form-group">
+                    <label>Customer</label>
+                    <select id="orderCustomerId" class="form-control" required>
+                        <option value="">Select a customer...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Note (Optional)</label>
+                    <textarea id="orderNote" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Order Items</label>
+                    <div id="orderItems">
+                        <div class="order-item">
+                            <select class="form-control order-product" required>
+                                <option value="">Select product...</option>
+                            </select>
+                            <input type="number" class="form-control order-quantity" placeholder="Quantity" min="0.01" step="0.01" required oninput="updateOrderTotal()">
+                            <input type="number" class="form-control order-price" placeholder="Unit Price" min="0" step="0.01" required oninput="updateOrderTotal()">
+                            <button type="button" class="btn btn-outline" onclick="removeOrderItem(this)">Remove</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline mt-2" onclick="addOrderItem()">+ Add Item</button>
+                </div>
+                <div class="form-group">
+                    <label>Tax Settings</label>
+                    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="orderTaxInclusive" checked onchange="updateOrderTotal()">
+                            Prices include VAT (14%) + Manufacturing (1%)
+                        </label>
+                    </div>
+                    <small class="text-muted">If unchecked, unit prices are before tax.</small>
+                </div>
+                <div class="form-group">
+                    <label>Tax Breakdown</label>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
+                        <div>
+                            <div class="text-muted" style="font-size: 0.85rem;">Subtotal (Before Tax)</div>
+                            <div class="stat-value currency" id="orderSubtotal">$0.00</div>
+                        </div>
+                        <div>
+                            <div class="text-muted" style="font-size: 0.85rem;">VAT (14%)</div>
+                            <div class="stat-value currency" id="orderVatAmount">$0.00</div>
+                        </div>
+                        <div>
+                            <div class="text-muted" style="font-size: 0.85rem;">Manufacturing Tax (1%)</div>
+                            <div class="stat-value currency" id="orderManufacturingTaxAmount">$0.00</div>
+                        </div>
+                        <div>
+                            <div class="text-muted" style="font-size: 0.85rem;">Total Amount</div>
+                            <div class="stat-value currency" id="orderTotal">$0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeCreateOrderModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="submitOrder()">Create Order</button>
+        </div>
+    </div>
+</div>
+
+<!-- Create Category Modal -->
+<div id="createCategoryModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add New Category</h3>
+            <button class="modal-close" onclick="closeCreateCategoryModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="createCategoryForm">
+                <div class="form-group">
+                    <label>Category Name *</label>
+                    <input type="text" id="categoryName" class="form-control" required>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeCreateCategoryModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="submitCategory()">Create Category</button>
+        </div>
+    </div>
+</div>
+
+<!-- Receive Stock Modal -->
+<div id="receiveStockModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Receive Stock</h3>
+            <button class="modal-close" onclick="closeReceiveStockModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="receiveStockForm">
+                <div class="form-group">
+                    <label>Supplier *</label>
+                    <select id="receiveSupplierId" class="form-control" required>
+                        <option value="">Select supplier...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Product *</label>
+                    <select id="receiveProductId" class="form-control" required>
+                        <option value="">Select product...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quantity *</label>
+                    <input type="number" id="receiveQuantity" class="form-control" min="0.01" step="0.01" required oninput="updateReceiveTotals()">
+                </div>
+                <div class="form-group">
+                    <label>Unit Cost *</label>
+                    <input type="number" id="receiveUnitCost" class="form-control" min="0" step="0.01" required oninput="updateReceiveTotals()">
+                </div>
+                <div class="form-group">
+                    <label>Tax Settings</label>
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="receiveTaxInclusive" checked onchange="updateReceiveTotals()">
+                        Prices include VAT (14%) + Manufacturing (1%)
+                    </label>
+                    <small class="text-muted">If unchecked, unit cost is before tax.</small>
+                </div>
+                <div class="form-group">
+                    <label>Receipt Expenses</label>
+                    <input type="number" id="receiveReceiptExpenses" class="form-control" min="0" step="0.01" value="0" oninput="updateReceiveTotals()">
+                </div>
+                <div class="form-group">
+                    <label>Tax Breakdown</label>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
+                        <div>
+                            <div class="text-muted" style="font-size: 0.85rem;">Subtotal (Before Tax)</div>
+                            <div class="stat-value currency" id="receiveSubtotal">$0.00</div>
+                        </div>
+                        <div>
+                            <div class="text-muted" style="font-size: 0.85rem;">VAT (14%)</div>
+                            <div class="stat-value currency" id="receiveVatAmount">$0.00</div>
+                        </div>
+                        <div>
+                            <div class="text-muted" style="font-size: 0.85rem;">Manufacturing Tax (1%)</div>
+                            <div class="stat-value currency" id="receiveManufacturingTaxAmount">$0.00</div>
+                        </div>
+                        <div>
+                            <div class="text-muted" style="font-size: 0.85rem;">Total Cost</div>
+                            <div class="stat-value currency" id="receiveTotal">$0.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Note (Optional)</label>
+                    <textarea id="receiveNote" class="form-control" rows="3" placeholder="e.g., New shipment received, Stock replenishment"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeReceiveStockModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="submitReceiveStock()">Receive Stock</button>
+        </div>
+    </div>
+</div>
+
+<!-- Issue Stock Modal -->
+<div id="issueStockModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Issue Stock (Loss/Damage)</h3>
+            <button class="modal-close" onclick="closeIssueStockModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="issueStockForm">
+                <div class="form-group">
+                    <label>Product *</label>
+                    <select id="issueProductId" class="form-control" required>
+                        <option value="">Select product...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quantity *</label>
+                    <input type="number" id="issueQuantity" class="form-control" min="0.01" step="0.01" required>
+                    <small class="text-muted">Available: <span id="issueAvailableStock">-</span></small>
+                </div>
+                <div class="form-group">
+                    <label>Reason *</label>
+                    <select id="issueReason" class="form-control" required>
+                        <option value="">Select reason...</option>
+                        <option value="Damage">Damage</option>
+                        <option value="Expired">Expired</option>
+                        <option value="Loss">Loss</option>
+                        <option value="Theft">Theft</option>
+                        <option value="Waste">Waste</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Note (Optional)</label>
+                    <textarea id="issueNote" class="form-control" rows="3" placeholder="Additional details about the stock issue"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeIssueStockModal()">Cancel</button>
+            <button type="button" class="btn btn-danger" onclick="submitIssueStock()">Issue Stock</button>
+        </div>
+    </div>
+</div>
+
+<!-- Adjust Stock Modal -->
+<div id="adjustStockModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Adjust Stock</h3>
+            <button class="modal-close" onclick="closeAdjustStockModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="adjustStockForm">
+                <div class="form-group">
+                    <label>Product *</label>
+                    <select id="adjustProductId" class="form-control" required>
+                        <option value="">Select product...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Current On Hand</label>
+                    <input type="text" id="adjustCurrentOnHand" class="form-control" readonly>
+                </div>
+                <div class="form-group">
+                    <label>New Quantity *</label>
+                    <input type="number" id="adjustNewQuantity" class="form-control" min="0" step="0.01" required>
+                    <small class="text-muted">Adjustment: <span id="adjustDifference">0</span></small>
+                </div>
+                <div class="form-group">
+                    <label>Reason *</label>
+                    <select id="adjustReason" class="form-control" required>
+                        <option value="">Select reason...</option>
+                        <option value="Count Correction">Count Correction</option>
+                        <option value="Physical Inventory">Physical Inventory</option>
+                        <option value="Reconciliation">Reconciliation</option>
+                        <option value="System Correction">System Correction</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Note (Optional)</label>
+                    <textarea id="adjustNote" class="form-control" rows="3" placeholder="Additional details about the adjustment"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeAdjustStockModal()">Cancel</button>
+            <button type="button" class="btn btn-warning" onclick="submitAdjustStock()">Adjust Stock</button>
+        </div>
+    </div>
+</div>
+
+<!-- Create Customer Modal -->
+<div id="createCustomerModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add New Customer</h3>
+            <button class="modal-close" onclick="closeCreateCustomerModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="createCustomerForm">
+                <div class="form-group">
+                    <label>Name *</label>
+                    <input type="text" id="customerName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="tel" id="customerPhone" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="customerEmail" class="form-control">
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeCreateCustomerModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="submitCustomer()">Create Customer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Create Supplier Modal -->
+<div id="createSupplierModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add New Supplier</h3>
+            <button class="modal-close" onclick="closeCreateSupplierModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="createSupplierForm">
+                <div class="form-group">
+                    <label>Name *</label>
+                    <input type="text" id="supplierName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="tel" id="supplierPhone" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="supplierEmail" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Address</label>
+                    <textarea id="supplierAddress" class="form-control" rows="2"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeCreateSupplierModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="submitSupplier()">Create Supplier</button>
+        </div>
+    </div>
+</div>
+
+<!-- Refund Modal -->
+<div id="refundModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Process Refund</h3>
+            <button class="modal-close" onclick="closeRefundModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="refundForm">
+                <input type="hidden" id="refundOrderId" value="">
+                <input type="hidden" id="refundCustomerId" value="">
+                
+                <div class="form-group">
+                    <label>Order Number</label>
+                    <div class="form-control" style="background-color: var(--background);" id="refundOrderNumber">-</div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Order Total</label>
+                    <div class="form-control currency" style="background-color: var(--background); font-weight: 600;" id="refundOrderAmount">$0.00</div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Refund Amount *</label>
+                    <input type="number" id="refundAmount" class="form-control" min="0.01" step="0.01" required>
+                    <small class="text-muted">Enter the amount to refund (cannot exceed order total)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Refund Reason / Note</label>
+                    <textarea id="refundNote" class="form-control" rows="3" placeholder="e.g., Customer requested refund, Product defect, etc."></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeRefundModal()">Cancel</button>
+            <button type="button" class="btn btn-warning" onclick="submitRefund()">Process Refund</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Expense Modal -->
+<div id="addExpenseModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add Internal Expense</h3>
+            <button class="modal-close" onclick="closeAddExpenseModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="addExpenseForm">
+                <div class="form-group">
+                    <label>Expense Type *</label>
+                    <select id="expenseType" class="form-control" required>
+                        <option value="">Select type...</option>
+                        <option value="Rent">Rent</option>
+                        <option value="Utilities">Utilities</option>
+                        <option value="Insurance">Insurance</option>
+                        <option value="Salaries">Salaries</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Description *</label>
+                    <input type="text" id="expenseDescription" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Amount *</label>
+                    <input type="number" id="expenseAmount" class="form-control" min="0.01" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Expense Date *</label>
+                    <input type="date" id="expenseDate" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Note (Optional)</label>
+                    <textarea id="expenseNote" class="form-control" rows="3"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeAddExpenseModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="submitExpense()">Add Expense</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/inventory.js" asp-append-version="true"></script>
+}
