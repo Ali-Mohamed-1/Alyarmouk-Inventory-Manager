@@ -47,7 +47,7 @@
                 _db.Customers.Add(new Customer { Id = 1, Name = "Test Customer" });
                 _db.Suppliers.Add(new Supplier { Id = 1, Name = "Test Supplier", IsActive = true });
                 _db.Products.Add(new Product { Id = 1, Name = "Product A", Unit = "PCS", IsActive = true });
-                _db.StockSnapshots.Add(new StockSnapshot { ProductId = 1, OnHand = 1000, Preserved = 0 });
+                _db.StockSnapshots.Add(new StockSnapshot { ProductId = 1, OnHand = 1000, Reserved = 0 });
                 _db.SaveChanges();
             }
 

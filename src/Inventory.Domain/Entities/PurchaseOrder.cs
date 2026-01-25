@@ -1,19 +1,12 @@
 namespace Inventory.Domain.Entities;
 
-public enum SalesOrderStatus
-{
-    Pending = 0,
-    Completed = 1,
-    Cancelled = 2
-}
-public  class SalesOrder
+public class PurchaseOrder
 {
     public long Id { get; set; }
     public string OrderNumber { get; set; } = "";
-    public int CustomerId { get; set; }
-    public Customer? Customer { get; set; }
-    public string CustomerNameSnapshot { get; set; } = "";
-    public SalesOrderStatus Status { get; set; } = SalesOrderStatus.Pending;
+    public int SupplierId { get; set; }
+    public Supplier? Supplier { get; set; }
+    public string SupplierNameSnapshot { get; set; } = "";
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public string CreatedByUserId { get; set; } = "";
     public string CreatedByUserDisplayName { get; set; } = "";
@@ -24,22 +17,23 @@ public  class SalesOrder
     public decimal Subtotal { get; set; }
     public decimal VatAmount { get; set; }
     public decimal ManufacturingTaxAmount { get; set; }
+    public decimal ReceiptExpenses { get; set; } // Shipping, handling, etc.
     public decimal TotalAmount { get; set; }
     
-    public List<SalesOrderLine> Lines { get; set; } = new();
+    public List<PurchaseOrderLine> Lines { get; set; } = new();
 }
 
-public class SalesOrderLine
+public class PurchaseOrderLine
 {
     public long Id { get; set; }
-    public long SalesOrderId { get; set; }
-    public SalesOrder? SalesOrder { get; set; }
+    public long PurchaseOrderId { get; set; }
+    public PurchaseOrder? PurchaseOrder { get; set; }
     public int ProductId { get; set; }
     public Product? Product { get; set; }
     public string ProductNameSnapshot { get; set; } = "";
     public decimal Quantity { get; set; }
     public string UnitSnapshot { get; set; } = "";
-    public decimal UnitPrice { get; set; } // Price per unit at time of order (snapshot)
+    public decimal UnitPrice { get; set; }
     
     // Tax System Fields
     public bool IsTaxInclusive { get; set; }

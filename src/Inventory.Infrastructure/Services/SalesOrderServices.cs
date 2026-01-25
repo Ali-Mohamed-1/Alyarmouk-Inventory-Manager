@@ -9,11 +9,13 @@ using Inventory.Application.DTOs.SalesOrder;
 using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Inventory.Domain.Constants;
 
 namespace Inventory.Infrastructure.Services
 {
     public sealed class SalesOrderServices : ISalesOrderServices
     {
+
         private const int MaxTake = 1000;
         private readonly AppDbContext _db;
         private readonly IAuditLogWriter _auditWriter;
@@ -46,7 +48,8 @@ namespace Inventory.Infrastructure.Services
                 throw new NotFoundException($"Customer id {req.CustomerId} was not found.");
 
             // Validate and group line items by product (combine quantities if duplicate products)
-            var lineItems = new Dictionary<int, decimal>();
+            // Store both quantity and unit price (use first price if product appears multiple times)
+            var lineItems = new Dictionary<int, (decimal Quantity, decimal UnitPrice)>();
             var productIds = new HashSet<int>();
 
             foreach (var line in req.Lines)
@@ -57,13 +60,17 @@ namespace Inventory.Infrastructure.Services
                 if (line.Quantity <= 0)
                     throw new ValidationException("Quantity must be greater than zero for all line items.");
 
+                if (line.UnitPrice < 0)
+                    throw new ValidationException("Unit price cannot be negative.");
+
                 if (lineItems.ContainsKey(line.ProductId))
                 {
-                    lineItems[line.ProductId] += line.Quantity;
+                    var existing = lineItems[line.ProductId];
+                    lineItems[line.ProductId] = (existing.Quantity + line.Quantity, existing.UnitPrice);
                 }
                 else
                 {
-                    lineItems[line.ProductId] = line.Quantity;
+                    lineItems[line.ProductId] = (line.Quantity, line.UnitPrice);
                     productIds.Add(line.ProductId);
                 }
             }
@@ -97,7 +104,7 @@ namespace Inventory.Infrastructure.Services
             foreach (var kvp in lineItems)
             {
                 var productId = kvp.Key;
-                var quantity = kvp.Value;
+                var quantity = kvp.Value.Quantity;
 
                 var snapshot = stockSnapshots.FirstOrDefault(s => s.ProductId == productId);
                 var availableStock = snapshot?.OnHand ?? 0;
@@ -132,25 +139,20 @@ namespace Inventory.Infrastructure.Services
                 _db.SalesOrders.Add(salesOrder);
                 await _db.SaveChangesAsync(ct); // Save to get the ID
 
-<<<<<<< Updated upstream
                 var inventoryTransactions = new List<InventoryTransaction>();
-=======
+
                 decimal totalVat = 0;
                 decimal totalManTax = 0;
                 decimal totalSubtotal = 0;
                 decimal totalOrderAmount = 0;
->>>>>>> Stashed changes
 
                 // Create order lines and update stock
                 foreach (var kvp in lineItems)
                 {
                     var productId = kvp.Key;
-                    var quantity = kvp.Value;
+                    var (quantity, unitPrice) = kvp.Value;
                     var product = products.First(p => p.Id == productId);
 
-<<<<<<< Updated upstream
-                    // Create order line with price snapshot
-=======
                     // TAX CALCULATION
                     decimal lineSubtotal, lineVat, lineManTax, lineTotal;
 
@@ -161,8 +163,8 @@ namespace Inventory.Infrastructure.Services
                         // Base = Price / (1 + TaxRates)
                         
                         decimal applicableTaxRate = 0m;
-                        if (req.ApplyVat) applicableTaxRate += Inventory.Domain.Constant.TaxConstants.VatRate;
-                        if (req.ApplyManufacturingTax) applicableTaxRate += Inventory.Domain.Constant.TaxConstants.ManufacturingTaxRate;
+                        if (req.ApplyVat) applicableTaxRate += Inventory.Domain.Constants.TaxConstants.VatRate;
+                        if (req.ApplyManufacturingTax) applicableTaxRate += Inventory.Domain.Constants.TaxConstants.ManufacturingTaxRate;
 
                         decimal totalLinePrice = unitPrice * quantity;
                         decimal baseAmount = totalLinePrice / (1 + applicableTaxRate);
@@ -171,8 +173,8 @@ namespace Inventory.Infrastructure.Services
                         baseAmount = Math.Round(baseAmount, 2);
 
                         lineSubtotal = baseAmount;
-                        lineVat = req.ApplyVat ? Math.Round(baseAmount * Inventory.Domain.Constant.TaxConstants.VatRate, 2) : 0;
-                        lineManTax = req.ApplyManufacturingTax ? Math.Round(baseAmount * Inventory.Domain.Constant.TaxConstants.ManufacturingTaxRate, 2) : 0;
+                        lineVat = req.ApplyVat ? Math.Round(baseAmount * Inventory.Domain.Constants.TaxConstants.VatRate, 2) : 0;
+                        lineManTax = req.ApplyManufacturingTax ? Math.Round(baseAmount * Inventory.Domain.Constants.TaxConstants.ManufacturingTaxRate, 2) : 0;
                         
                         // LineTotal should match what was paid (inclusive)
                         lineTotal = lineSubtotal + lineVat + lineManTax;
@@ -184,8 +186,8 @@ namespace Inventory.Infrastructure.Services
                         decimal totalLinePrice = unitPrice * quantity;
                         
                         lineSubtotal = totalLinePrice;
-                        lineVat = req.ApplyVat ? Math.Round(totalLinePrice * Inventory.Domain.Constant.TaxConstants.VatRate, 2) : 0;
-                        lineManTax = req.ApplyManufacturingTax ? Math.Round(totalLinePrice * Inventory.Domain.Constant.TaxConstants.ManufacturingTaxRate, 2) : 0;
+                        lineVat = req.ApplyVat ? Math.Round(totalLinePrice * Inventory.Domain.Constants.TaxConstants.VatRate, 2) : 0;
+                        lineManTax = req.ApplyManufacturingTax ? Math.Round(totalLinePrice * Inventory.Domain.Constants.TaxConstants.ManufacturingTaxRate, 2) : 0;
                         lineTotal = lineSubtotal + lineVat + lineManTax;
                     }
 
@@ -195,7 +197,6 @@ namespace Inventory.Infrastructure.Services
                     totalOrderAmount += lineTotal;
 
                     // Create order line
->>>>>>> Stashed changes
                     var orderLine = new SalesOrderLine
                     {
                         SalesOrderId = salesOrder.Id,
@@ -203,16 +204,12 @@ namespace Inventory.Infrastructure.Services
                         ProductNameSnapshot = product.Name,
                         UnitSnapshot = product.Unit,
                         Quantity = quantity,
-<<<<<<< Updated upstream
-                        UnitPrice = product.Price // Snapshot price at time of order
-=======
                         UnitPrice = unitPrice,
                         IsTaxInclusive = req.IsTaxInclusive,
                         LineSubtotal = lineSubtotal,
                         LineVatAmount = lineVat,
                         LineManufacturingTaxAmount = lineManTax,
                         LineTotal = lineTotal
->>>>>>> Stashed changes
                     };
 
                     _db.SalesOrderLines.Add(orderLine);
@@ -257,7 +254,7 @@ namespace Inventory.Infrastructure.Services
                     var inventoryTransaction = inventoryTransactions[i];
                     var productId = inventoryTransaction.ProductId;
                     var product = products.First(p => p.Id == productId);
-                    var quantity = lineItems[productId];
+                    var quantity = lineItems[productId].Quantity;
                     var cogsAmount = product.Cost * quantity;
 
                     var cogsTransaction = new FinancialTransaction

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Inventory.Application.Abstractions;
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.PurchaseOrder;
-using Inventory.Domain.Constant;
+using Inventory.Domain.Constants;
 using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -135,8 +135,8 @@ namespace Inventory.Infrastructure.Services
                         // Base = Price / (1 + TaxRates)
                         
                         decimal applicableTaxRate = 0m;
-                        if (req.ApplyVat) applicableTaxRate += TaxConstants.VatRate;
-                        if (req.ApplyManufacturingTax) applicableTaxRate += TaxConstants.ManufacturingTaxRate;
+                        if (req.ApplyVat) applicableTaxRate += Inventory.Domain.Constants.TaxConstants.VatRate;
+                        if (req.ApplyManufacturingTax) applicableTaxRate += Inventory.Domain.Constants.TaxConstants.ManufacturingTaxRate;
 
                         decimal totalLinePrice = unitPrice * quantity;
                         decimal baseAmount = totalLinePrice / (1 + applicableTaxRate);
@@ -146,8 +146,8 @@ namespace Inventory.Infrastructure.Services
                         baseAmount = Math.Round(baseAmount, 2);
 
                         lineSubtotal = baseAmount;
-                        lineVat = req.ApplyVat ? Math.Round(baseAmount * TaxConstants.VatRate, 2) : 0;
-                        lineManTax = req.ApplyManufacturingTax ? Math.Round(baseAmount * TaxConstants.ManufacturingTaxRate, 2) : 0;
+                        lineVat = req.ApplyVat ? Math.Round(baseAmount * Inventory.Domain.Constants.TaxConstants.VatRate, 2) : 0;
+                        lineManTax = req.ApplyManufacturingTax ? Math.Round(baseAmount * Inventory.Domain.Constants.TaxConstants.ManufacturingTaxRate, 2) : 0;
                         
                         // LineTotal should match what was paid (inclusive)
                         // However, due to rounding, Base + Tax might differ slightly from TotalLinePrice.
@@ -164,8 +164,8 @@ namespace Inventory.Infrastructure.Services
                         decimal totalLinePrice = unitPrice * quantity;
                         
                         lineSubtotal = totalLinePrice;
-                        lineVat = req.ApplyVat ? Math.Round(totalLinePrice * TaxConstants.VatRate, 2) : 0;
-                        lineManTax = req.ApplyManufacturingTax ? Math.Round(totalLinePrice * TaxConstants.ManufacturingTaxRate, 2) : 0;
+                        lineVat = req.ApplyVat ? Math.Round(totalLinePrice * Inventory.Domain.Constants.TaxConstants.VatRate, 2) : 0;
+                        lineManTax = req.ApplyManufacturingTax ? Math.Round(totalLinePrice * Inventory.Domain.Constants.TaxConstants.ManufacturingTaxRate, 2) : 0;
                         lineTotal = lineSubtotal + lineVat + lineManTax;
                     }
 
@@ -201,7 +201,7 @@ namespace Inventory.Infrastructure.Services
                             {
                                 ProductId = productId,
                                 OnHand = 0,
-                                Preserved = 0
+                                Reserved = 0
                             };
                             _db.StockSnapshots.Add(snapshot);
                         }
