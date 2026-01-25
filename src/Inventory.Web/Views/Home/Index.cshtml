@@ -529,11 +529,15 @@
                     <label>Tax Settings</label>
                     <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                         <label style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" id="orderTaxInclusive" checked onchange="updateOrderTotal()">
-                            Prices include VAT (14%) + Manufacturing (1%)
+                            <input type="checkbox" id="orderIncludeVAT" checked onchange="updateOrderTotal()">
+                            Add VAT (14%)
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="orderIncludeManufacturingTax" onchange="updateOrderTotal()">
+                            Deduct Manufacturing Tax (1%)
                         </label>
                     </div>
-                    <small class="text-muted">If unchecked, unit prices are before tax.</small>
+                    <small class="text-muted">Select which taxes to apply to the order.</small>
                 </div>
                 <div class="form-group">
                     <label>Tax Breakdown</label>
@@ -618,11 +622,17 @@
                 </div>
                 <div class="form-group">
                     <label>Tax Settings</label>
-                    <label style="display: flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" id="receiveTaxInclusive" checked onchange="updateReceiveTotals()">
-                        Prices include VAT (14%) + Manufacturing (1%)
-                    </label>
-                    <small class="text-muted">If unchecked, unit cost is before tax.</small>
+                    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="receiveIncludeVAT" checked onchange="updateReceiveTotals()">
+                            Add VAT (14%)
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="receiveIncludeManufacturingTax" onchange="updateReceiveTotals()">
+                            Deduct Manufacturing Tax (1%)
+                        </label>
+                    </div>
+                    <small class="text-muted">Select which taxes to apply to the purchase.</small>
                 </div>
                 <div class="form-group">
                     <label>Receipt Expenses</label>

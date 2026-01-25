@@ -87,17 +87,17 @@ const demoData = {
         {
             id: 1, orderNumber: "PO-2026-001", supplierId: 1, supplierName: "Global Chemical Supplies",
             createdUtc: "2026-01-15T08:00:00Z", createdBy: "Admin", isTaxInclusive: true,
-            subtotal: 86.96, vatAmount: 12.17, manufacturingTaxAmount: 0.87, receiptExpenses: 20.00, totalAmount: 120.00
+            subtotal: 100, vatAmount: 14, manufacturingTaxAmount: 1, receiptExpenses: 20.00, totalAmount: 133.00
         },
         {
             id: 2, orderNumber: "PO-2026-002", supplierId: 2, supplierName: "International Chemical Importers",
             createdUtc: "2026-01-18T10:00:00Z", createdBy: "Admin", isTaxInclusive: false,
-            subtotal: 200.00, vatAmount: 28.00, manufacturingTaxAmount: 2.00, receiptExpenses: 15.00, totalAmount: 245.00
+            subtotal: 200.00, vatAmount: 28.00, manufacturingTaxAmount: 2.00, receiptExpenses: 15.00, totalAmount: 241.00
         },
         {
             id: 3, orderNumber: "PO-2026-003", supplierId: 1, supplierName: "Global Chemical Supplies",
             createdUtc: "2026-01-20T14:00:00Z", createdBy: "Admin", isTaxInclusive: true,
-            subtotal: 150.00, vatAmount: 21.00, manufacturingTaxAmount: 1.50, receiptExpenses: 10.00, totalAmount: 182.50
+            subtotal: 150.00, vatAmount: 21.00, manufacturingTaxAmount: 1.50, receiptExpenses: 10.00, totalAmount: 179.50
         }
     ],
     expenses: [
@@ -112,7 +112,7 @@ function formatCurrency(amount) {
 
 const VAT_RATE = 0.14;
 const MANUFACTURING_RATE = 0.01;
-const TOTAL_TAX_RATE = VAT_RATE + MANUFACTURING_RATE;
+const TOTAL_TAX_RATE = VAT_RATE - MANUFACTURING_RATE;
 
 function calculateTaxFromTotal(totalAmount) {
     const subtotal = totalAmount / (1 + TOTAL_TAX_RATE);
@@ -177,7 +177,7 @@ function getDeadlineUrgencyClass(deadlineString) {
     const deadline = new Date(deadlineString);
     const now = new Date();
     const daysUntilDeadline = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
-    
+
     if (daysUntilDeadline <= 7) return 'deadline-urgent';
     if (daysUntilDeadline <= 30) return 'deadline-warning';
     return '';
@@ -192,18 +192,18 @@ function calculateTotalOwed(customerId) {
 function calculatePaymentBreakdown(customerId) {
     const now = new Date();
     const pendingOrders = demoData.orders.filter(o => o.customerId === customerId && o.paymentStatus === 'Pending');
-    
+
     const breakdown = {
         within7Days: 0,
         within30Days: 0,
         after30Days: 0
     };
-    
+
     pendingOrders.forEach(order => {
         if (!order.paymentDeadline) return;
         const deadline = new Date(order.paymentDeadline);
         const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
-        
+
         if (daysUntil <= 7) {
             breakdown.within7Days += order.totalAmount;
         } else if (daysUntil <= 30) {
@@ -212,7 +212,7 @@ function calculatePaymentBreakdown(customerId) {
             breakdown.after30Days += order.totalAmount;
         }
     });
-    
+
     return breakdown;
 }
 
@@ -235,7 +235,7 @@ function switchTab(tabName) {
 }
 
 function loadTabData(tabName) {
-    switch(tabName) {
+    switch (tabName) {
         case 'dashboard':
             renderProducts();
             updateDashboardStats();
@@ -292,11 +292,11 @@ function renderProducts() {
 function updateDashboardStats() {
     document.getElementById('totalProducts').textContent = demoData.products.length;
     document.getElementById('totalOrders').textContent = demoData.orders.length;
-    
+
     // Calculate low stock count
     const lowStockCount = demoData.products.filter(p => p.available <= 50).length;
     document.getElementById('lowStockCount').textContent = lowStockCount;
-    
+
     // Total purchase orders
     const totalPurchaseOrders = demoData.purchaseOrders ? demoData.purchaseOrders.length : 0;
     document.getElementById('totalPurchaseOrders').textContent = totalPurchaseOrders;
@@ -345,9 +345,11 @@ function showOrderDetails(orderId) {
             totalAmount: order.totalAmount
         };
     } else {
+        breakdown = calculateTaxFromTotal(order.totalAmount)
+        /*
         breakdown = isTaxInclusive
             ? calculateTaxFromTotal(order.totalAmount)
-            : calculateTaxFromSubtotal(order.totalAmount);
+            : calculateTaxFromSubtotal(order.totalAmount); */
     }
 
     const paymentInfoHtml = `
@@ -417,17 +419,17 @@ function showOrderDetails(orderId) {
                 </thead>
                 <tbody>
                     ${order.lines.map(line => {
-                        const lineTotal = line.lineTotal ?? (line.quantity * line.unitPrice);
-                        const lineBreakdown = line.lineSubtotal != null
-                            ? {
-                                subtotal: line.lineSubtotal,
-                                vatAmount: line.lineVatAmount ?? 0,
-                                manufacturingTaxAmount: line.lineManufacturingTaxAmount ?? 0,
-                                totalAmount: lineTotal
-                              }
-                            : (isTaxInclusive ? calculateTaxFromTotal(lineTotal) : calculateTaxFromSubtotal(lineTotal));
+        const lineTotal = line.lineTotal ?? (line.quantity * line.unitPrice);
+        const lineBreakdown = line.lineSubtotal != null
+            ? {
+                subtotal: line.lineSubtotal,
+                vatAmount: line.lineVatAmount ?? 0,
+                manufacturingTaxAmount: line.lineManufacturingTaxAmount ?? 0,
+                totalAmount: lineTotal
+            }
+            : (isTaxInclusive ? calculateTaxFromTotal(lineTotal) : calculateTaxFromSubtotal(lineTotal));
 
-                        return `
+        return `
                             <tr>
                                 <td><strong>${line.productName}</strong></td>
                                 <td class="text-right">${line.quantity} ${line.unit}</td>
@@ -438,7 +440,7 @@ function showOrderDetails(orderId) {
                                 <td class="text-right currency"><strong>${formatCurrency(lineBreakdown.totalAmount)}</strong></td>
                             </tr>
                         `;
-                    }).join('')}
+    }).join('')}
                     <tr style="border-top: 2px solid var(--border);">
                         <td colspan="6" class="text-right"><strong>Total Amount:</strong></td>
                         <td class="text-right currency"><strong style="font-size: 1.25rem; color: var(--primary-color);">${formatCurrency(breakdown.totalAmount)}</strong></td>
@@ -538,17 +540,17 @@ function showCustomerHistory(customerId) {
                     </thead>
                     <tbody>
                         ${customerOrders.map(o => {
-                            const paymentStatus = o.paymentStatus || 'Pending';
-                            let actionButtons = '';
-                            
-                            if (paymentStatus === 'Pending') {
-                                actionButtons = `
+        const paymentStatus = o.paymentStatus || 'Pending';
+        let actionButtons = '';
+
+        if (paymentStatus === 'Pending') {
+            actionButtons = `
                                     <button class="btn btn-success btn-sm" onclick="markOrderAsPaid(${o.id}, ${customerId})" title="Mark as Paid">
                                         ✓ Mark Paid
                                     </button>
                                 `;
-                            } else if (paymentStatus === 'Paid') {
-                                actionButtons = `
+        } else if (paymentStatus === 'Paid') {
+            actionButtons = `
                                     <button class="btn btn-outline btn-sm" onclick="markOrderAsPending(${o.id}, ${customerId})" title="Mark as Pending">
                                         ↻ Mark Pending
                                     </button>
@@ -556,13 +558,13 @@ function showCustomerHistory(customerId) {
                                         ↩️ Refund
                                     </button>
                                 `;
-                            } else if (paymentStatus === 'Refunded') {
-                                actionButtons = `
+        } else if (paymentStatus === 'Refunded') {
+            actionButtons = `
                                     <span class="text-muted" style="font-size: 0.875rem;">Refunded</span>
                                 `;
-                            }
-                            
-                            return `
+        }
+
+        return `
                                 <tr>
                                     <td><code>${o.orderNumber}</code></td>
                                     <td>${formatDate(o.createdUtc)}</td>
@@ -576,7 +578,7 @@ function showCustomerHistory(customerId) {
                                     </td>
                                 </tr>
                             `;
-                        }).join('')}
+    }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -619,15 +621,15 @@ function markOrderAsPaid(orderId, customerId) {
     if (!confirm('Mark this order as paid? This will update the payment status and recalculate the total owed.')) {
         return;
     }
-    
+
     const order = demoData.orders.find(o => o.id === orderId);
     if (!order) return;
-    
+
     order.paymentStatus = 'Paid';
-    
+
     // Refresh customer history to show updated status and recalculated total
     showCustomerHistory(customerId);
-    
+
     // Also refresh orders table if we're on that tab
     if (document.getElementById('tab-orders').classList.contains('active')) {
         renderOrders();
@@ -643,15 +645,15 @@ function markOrderAsPending(orderId, customerId) {
     if (!confirm('Mark this order as pending? This will update the payment status and recalculate the total owed.')) {
         return;
     }
-    
+
     const order = demoData.orders.find(o => o.id === orderId);
     if (!order) return;
-    
+
     order.paymentStatus = 'Pending';
-    
+
     // Refresh customer history to show updated status and recalculated total
     showCustomerHistory(customerId);
-    
+
     // Also refresh orders table if we're on that tab
     if (document.getElementById('tab-orders').classList.contains('active')) {
         renderOrders();
@@ -666,7 +668,7 @@ function markOrderAsPending(orderId, customerId) {
 function showRefundModal(orderId, customerId) {
     const order = demoData.orders.find(o => o.id === orderId);
     if (!order) return;
-    
+
     // Store order and customer IDs for the refund function
     document.getElementById('refundOrderId').value = orderId;
     document.getElementById('refundCustomerId').value = customerId;
@@ -674,10 +676,10 @@ function showRefundModal(orderId, customerId) {
     document.getElementById('refundOrderAmount').textContent = formatCurrency(order.totalAmount);
     document.getElementById('refundAmount').value = order.totalAmount.toFixed(2);
     document.getElementById('refundAmount').max = order.totalAmount;
-    
+
     // Add validation on input
     const refundAmountInput = document.getElementById('refundAmount');
-    refundAmountInput.oninput = function() {
+    refundAmountInput.oninput = function () {
         const value = parseFloat(this.value);
         const max = parseFloat(this.max);
         if (value > max) {
@@ -688,7 +690,7 @@ function showRefundModal(orderId, customerId) {
             this.setCustomValidity('');
         }
     };
-    
+
     document.getElementById('refundModal').style.display = 'flex';
 }
 
@@ -704,39 +706,39 @@ function submitRefund() {
     const customerId = parseInt(document.getElementById('refundCustomerId').value);
     const refundAmount = parseFloat(document.getElementById('refundAmount').value);
     const refundNote = document.getElementById('refundNote').value;
-    
+
     if (!orderId || !refundAmount || refundAmount <= 0) {
         alert('Please enter a valid refund amount.');
         return;
     }
-    
+
     const order = demoData.orders.find(o => o.id === orderId);
     if (!order) {
         alert('Order not found.');
         return;
     }
-    
+
     if (refundAmount > order.totalAmount) {
         alert(`Refund amount cannot exceed order total of ${formatCurrency(order.totalAmount)}.`);
         return;
     }
-    
+
     if (!confirm(`Process refund of ${formatCurrency(refundAmount)} for order ${order.orderNumber}?`)) {
         return;
     }
-    
+
     // Update order payment status and refund amount
     order.paymentStatus = 'Refunded';
     order.refundAmount = refundAmount;
-    
+
     // In a real application, this would make an API call to process the refund
     alert(`Refund of ${formatCurrency(refundAmount)} processed successfully for order ${order.orderNumber}.`);
-    
+
     closeRefundModal();
-    
+
     // Refresh customer history to show updated status
     showCustomerHistory(customerId);
-    
+
     // Also refresh orders table if we're on that tab
     if (document.getElementById('tab-orders').classList.contains('active')) {
         renderOrders();
@@ -817,7 +819,7 @@ function submitCategory() {
 function editCategory(categoryId) {
     const category = demoData.categories.find(c => c.id === categoryId);
     if (!category) return;
-    
+
     // In a real app, this would open an edit modal
     alert(`Edit category: ${category.name} (ID: ${categoryId})`);
 }
@@ -946,26 +948,24 @@ function updateOrderTotal() {
     let vatAmount = 0;
     let manufacturingTaxAmount = 0;
     let total = 0;
-    const isTaxInclusive = document.getElementById('orderTaxInclusive')?.checked ?? true;
+    const includeVAT = document.getElementById('orderIncludeVAT')?.checked ?? true;
+    const includeManufacturingTax = document.getElementById('orderIncludeManufacturingTax')?.checked ?? false;
 
     document.querySelectorAll('.order-item').forEach(item => {
         const quantity = parseFloat(item.querySelector('.order-quantity').value) || 0;
         const price = parseFloat(item.querySelector('.order-price').value) || 0;
         const lineAmount = quantity * price;
-        if (isTaxInclusive) {
-            const breakdown = calculateTaxFromTotal(lineAmount);
-            subtotal += breakdown.subtotal;
-            vatAmount += breakdown.vatAmount;
-            manufacturingTaxAmount += breakdown.manufacturingTaxAmount;
-            total += breakdown.totalAmount;
-        } else {
-            const breakdown = calculateTaxFromSubtotal(lineAmount);
-            subtotal += breakdown.subtotal;
-            vatAmount += breakdown.vatAmount;
-            manufacturingTaxAmount += breakdown.manufacturingTaxAmount;
-            total += breakdown.totalAmount;
-        }
+        subtotal += lineAmount;
     });
+
+    // Apply taxes based on checkboxes
+    if (includeVAT) {
+        vatAmount = subtotal * VAT_RATE;
+    }
+    if (includeManufacturingTax) {
+        manufacturingTaxAmount = subtotal * MANUFACTURING_RATE;
+    }
+    total = subtotal + vatAmount - manufacturingTaxAmount;
 
     document.getElementById('orderSubtotal').textContent = formatCurrency(subtotal);
     document.getElementById('orderVatAmount').textContent = formatCurrency(vatAmount);
@@ -987,7 +987,8 @@ function submitOrder() {
         return;
     }
 
-    const isTaxInclusive = document.getElementById('orderTaxInclusive')?.checked ?? true;
+    const includeVAT = document.getElementById('orderIncludeVAT')?.checked ?? true;
+    const includeManufacturingTax = document.getElementById('orderIncludeManufacturingTax')?.checked ?? false;
     const lines = [];
     let subtotal = 0;
     let vatAmount = 0;
@@ -1003,22 +1004,25 @@ function submitOrder() {
 
         if (!product) return;
 
-        const breakdown = isTaxInclusive ? calculateTaxFromTotal(lineAmount) : calculateTaxFromSubtotal(lineAmount);
+        subtotal += lineAmount;
 
-        subtotal += breakdown.subtotal;
-        vatAmount += breakdown.vatAmount;
-        manufacturingTaxAmount += breakdown.manufacturingTaxAmount;
-        totalAmount += breakdown.totalAmount;
+        const lineVatAmount = includeVAT ? lineAmount * VAT_RATE : 0;
+        const lineManufacturingTaxAmount = includeManufacturingTax ? lineAmount * MANUFACTURING_RATE : 0;
+        const lineTotal = lineAmount + lineVatAmount - lineManufacturingTaxAmount;
+
+        vatAmount += lineVatAmount;
+        manufacturingTaxAmount += lineManufacturingTaxAmount;
+        totalAmount += lineTotal;
 
         lines.push({
             productName: product.productName,
             quantity,
             unit: product.unit || 'unit',
             unitPrice,
-            lineSubtotal: breakdown.subtotal,
-            lineVatAmount: breakdown.vatAmount,
-            lineManufacturingTaxAmount: breakdown.manufacturingTaxAmount,
-            lineTotal: breakdown.totalAmount
+            lineSubtotal: lineAmount,
+            lineVatAmount,
+            lineManufacturingTaxAmount,
+            lineTotal
         });
     });
 
@@ -1033,7 +1037,7 @@ function submitOrder() {
         subtotal,
         vatAmount,
         manufacturingTaxAmount,
-        isTaxInclusive,
+        isTaxInclusive: true,
         paymentStatus: 'Pending',
         paymentDeadline: null,
         refundAmount: null,
@@ -1243,15 +1247,18 @@ function updateReceiveTotals() {
     const quantity = parseFloat(document.getElementById('receiveQuantity').value) || 0;
     const unitCost = parseFloat(document.getElementById('receiveUnitCost').value) || 0;
     const receiptExpenses = parseFloat(document.getElementById('receiveReceiptExpenses').value) || 0;
-    const isTaxInclusive = document.getElementById('receiveTaxInclusive')?.checked ?? true;
-    const lineAmount = quantity * unitCost;
+    const includeVAT = document.getElementById('receiveIncludeVAT')?.checked ?? true;
+    const includeManufacturingTax = document.getElementById('receiveIncludeManufacturingTax')?.checked ?? false;
+    const subtotal = quantity * unitCost;
 
-    const breakdown = isTaxInclusive ? calculateTaxFromTotal(lineAmount) : calculateTaxFromSubtotal(lineAmount);
-    const total = breakdown.totalAmount + receiptExpenses;
+    // Apply taxes based on checkboxes
+    const vatAmount = includeVAT ? subtotal * VAT_RATE : 0;
+    const manufacturingTaxAmount = includeManufacturingTax ? subtotal * MANUFACTURING_RATE : 0;
+    const total = subtotal + vatAmount - manufacturingTaxAmount + receiptExpenses;
 
-    document.getElementById('receiveSubtotal').textContent = formatCurrency(breakdown.subtotal);
-    document.getElementById('receiveVatAmount').textContent = formatCurrency(breakdown.vatAmount);
-    document.getElementById('receiveManufacturingTaxAmount').textContent = formatCurrency(breakdown.manufacturingTaxAmount);
+    document.getElementById('receiveSubtotal').textContent = formatCurrency(subtotal);
+    document.getElementById('receiveVatAmount').textContent = formatCurrency(vatAmount);
+    document.getElementById('receiveManufacturingTaxAmount').textContent = formatCurrency(manufacturingTaxAmount);
     document.getElementById('receiveTotal').textContent = formatCurrency(total);
 }
 
@@ -1260,7 +1267,8 @@ function submitReceiveStock() {
     const productId = document.getElementById('receiveProductId').value;
     const quantity = parseFloat(document.getElementById('receiveQuantity').value);
     const unitCost = parseFloat(document.getElementById('receiveUnitCost').value);
-    const isTaxInclusive = document.getElementById('receiveTaxInclusive')?.checked ?? true;
+    const includeVAT = document.getElementById('receiveIncludeVAT')?.checked ?? true;
+    const includeManufacturingTax = document.getElementById('receiveIncludeManufacturingTax')?.checked ?? false;
     const receiptExpenses = parseFloat(document.getElementById('receiveReceiptExpenses').value) || 0;
     const note = document.getElementById('receiveNote').value;
 
@@ -1277,9 +1285,10 @@ function submitReceiveStock() {
         renderProducts();
         updateDashboardStats();
 
-        const lineAmount = quantity * unitCost;
-        const breakdown = isTaxInclusive ? calculateTaxFromTotal(lineAmount) : calculateTaxFromSubtotal(lineAmount);
-        const totalAmount = breakdown.totalAmount + receiptExpenses;
+        const subtotal = quantity * unitCost;
+        const vatAmount = includeVAT ? subtotal * VAT_RATE : 0;
+        const manufacturingTaxAmount = includeManufacturingTax ? subtotal * MANUFACTURING_RATE : 0;
+        const totalAmount = subtotal + vatAmount - manufacturingTaxAmount + receiptExpenses;
 
         if (!demoData.purchaseOrders) {
             demoData.purchaseOrders = [];
@@ -1292,10 +1301,10 @@ function submitReceiveStock() {
             supplierName: supplier.name,
             createdUtc: new Date().toISOString(),
             createdBy: 'Current User',
-            isTaxInclusive,
-            subtotal: breakdown.subtotal,
-            vatAmount: breakdown.vatAmount,
-            manufacturingTaxAmount: breakdown.manufacturingTaxAmount,
+            isTaxInclusive: true,
+            subtotal,
+            vatAmount,
+            manufacturingTaxAmount,
             receiptExpenses,
             totalAmount
         };
@@ -1315,7 +1324,7 @@ function submitReceiveStock() {
             note: note || `Purchase order ${newPurchaseOrder.orderNumber}`
         };
         demoData.transactions.unshift(newTransaction);
-        
+
         if (document.getElementById('tab-transactions').classList.contains('active')) {
             renderTransactions();
         }
@@ -1375,7 +1384,7 @@ function submitIssueStock() {
     product.onHand -= quantity;
     renderProducts();
     updateDashboardStats();
-    
+
     // Add to transactions
     const newTransaction = {
         id: demoData.transactions.length + 1,
@@ -1390,7 +1399,7 @@ function submitIssueStock() {
         note: `${reason}${note ? ': ' + note : ''}`
     };
     demoData.transactions.unshift(newTransaction);
-    
+
     if (document.getElementById('tab-transactions').classList.contains('active')) {
         renderTransactions();
     }
@@ -1430,7 +1439,7 @@ function updateAdjustCurrentStock() {
 function updateAdjustDifference() {
     const productId = document.getElementById('adjustProductId').value;
     const newQuantity = parseFloat(document.getElementById('adjustNewQuantity').value) || 0;
-    
+
     if (productId) {
         const product = demoData.products.find(p => p.productId == productId);
         if (product) {
@@ -1466,7 +1475,7 @@ function submitAdjustStock() {
     product.onHand = newQuantity;
     renderProducts();
     updateDashboardStats();
-    
+
     // Add to transactions
     const newTransaction = {
         id: demoData.transactions.length + 1,
@@ -1481,7 +1490,7 @@ function submitAdjustStock() {
         note: `${reason}${note ? ': ' + note : ''} (Adjusted from ${oldQuantity} to ${newQuantity})`
     };
     demoData.transactions.unshift(newTransaction);
-    
+
     if (document.getElementById('tab-transactions').classList.contains('active')) {
         renderTransactions();
     }
@@ -1492,11 +1501,11 @@ function submitAdjustStock() {
 
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     loadTabData('dashboard');
-    
+
     // Close modals when clicking outside
-    window.onclick = function(event) {
+    window.onclick = function (event) {
         const orderModal = document.getElementById('createOrderModal');
         const customerModal = document.getElementById('createCustomerModal');
         const supplierModal = document.getElementById('createSupplierModal');
@@ -1504,7 +1513,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const receiveModal = document.getElementById('receiveStockModal');
         const issueModal = document.getElementById('issueStockModal');
         const adjustModal = document.getElementById('adjustStockModal');
-        
+
         if (event.target === orderModal) {
             closeCreateOrderModal();
         }
@@ -1526,18 +1535,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (event.target === adjustModal) {
             closeAdjustStockModal();
         }
-        
+
         const refundModal = document.getElementById('refundModal');
         if (event.target === refundModal) {
             closeRefundModal();
         }
-        
+
         const addExpenseModal = document.getElementById('addExpenseModal');
         if (event.target === addExpenseModal) {
             closeAddExpenseModal();
         }
     };
-    
+
     // Initialize financial tab on page load
     initializeFinancialTab();
 });
@@ -1548,10 +1557,10 @@ function initializeFinancialTab() {
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
+
     document.getElementById('periodFromDate').value = firstDay.toISOString().split('T')[0];
     document.getElementById('periodToDate').value = lastDay.toISOString().split('T')[0];
-    
+
     updateFinancialData();
 }
 
@@ -1559,8 +1568,8 @@ function updatePeriodFromPreset() {
     const preset = document.getElementById('periodPreset').value;
     const now = new Date();
     let fromDate, toDate;
-    
-    switch(preset) {
+
+    switch (preset) {
         case 'today':
             fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
@@ -1589,7 +1598,7 @@ function updatePeriodFromPreset() {
             // Don't change dates, let user select
             return;
     }
-    
+
     document.getElementById('periodFromDate').value = fromDate.toISOString().split('T')[0];
     document.getElementById('periodToDate').value = toDate.toISOString().split('T')[0];
     updateFinancialData();
@@ -1599,13 +1608,13 @@ function updateFinancialData() {
     const fromDate = new Date(document.getElementById('periodFromDate').value);
     const toDate = new Date(document.getElementById('periodToDate').value);
     toDate.setHours(23, 59, 59, 999);
-    
+
     // Calculate profitability
     calculateProfitability(fromDate, toDate);
-    
+
     // Calculate tax liabilities
     calculateTaxLiabilities(fromDate, toDate);
-    
+
     // Load expenses
     loadExpenses(fromDate, toDate);
 }
@@ -1618,7 +1627,7 @@ function calculateProfitability(fromDate, toDate) {
             return orderDate >= fromDate && orderDate <= toDate;
         })
         .reduce((sum, o) => sum + o.totalAmount, 0);
-    
+
     // Cost of goods sold from purchase orders
     const costOfGoodsSold = (demoData.purchaseOrders || [])
         .filter(po => {
@@ -1626,7 +1635,7 @@ function calculateProfitability(fromDate, toDate) {
             return orderDate >= fromDate && orderDate <= toDate;
         })
         .reduce((sum, po) => sum + po.totalAmount, 0);
-    
+
     // Internal expenses
     const internalExpenses = (demoData.expenses || [])
         .filter(e => {
@@ -1634,11 +1643,11 @@ function calculateProfitability(fromDate, toDate) {
             return expenseDate >= fromDate && expenseDate <= toDate;
         })
         .reduce((sum, e) => sum + e.amount, 0);
-    
+
     const grossProfit = revenue - costOfGoodsSold;
     const netProfit = grossProfit - internalExpenses;
     const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
-    
+
     // Update UI
     document.getElementById('revenue').textContent = formatCurrency(revenue);
     document.getElementById('costOfGoodsSold').textContent = formatCurrency(costOfGoodsSold);
@@ -1663,7 +1672,7 @@ function calculateTaxLiabilities(fromDate, toDate) {
             const basePrice = o.totalAmount / 1.15;
             return sum + (basePrice * 0.14);
         }, 0);
-    
+
     // VAT Paid on purchase orders (only tax-inclusive)
     const vatPaid = (demoData.purchaseOrders || [])
         .filter(po => {
@@ -1671,7 +1680,7 @@ function calculateTaxLiabilities(fromDate, toDate) {
             return orderDate >= fromDate && orderDate <= toDate && po.isTaxInclusive;
         })
         .reduce((sum, po) => sum + (po.vatAmount || 0), 0);
-    
+
     // Manufacturing Tax Collected
     const manufacturingTaxCollected = demoData.orders
         .filter(o => {
@@ -1682,7 +1691,7 @@ function calculateTaxLiabilities(fromDate, toDate) {
             const basePrice = o.totalAmount / 1.15;
             return sum + (basePrice * 0.01);
         }, 0);
-    
+
     // Manufacturing Tax Paid
     const manufacturingTaxPaid = (demoData.purchaseOrders || [])
         .filter(po => {
@@ -1690,11 +1699,11 @@ function calculateTaxLiabilities(fromDate, toDate) {
             return orderDate >= fromDate && orderDate <= toDate && po.isTaxInclusive;
         })
         .reduce((sum, po) => sum + (po.manufacturingTaxAmount || 0), 0);
-    
+
     const vatPayable = vatCollected - vatPaid;
     const manufacturingTaxPayable = manufacturingTaxCollected - manufacturingTaxPaid;
     const totalTaxLiability = vatPayable + manufacturingTaxPayable;
-    
+
     // Update UI
     document.getElementById('vatPayable').textContent = formatCurrency(vatPayable);
     document.getElementById('vatPayable').style.color = vatPayable >= 0 ? 'var(--danger)' : 'var(--success)';
@@ -1711,15 +1720,15 @@ function loadExpenses(fromDate, toDate) {
             return expenseDate >= fromDate && expenseDate <= toDate;
         })
         .sort((a, b) => new Date(b.expenseDate) - new Date(a.expenseDate));
-    
+
     const tbody = document.querySelector('#expensesTable tbody');
     if (!tbody) return;
-    
+
     if (expenses.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No expenses found for this period</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = expenses.map(e => `
         <tr>
             <td>${formatDate(e.expenseDate)}</td>
@@ -1752,7 +1761,7 @@ function submitExpense() {
         form.reportValidity();
         return;
     }
-    
+
     const expense = {
         id: (demoData.expenses?.length || 0) + 1,
         expenseType: document.getElementById('expenseType').value,
@@ -1763,19 +1772,19 @@ function submitExpense() {
         createdUtc: new Date().toISOString(),
         note: document.getElementById('expenseNote').value || null
     };
-    
+
     if (!demoData.expenses) {
         demoData.expenses = [];
     }
     demoData.expenses.push(expense);
-    
+
     closeAddExpenseModal();
     updateFinancialData();
 }
 
 function deleteExpense(id) {
     if (!confirm('Are you sure you want to delete this expense?')) return;
-    
+
     if (demoData.expenses) {
         demoData.expenses = demoData.expenses.filter(e => e.id !== id);
         updateFinancialData();
