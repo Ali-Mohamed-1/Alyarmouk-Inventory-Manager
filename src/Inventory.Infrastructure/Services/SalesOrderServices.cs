@@ -125,13 +125,21 @@ namespace Inventory.Infrastructure.Services
                     CreatedUtc = DateTimeOffset.UtcNow,
                     CreatedByUserId = user.UserId,
                     CreatedByUserDisplayName = user.UserDisplayName,
-                    Note = req.Note
+                    Note = req.Note,
+                    IsTaxInclusive = req.IsTaxInclusive
                 };
 
                 _db.SalesOrders.Add(salesOrder);
                 await _db.SaveChangesAsync(ct); // Save to get the ID
 
+<<<<<<< Updated upstream
                 var inventoryTransactions = new List<InventoryTransaction>();
+=======
+                decimal totalVat = 0;
+                decimal totalManTax = 0;
+                decimal totalSubtotal = 0;
+                decimal totalOrderAmount = 0;
+>>>>>>> Stashed changes
 
                 // Create order lines and update stock
                 foreach (var kvp in lineItems)
@@ -140,7 +148,54 @@ namespace Inventory.Infrastructure.Services
                     var quantity = kvp.Value;
                     var product = products.First(p => p.Id == productId);
 
+<<<<<<< Updated upstream
                     // Create order line with price snapshot
+=======
+                    // TAX CALCULATION
+                    decimal lineSubtotal, lineVat, lineManTax, lineTotal;
+
+                    if (req.IsTaxInclusive)
+                    {
+                        // UnitPrice includes tax.
+                        // Formula: Price = Base * (1 + TaxRates)
+                        // Base = Price / (1 + TaxRates)
+                        
+                        decimal applicableTaxRate = 0m;
+                        if (req.ApplyVat) applicableTaxRate += Inventory.Domain.Constant.TaxConstants.VatRate;
+                        if (req.ApplyManufacturingTax) applicableTaxRate += Inventory.Domain.Constant.TaxConstants.ManufacturingTaxRate;
+
+                        decimal totalLinePrice = unitPrice * quantity;
+                        decimal baseAmount = totalLinePrice / (1 + applicableTaxRate);
+
+                        // Rounding
+                        baseAmount = Math.Round(baseAmount, 2);
+
+                        lineSubtotal = baseAmount;
+                        lineVat = req.ApplyVat ? Math.Round(baseAmount * Inventory.Domain.Constant.TaxConstants.VatRate, 2) : 0;
+                        lineManTax = req.ApplyManufacturingTax ? Math.Round(baseAmount * Inventory.Domain.Constant.TaxConstants.ManufacturingTaxRate, 2) : 0;
+                        
+                        // LineTotal should match what was paid (inclusive)
+                        lineTotal = lineSubtotal + lineVat + lineManTax;
+                    }
+                    else
+                    {
+                        // Exclusive
+                        // UnitPrice is Base.
+                        decimal totalLinePrice = unitPrice * quantity;
+                        
+                        lineSubtotal = totalLinePrice;
+                        lineVat = req.ApplyVat ? Math.Round(totalLinePrice * Inventory.Domain.Constant.TaxConstants.VatRate, 2) : 0;
+                        lineManTax = req.ApplyManufacturingTax ? Math.Round(totalLinePrice * Inventory.Domain.Constant.TaxConstants.ManufacturingTaxRate, 2) : 0;
+                        lineTotal = lineSubtotal + lineVat + lineManTax;
+                    }
+
+                    totalSubtotal += lineSubtotal;
+                    totalVat += lineVat;
+                    totalManTax += lineManTax;
+                    totalOrderAmount += lineTotal;
+
+                    // Create order line
+>>>>>>> Stashed changes
                     var orderLine = new SalesOrderLine
                     {
                         SalesOrderId = salesOrder.Id,
@@ -148,7 +203,16 @@ namespace Inventory.Infrastructure.Services
                         ProductNameSnapshot = product.Name,
                         UnitSnapshot = product.Unit,
                         Quantity = quantity,
+<<<<<<< Updated upstream
                         UnitPrice = product.Price // Snapshot price at time of order
+=======
+                        UnitPrice = unitPrice,
+                        IsTaxInclusive = req.IsTaxInclusive,
+                        LineSubtotal = lineSubtotal,
+                        LineVatAmount = lineVat,
+                        LineManufacturingTaxAmount = lineManTax,
+                        LineTotal = lineTotal
+>>>>>>> Stashed changes
                     };
 
                     _db.SalesOrderLines.Add(orderLine);
@@ -213,6 +277,11 @@ namespace Inventory.Infrastructure.Services
                     _db.FinancialTransactions.Add(cogsTransaction);
                 }
 
+                salesOrder.Subtotal = totalSubtotal;
+                salesOrder.VatAmount = totalVat;
+                salesOrder.ManufacturingTaxAmount = totalManTax;
+                salesOrder.TotalAmount = totalOrderAmount;
+
                 await _db.SaveChangesAsync(ct);
 
                 // AUDIT LOG: Record the order creation
@@ -225,7 +294,8 @@ namespace Inventory.Infrastructure.Services
                         CustomerId = salesOrder.CustomerId,
                         CustomerName = salesOrder.CustomerNameSnapshot,
                         LineCount = lineItems.Count,
-                        Note = salesOrder.Note
+                        Note = salesOrder.Note,
+                        TotalAmount = salesOrder.TotalAmount
                     },
                     ct);
 
