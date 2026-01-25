@@ -421,3 +421,5 @@ FodyWeavers.xsd
 
 # Entity Framework Migrations
 **/Migrations/
+/PAYMENT_UI_DESIGN.md
+*.md
