@@ -133,7 +133,9 @@ namespace Inventory.Infrastructure.Services
                     CreatedByUserId = user.UserId,
                     CreatedByUserDisplayName = user.UserDisplayName,
                     Note = req.Note,
-                    IsTaxInclusive = req.IsTaxInclusive
+                    IsTaxInclusive = req.IsTaxInclusive,
+                    ApplyVat = req.ApplyVat,
+                    ApplyManufacturingTax = req.ApplyManufacturingTax
                 };
 
                 _db.SalesOrders.Add(salesOrder);
@@ -153,43 +155,28 @@ namespace Inventory.Infrastructure.Services
                     var (quantity, unitPrice) = kvp.Value;
                     var product = products.First(p => p.Id == productId);
 
-                    // TAX CALCULATION
-                    decimal lineSubtotal, lineVat, lineManTax, lineTotal;
+                    // SIMPLIFIED TAX CALCULATION
+                    // Base is always unitPrice * quantity
+                    decimal baseAmount = unitPrice * quantity;
+                    decimal lineSubtotal = baseAmount;
+                    decimal lineVat = 0;
+                    decimal lineManTax = 0;
+                    decimal lineTotal;
 
-                    if (req.IsTaxInclusive)
+                    // Calculate VAT if enabled
+                    if (req.ApplyVat)
                     {
-                        // UnitPrice includes tax.
-                        // Formula: Price = Base * (1 + TaxRates)
-                        // Base = Price / (1 + TaxRates)
-                        
-                        decimal applicableTaxRate = 0m;
-                        if (req.ApplyVat) applicableTaxRate += Inventory.Domain.Constants.TaxConstants.VatRate;
-                        if (req.ApplyManufacturingTax) applicableTaxRate += Inventory.Domain.Constants.TaxConstants.ManufacturingTaxRate;
-
-                        decimal totalLinePrice = unitPrice * quantity;
-                        decimal baseAmount = totalLinePrice / (1 + applicableTaxRate);
-
-                        // Rounding
-                        baseAmount = Math.Round(baseAmount, 2);
-
-                        lineSubtotal = baseAmount;
-                        lineVat = req.ApplyVat ? Math.Round(baseAmount * Inventory.Domain.Constants.TaxConstants.VatRate, 2) : 0;
-                        lineManTax = req.ApplyManufacturingTax ? Math.Round(baseAmount * Inventory.Domain.Constants.TaxConstants.ManufacturingTaxRate, 2) : 0;
-                        
-                        // LineTotal should match what was paid (inclusive)
-                        lineTotal = lineSubtotal + lineVat + lineManTax;
+                        lineVat = Math.Round(baseAmount * TaxConstants.VatRate, 2, MidpointRounding.AwayFromZero);
                     }
-                    else
+
+                    // Calculate Manufacturing Tax if enabled
+                    if (req.ApplyManufacturingTax)
                     {
-                        // Exclusive
-                        // UnitPrice is Base.
-                        decimal totalLinePrice = unitPrice * quantity;
-                        
-                        lineSubtotal = totalLinePrice;
-                        lineVat = req.ApplyVat ? Math.Round(totalLinePrice * Inventory.Domain.Constants.TaxConstants.VatRate, 2) : 0;
-                        lineManTax = req.ApplyManufacturingTax ? Math.Round(totalLinePrice * Inventory.Domain.Constants.TaxConstants.ManufacturingTaxRate, 2) : 0;
-                        lineTotal = lineSubtotal + lineVat + lineManTax;
+                        lineManTax = Math.Round(baseAmount * TaxConstants.ManufacturingTaxRate, 2, MidpointRounding.AwayFromZero);
                     }
+
+                    // Total = Base + VAT - ManTax
+                    lineTotal = lineSubtotal + lineVat - lineManTax;
 
                     totalSubtotal += lineSubtotal;
                     totalVat += lineVat;
@@ -205,7 +192,7 @@ namespace Inventory.Infrastructure.Services
                         UnitSnapshot = product.Unit,
                         Quantity = quantity,
                         UnitPrice = unitPrice,
-                        IsTaxInclusive = req.IsTaxInclusive,
+                        IsTaxInclusive = req.IsTaxInclusive, // Keep for reference, but doesn't affect calculation
                         LineSubtotal = lineSubtotal,
                         LineVatAmount = lineVat,
                         LineManufacturingTaxAmount = lineManTax,

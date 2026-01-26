@@ -62,11 +62,7 @@ namespace Inventory.Infrastructure.Services
 
                 if (lineItems.ContainsKey(line.ProductId))
                 {
-                    // If duplicate product, we average the price? Or reject?
-                    // For simplicity, let's reject duplicate products in one PO or just sum quantity and use weighted average price?
-                    // Using latest price for simplicity or throwing error.
-                    // Given the dictionary structure in SalesOrderServices summed them, let's do the same but be careful about price.
-                    // Actually SalesOrderServices used "first price if product appears multiple times".
+                    // Combine quantities, keep first price
                     var existing = lineItems[line.ProductId];
                     lineItems[line.ProductId] = (existing.Quantity + line.Quantity, existing.UnitPrice);
                 }
@@ -77,9 +73,8 @@ namespace Inventory.Infrastructure.Services
                 }
             }
 
-            // Load products
+            // Load products (need tracking for cost updates)
             var products = await _db.Products
-                .AsNoTracking()
                 .Where(p => productIds.Contains(p.Id))
                 .ToListAsync(ct);
 
@@ -106,10 +101,12 @@ namespace Inventory.Infrastructure.Services
                     CreatedByUserDisplayName = user.UserDisplayName,
                     Note = req.Note,
                     IsTaxInclusive = req.IsTaxInclusive,
+                    ApplyVat = req.ApplyVat,
+                    ApplyManufacturingTax = req.ApplyManufacturingTax,
                     ReceiptExpenses = req.ReceiptExpenses
                 };
 
-                // Add to DB context to generate ID later
+                // Add to DB context to generate ID
                 _db.PurchaseOrders.Add(purchaseOrder);
                 await _db.SaveChangesAsync(ct);
 
@@ -125,49 +122,28 @@ namespace Inventory.Infrastructure.Services
                     var unitPrice = kvp.Value.UnitPrice;
                     var product = products.First(p => p.Id == productId);
 
-                    // TAX CALCULATION
-                    decimal lineSubtotal, lineVat, lineManTax, lineTotal;
+                    // SIMPLIFIED TAX CALCULATION
+                    // Base is always unitPrice * quantity
+                    decimal baseAmount = unitPrice * quantity;
+                    decimal lineSubtotal = baseAmount;
+                    decimal lineVat = 0;
+                    decimal lineManTax = 0;
+                    decimal lineTotal;
 
-                    if (req.IsTaxInclusive)
+                    // Calculate VAT if enabled
+                    if (req.ApplyVat)
                     {
-                        // UnitPrice includes tax.
-                        // Formula: Price = Base * (1 + TaxRates)
-                        // Base = Price / (1 + TaxRates)
-                        
-                        decimal applicableTaxRate = 0m;
-                        if (req.ApplyVat) applicableTaxRate += Inventory.Domain.Constants.TaxConstants.VatRate;
-                        if (req.ApplyManufacturingTax) applicableTaxRate += Inventory.Domain.Constants.TaxConstants.ManufacturingTaxRate;
-
-                        decimal totalLinePrice = unitPrice * quantity;
-                        decimal baseAmount = totalLinePrice / (1 + applicableTaxRate);
-
-                        // Rounding to 2 decimal places to avoid precision issues typically done in currency
-                        // But for high precision tax calculation, maybe keep more? Let's round to 2 for currency.
-                        baseAmount = Math.Round(baseAmount, 2);
-
-                        lineSubtotal = baseAmount;
-                        lineVat = req.ApplyVat ? Math.Round(baseAmount * Inventory.Domain.Constants.TaxConstants.VatRate, 2) : 0;
-                        lineManTax = req.ApplyManufacturingTax ? Math.Round(baseAmount * Inventory.Domain.Constants.TaxConstants.ManufacturingTaxRate, 2) : 0;
-                        
-                        // LineTotal should match what was paid (inclusive)
-                        // However, due to rounding, Base + Tax might differ slightly from TotalLinePrice.
-                        // Usually we adjust the last bucket (Base) or Tax.
-                        // Let's re-calculate Total from Base+Tax to be sure of the breakdown, 
-                        // OR trust the inclusive price and adjust rounding?
-                        // Standard approach: LineTotal = LineSubtotal + Taxes.
-                        lineTotal = lineSubtotal + lineVat + lineManTax;
+                        lineVat = Math.Round(baseAmount * TaxConstants.VatRate, 2, MidpointRounding.AwayFromZero);
                     }
-                    else
+
+                    // Calculate Manufacturing Tax if enabled (1%)
+                    if (req.ApplyManufacturingTax)
                     {
-                        // Exclusive
-                        // UnitPrice is Base.
-                        decimal totalLinePrice = unitPrice * quantity;
-                        
-                        lineSubtotal = totalLinePrice;
-                        lineVat = req.ApplyVat ? Math.Round(totalLinePrice * Inventory.Domain.Constants.TaxConstants.VatRate, 2) : 0;
-                        lineManTax = req.ApplyManufacturingTax ? Math.Round(totalLinePrice * Inventory.Domain.Constants.TaxConstants.ManufacturingTaxRate, 2) : 0;
-                        lineTotal = lineSubtotal + lineVat + lineManTax;
+                        lineManTax = Math.Round(baseAmount * TaxConstants.ManufacturingTaxRate, 2, MidpointRounding.AwayFromZero);
                     }
+
+                    // Total = Base + VAT - ManTax
+                    lineTotal = lineSubtotal + lineVat - lineManTax;
 
                     totalSubtotal += lineSubtotal;
                     totalVat += lineVat;
@@ -193,19 +169,50 @@ namespace Inventory.Infrastructure.Services
 
                     if (req.ConnectToReceiveStock)
                     {
-                         // Update stock
-                        var snapshot = await _db.StockSnapshots.FirstOrDefaultAsync(s => s.ProductId == productId, ct);
-                        if (snapshot is null)
+                        // ============================================================
+                        // UPDATE PRODUCT COST using WEIGHTED AVERAGE
+                        // ============================================================
+
+                        var snapshot = await _db.StockSnapshots
+                            .FirstOrDefaultAsync(s => s.ProductId == productId, ct);
+
+                        decimal oldCost = product.Cost;
+                        decimal newCost;
+
+                        if (snapshot is null || snapshot.OnHand == 0)
                         {
-                            snapshot = new StockSnapshot
+                            // First purchase OR zero stock - use purchase price as cost
+                            newCost = unitPrice;
+
+                            // Create snapshot if doesn't exist
+                            if (snapshot is null)
                             {
-                                ProductId = productId,
-                                OnHand = 0,
-                                Reserved = 0
-                            };
-                            _db.StockSnapshots.Add(snapshot);
+                                snapshot = new StockSnapshot
+                                {
+                                    ProductId = productId,
+                                    OnHand = 0,
+                                    Reserved = 0
+                                };
+                                _db.StockSnapshots.Add(snapshot);
+                            }
+                        }
+                        else
+                        {
+                            // Weighted Average Cost calculation
+                            // New Cost = (Old Stock Value + New Purchase Value) / (Old Stock + New Stock)
+                            decimal oldStockValue = snapshot.OnHand * product.Cost;
+                            decimal newPurchaseValue = quantity * unitPrice;
+                            decimal totalValue = oldStockValue + newPurchaseValue;
+                            decimal totalQuantity = snapshot.OnHand + quantity;
+
+                            newCost = Math.Round(totalValue / totalQuantity, 2, MidpointRounding.AwayFromZero);
                         }
 
+                        // Update product cost
+                        product.Cost = newCost;
+                        _db.Products.Update(product);
+
+                        // Update stock quantity
                         snapshot.OnHand += quantity;
 
                         // Create Inventory Transaction (Receipt)
@@ -213,21 +220,33 @@ namespace Inventory.Infrastructure.Services
                         {
                             ProductId = productId,
                             QuantityDelta = quantity,
+                            UnitCost = newCost, // Use the newly calculated cost
                             Type = InventoryTransactionType.Receive,
                             TimestampUtc = DateTimeOffset.UtcNow,
                             UserId = user.UserId,
                             UserDisplayName = user.UserDisplayName,
-                            clientId = req.SupplierId, // Assuming clientId processes SupplierId too or we specifically map it
+                            clientId = req.SupplierId,
                             Note = $"Purchase Order {orderNumber}"
                         };
                         _db.InventoryTransactions.Add(inventoryTransaction);
+
+                        // Log cost change in audit if cost changed
+                        if (oldCost != newCost)
+                        {
+                            await _auditWriter.LogUpdateAsync<Product>(
+                                product.Id,
+                                user,
+                                beforeState: new { Cost = oldCost },
+                                afterState: new { Cost = newCost },
+                                ct);
+                        }
                     }
                 }
 
                 purchaseOrder.Subtotal = totalSubtotal;
                 purchaseOrder.VatAmount = totalVat;
                 purchaseOrder.ManufacturingTaxAmount = totalManTax;
-                purchaseOrder.TotalAmount = totalOrderAmount + req.ReceiptExpenses; // Add expenses to final total
+                purchaseOrder.TotalAmount = totalOrderAmount + req.ReceiptExpenses;
 
                 await _db.SaveChangesAsync(ct);
 
@@ -240,7 +259,8 @@ namespace Inventory.Infrastructure.Services
                         OrderNumber = purchaseOrder.OrderNumber,
                         SupplierId = purchaseOrder.SupplierId,
                         LineCount = lineItems.Count,
-                        TotalAmount = purchaseOrder.TotalAmount
+                        TotalAmount = purchaseOrder.TotalAmount,
+                        ConnectedToStock = req.ConnectToReceiveStock
                     },
                     ct);
 
