@@ -61,9 +61,9 @@ namespace Inventory.Infrastructure.Services
             if (customer is null)
                 throw new NotFoundException($"Customer id {req.CustomerId} was not found.");
 
-            // Validate and group line items by product (combine quantities if duplicate products)
-            // Store both quantity and unit price (use first price if product appears multiple times)
-            var lineItems = new Dictionary<int, (decimal Quantity, decimal UnitPrice)>();
+            // Validate and group line items by product and optional batch (so each batch has its own quantity)
+            // Store quantity, price and batch number; keep first price per (product,batch) pair.
+            var lineItems = new Dictionary<(int ProductId, string? BatchNumber), (decimal Quantity, decimal UnitPrice)>();
             var productIds = new HashSet<int>();
 
             foreach (var line in req.Lines)
@@ -77,14 +77,16 @@ namespace Inventory.Infrastructure.Services
                 if (line.UnitPrice < 0)
                     throw new ValidationException("Unit price cannot be negative.");
 
-                if (lineItems.ContainsKey(line.ProductId))
+                var key = (line.ProductId, line.BatchNumber);
+
+                if (lineItems.ContainsKey(key))
                 {
-                    var existing = lineItems[line.ProductId];
-                    lineItems[line.ProductId] = (existing.Quantity + line.Quantity, existing.UnitPrice);
+                    var existing = lineItems[key];
+                    lineItems[key] = (existing.Quantity + line.Quantity, existing.UnitPrice);
                 }
                 else
                 {
-                    lineItems[line.ProductId] = (line.Quantity, line.UnitPrice);
+                    lineItems[key] = (line.Quantity, line.UnitPrice);
                     productIds.Add(line.ProductId);
                 }
             }
@@ -117,7 +119,7 @@ namespace Inventory.Infrastructure.Services
             // Verify sufficient stock for all products
             foreach (var kvp in lineItems)
             {
-                var productId = kvp.Key;
+                var productId = kvp.Key.ProductId;
                 var quantity = kvp.Value.Quantity;
 
                 var snapshot = stockSnapshots.FirstOrDefault(s => s.ProductId == productId);
@@ -173,7 +175,8 @@ namespace Inventory.Infrastructure.Services
                 // Create order lines and update stock
                 foreach (var kvp in lineItems)
                 {
-                    var productId = kvp.Key;
+                    var productId = kvp.Key.ProductId;
+                    var batchNumber = kvp.Key.BatchNumber;
                     var (quantity, unitPrice) = kvp.Value;
                     var product = products.First(p => p.Id == productId);
 
@@ -212,6 +215,7 @@ namespace Inventory.Infrastructure.Services
                         ProductId = productId,
                         ProductNameSnapshot = product.Name,
                         UnitSnapshot = product.Unit,
+                        BatchNumber = batchNumber,
                         Quantity = quantity,
                         UnitPrice = unitPrice,
                         IsTaxInclusive = req.IsTaxInclusive, // Keep for reference, but doesn't affect calculation
@@ -248,6 +252,7 @@ namespace Inventory.Infrastructure.Services
                         UserId = user.UserId,
                         UserDisplayName = user.UserDisplayName,
                         clientId = req.CustomerId,
+                        BatchNumber = batchNumber,
                         Note = $"Sales order {orderNumber}"
                     };
 

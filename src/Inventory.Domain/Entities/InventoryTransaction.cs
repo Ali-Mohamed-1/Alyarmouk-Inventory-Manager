@@ -22,6 +22,11 @@ public sealed class InventoryTransaction
 
     public InventoryTransactionType Type { get; set; }
 
+    /// <summary>
+    /// Optional batch/lot identifier for this movement, when stock is tracked per batch.
+    /// </summary>
+    public string? BatchNumber { get; set; }
+
     public DateTimeOffset TimestampUtc { get; set; }
     public string UserId { get; set; } = "";
     public int clientId { get; set; }

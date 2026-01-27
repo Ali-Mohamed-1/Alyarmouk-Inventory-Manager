@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -30,6 +30,7 @@ namespace Inventory.Application.DTOs
         long Id,
         int ProductId,
         string ProductName,
+        string? BatchNumber,
         decimal Quantity,
         string Unit,
         decimal UnitPrice,

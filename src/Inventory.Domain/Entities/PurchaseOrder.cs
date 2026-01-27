@@ -33,6 +33,12 @@ public class PurchaseOrderLine
     public int ProductId { get; set; }
     public Product? Product { get; set; }
     public string ProductNameSnapshot { get; set; } = "";
+
+    /// <summary>
+    /// Optional batch/lot number for the quantity received on this line.
+    /// </summary>
+    public string? BatchNumber { get; set; }
+
     public decimal Quantity { get; set; }
     public string UnitSnapshot { get; set; } = "";
     public decimal UnitPrice { get; set; }

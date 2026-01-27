@@ -45,8 +45,8 @@ namespace Inventory.Infrastructure.Services
             if (supplier is null)
                 throw new NotFoundException($"Supplier id {req.SupplierId} was not found.");
 
-            // Validate and group line items by product
-            var lineItems = new Dictionary<int, (decimal Quantity, decimal UnitPrice)>();
+            // Validate and group line items by product and optional batch
+            var lineItems = new Dictionary<(int ProductId, string? BatchNumber), (decimal Quantity, decimal UnitPrice)>();
             var productIds = new HashSet<int>();
 
             foreach (var line in req.Lines)
@@ -60,15 +60,17 @@ namespace Inventory.Infrastructure.Services
                 if (line.UnitPrice < 0)
                     throw new ValidationException("Unit price cannot be negative.");
 
-                if (lineItems.ContainsKey(line.ProductId))
+                var key = (line.ProductId, line.BatchNumber);
+
+                if (lineItems.ContainsKey(key))
                 {
                     // Combine quantities, keep first price
-                    var existing = lineItems[line.ProductId];
-                    lineItems[line.ProductId] = (existing.Quantity + line.Quantity, existing.UnitPrice);
+                    var existing = lineItems[key];
+                    lineItems[key] = (existing.Quantity + line.Quantity, existing.UnitPrice);
                 }
                 else
                 {
-                    lineItems[line.ProductId] = (line.Quantity, line.UnitPrice);
+                    lineItems[key] = (line.Quantity, line.UnitPrice);
                     productIds.Add(line.ProductId);
                 }
             }
@@ -117,7 +119,8 @@ namespace Inventory.Infrastructure.Services
 
                 foreach (var kvp in lineItems)
                 {
-                    var productId = kvp.Key;
+                    var productId = kvp.Key.ProductId;
+                    var batchNumber = kvp.Key.BatchNumber;
                     var quantity = kvp.Value.Quantity;
                     var unitPrice = kvp.Value.UnitPrice;
                     var product = products.First(p => p.Id == productId);
@@ -155,6 +158,7 @@ namespace Inventory.Infrastructure.Services
                         PurchaseOrderId = purchaseOrder.Id,
                         ProductId = productId,
                         ProductNameSnapshot = product.Name,
+                        BatchNumber = batchNumber,
                         Quantity = quantity,
                         UnitSnapshot = product.Unit,
                         UnitPrice = unitPrice,
@@ -226,6 +230,7 @@ namespace Inventory.Infrastructure.Services
                             UserId = user.UserId,
                             UserDisplayName = user.UserDisplayName,
                             clientId = req.SupplierId,
+                            BatchNumber = batchNumber,
                             Note = $"Purchase Order {orderNumber}"
                         };
                         _db.InventoryTransactions.Add(inventoryTransaction);

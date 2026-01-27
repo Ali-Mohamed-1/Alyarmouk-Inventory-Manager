@@ -58,6 +58,7 @@ namespace Inventory.Infrastructure.Data
             {
                 b.Property(x => x.QuantityDelta).HasPrecision(18, 2);
                 b.Property(x => x.UnitCost).HasPrecision(18, 2);
+                b.Property(x => x.BatchNumber).HasMaxLength(100);
                 b.Property(x => x.UserId).HasMaxLength(450).IsRequired();
                 b.Property(x => x.UserDisplayName).HasMaxLength(200).IsRequired();
                 b.Property(x => x.Note).HasMaxLength(500);
@@ -113,6 +114,7 @@ namespace Inventory.Infrastructure.Data
             {
                 b.Property(x => x.ProductNameSnapshot).HasMaxLength(200).IsRequired();
                 b.Property(x => x.UnitSnapshot).HasMaxLength(32).IsRequired();
+                b.Property(x => x.BatchNumber).HasMaxLength(100);
                 b.Property(x => x.Quantity).HasPrecision(18, 2);
                 b.Property(x => x.UnitPrice).HasPrecision(18, 2);
                 b.Property(x => x.LineSubtotal).HasPrecision(18, 2);
@@ -155,6 +157,7 @@ namespace Inventory.Infrastructure.Data
             {
                 b.Property(x => x.ProductNameSnapshot).HasMaxLength(200).IsRequired();
                 b.Property(x => x.UnitSnapshot).HasMaxLength(32).IsRequired();
+                b.Property(x => x.BatchNumber).HasMaxLength(100);
                 b.Property(x => x.Quantity).HasPrecision(18, 2);
                 b.Property(x => x.UnitPrice).HasPrecision(18, 2);
                 b.Property(x => x.LineSubtotal).HasPrecision(18, 2);

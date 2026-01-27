@@ -30,6 +30,11 @@ namespace Inventory.Application.DTOs.PurchaseOrder
         [Required]
         public int ProductId { get; set; }
 
+        /// <summary>
+        /// Optional batch/lot number for the stock being received on this line.
+        /// </summary>
+        public string? BatchNumber { get; set; }
+
         [Range(0.0001, double.MaxValue, ErrorMessage = "Quantity must be greater than 0.")]
         public decimal Quantity { get; set; }
 

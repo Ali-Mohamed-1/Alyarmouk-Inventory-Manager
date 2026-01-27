@@ -105,6 +105,12 @@ public class SalesOrderLine
     public int ProductId { get; set; }
     public Product? Product { get; set; }
     public string ProductNameSnapshot { get; set; } = "";
+
+    /// <summary>
+    /// Optional batch/lot number for this line, when stock is tracked per batch.
+    /// </summary>
+    public string? BatchNumber { get; set; }
+
     public decimal Quantity { get; set; }
     public string UnitSnapshot { get; set; } = "";
     public decimal UnitPrice { get; set; } // Price per unit at time of order (snapshot)
