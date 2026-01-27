@@ -268,7 +268,8 @@ namespace Inventory.Infrastructure.Services
                     var inventoryTransaction = inventoryTransactions[i];
                     var productId = inventoryTransaction.ProductId;
                     var product = products.First(p => p.Id == productId);
-                    var quantity = lineItems[productId].Quantity;
+                    var batchNumber = inventoryTransaction.BatchNumber;
+                    var quantity = lineItems[(productId, batchNumber)].Quantity;
                     var cogsAmount = product.Cost * quantity;
 
                     var cogsTransaction = new FinancialTransaction
