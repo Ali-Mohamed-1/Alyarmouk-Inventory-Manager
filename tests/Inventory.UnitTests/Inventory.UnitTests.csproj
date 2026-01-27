@@ -21,6 +21,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Inventory.Domain\Inventory.Domain.csproj" />
     <ProjectReference Include="..\..\src\Inventory.Application\Inventory.Application.csproj" />
+    <ProjectReference Include="..\..\src\Inventory.Infrastructure\Inventory.Infrastructure.csproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+      <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.0" />
   </ItemGroup>
 
 </Project>

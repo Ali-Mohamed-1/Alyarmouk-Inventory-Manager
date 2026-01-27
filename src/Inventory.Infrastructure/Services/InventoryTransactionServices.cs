@@ -79,28 +79,31 @@ namespace Inventory.Infrastructure.Services
                     snapshot = new StockSnapshot
                     {
                         ProductId = req.ProductId,
-                        OnHand = 0,
-                        Reserved = 0
+                        OnHand = 0
                     };
                     _db.StockSnapshots.Add(snapshot);
                 }
 
-                // For Issue transactions, ensure we have enough available stock (OnHand - Reserved)
+                // For Issue transactions, ensure we have enough stock
                 if (req.Type == InventoryTransactionType.Issue)
                 {
-                    var availableStock = snapshot.OnHand - snapshot.Reserved;
-                    if (availableStock < req.Quantity)
-                        throw new ValidationException($"Insufficient stock. Available: {availableStock} (OnHand: {snapshot.OnHand}, Reserved: {snapshot.Reserved}), Requested: {req.Quantity}");
+                    if (snapshot.OnHand + quantityDelta < 0)
+                        throw new ValidationException($"Insufficient stock. Available: {snapshot.OnHand}, Requested: {req.Quantity}");
                 }
 
                 // Update stock snapshot
                 snapshot.OnHand += quantityDelta;
+
+                // Get product cost for financial tracking
+                var unitCost = product.Cost;
+                var totalCost = unitCost * req.Quantity;
 
                 // Create inventory transaction
                 var inventoryTransaction = new InventoryTransaction
                 {
                     ProductId = req.ProductId,
                     QuantityDelta = quantityDelta,
+                    UnitCost = unitCost,
                     Type = req.Type,
                     TimestampUtc = DateTimeOffset.UtcNow,
                     UserId = user.UserId,
@@ -110,6 +113,30 @@ namespace Inventory.Infrastructure.Services
                 };
 
                 _db.InventoryTransactions.Add(inventoryTransaction);
+                await _db.SaveChangesAsync(ct); // Save to get the ID
+
+                // Create financial transaction for money flow
+                // Receive: Expense (money going out to buy stock)
+                // Issue: Expense (cost of goods sold)
+                if (req.Type == InventoryTransactionType.Receive || req.Type == InventoryTransactionType.Issue)
+                {
+                    var financialTransaction = new FinancialTransaction
+                    {
+                        Type = FinancialTransactionType.Expense, // Money going out
+                        Amount = totalCost,
+                        InventoryTransactionId = inventoryTransaction.Id,
+                        ProductId = req.ProductId,
+                        CustomerId = req.CustomerId,
+                        TimestampUtc = DateTimeOffset.UtcNow,
+                        UserId = user.UserId,
+                        UserDisplayName = user.UserDisplayName,
+                        Note = req.Type == InventoryTransactionType.Receive 
+                            ? $"Stock received: {product.Name}" 
+                            : $"Stock issued (COGS): {product.Name}"
+                    };
+
+                    _db.FinancialTransactions.Add(financialTransaction);
+                }
 
                 await _db.SaveChangesAsync(ct);
 

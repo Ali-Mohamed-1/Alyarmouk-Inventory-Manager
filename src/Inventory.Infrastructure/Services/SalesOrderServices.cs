@@ -1,14 +1,21 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Inventory.Application.Abstractions;
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.SalesOrder;
 using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Inventory.Domain.Constants;
 
 namespace Inventory.Infrastructure.Services
 {
     public sealed class SalesOrderServices : ISalesOrderServices
     {
+
         private const int MaxTake = 1000;
         private readonly AppDbContext _db;
         private readonly IAuditLogWriter _auditWriter;
@@ -26,6 +33,20 @@ namespace Inventory.Infrastructure.Services
             if (req is null) throw new ArgumentNullException(nameof(req));
             ValidateUser(user);
 
+            // Money flow / payment validation
+            if (!req.DueDate.HasValue)
+                throw new ValidationException("Due date is required for a sales order.");
+
+            if (req.PaymentMethod == PaymentMethod.Check)
+            {
+                // For check payments, track whether we received and cashed the check with corresponding dates.
+                if (req.CheckReceived == true && !req.CheckReceivedDate.HasValue)
+                    throw new ValidationException("Check received date is required when the check is marked as received.");
+
+                if (req.CheckCashed == true && !req.CheckCashedDate.HasValue)
+                    throw new ValidationException("Check cashed date is required when the check is marked as cashed.");
+            }
+
             if (req.CustomerId <= 0)
                 throw new ArgumentOutOfRangeException(nameof(req), "Customer ID must be positive.");
 
@@ -40,8 +61,9 @@ namespace Inventory.Infrastructure.Services
             if (customer is null)
                 throw new NotFoundException($"Customer id {req.CustomerId} was not found.");
 
-            // Validate and group line items by product (combine quantities if duplicate products)
-            var lineItems = new Dictionary<int, decimal>();
+            // Validate and group line items by product and optional batch (so each batch has its own quantity)
+            // Store quantity, price and batch number; keep first price per (product,batch) pair.
+            var lineItems = new Dictionary<(int ProductId, string? BatchNumber), (decimal Quantity, decimal UnitPrice)>();
             var productIds = new HashSet<int>();
 
             foreach (var line in req.Lines)
@@ -52,13 +74,19 @@ namespace Inventory.Infrastructure.Services
                 if (line.Quantity <= 0)
                     throw new ValidationException("Quantity must be greater than zero for all line items.");
 
-                if (lineItems.ContainsKey(line.ProductId))
+                if (line.UnitPrice < 0)
+                    throw new ValidationException("Unit price cannot be negative.");
+
+                var key = (line.ProductId, line.BatchNumber);
+
+                if (lineItems.ContainsKey(key))
                 {
-                    lineItems[line.ProductId] += line.Quantity;
+                    var existing = lineItems[key];
+                    lineItems[key] = (existing.Quantity + line.Quantity, existing.UnitPrice);
                 }
                 else
                 {
-                    lineItems[line.ProductId] = line.Quantity;
+                    lineItems[key] = (line.Quantity, line.UnitPrice);
                     productIds.Add(line.ProductId);
                 }
             }
@@ -88,21 +116,19 @@ namespace Inventory.Infrastructure.Services
                 .Where(s => productIdsList.Contains(s.ProductId))
                 .ToListAsync(ct);
 
-            // Verify sufficient available stock for all products (OnHand - Reserved)
+            // Verify sufficient stock for all products
             foreach (var kvp in lineItems)
             {
-                var productId = kvp.Key;
-                var quantity = kvp.Value;
+                var productId = kvp.Key.ProductId;
+                var quantity = kvp.Value.Quantity;
 
                 var snapshot = stockSnapshots.FirstOrDefault(s => s.ProductId == productId);
-                var availableStock = snapshot != null ? (snapshot.OnHand - snapshot.Reserved) : 0;
+                var availableStock = snapshot?.OnHand ?? 0;
 
                 if (availableStock < quantity)
                 {
                     var product = products.First(p => p.Id == productId);
-                    var onHand = snapshot?.OnHand ?? 0;
-                    var reserved = snapshot?.Reserved ?? 0;
-                    throw new ValidationException($"Insufficient stock for product '{product.Name}'. Available: {availableStock} (OnHand: {onHand}, Reserved: {reserved}), Requested: {quantity}");
+                    throw new ValidationException($"Insufficient stock for product '{product.Name}'. Available: {availableStock}, Requested: {quantity}");
                 }
             }
 
@@ -119,22 +145,68 @@ namespace Inventory.Infrastructure.Services
                     OrderNumber = orderNumber,
                     CustomerId = req.CustomerId,
                     CustomerNameSnapshot = customer.Name,
-                    Status = SalesOrderStatus.Pending,
                     CreatedUtc = DateTimeOffset.UtcNow,
+                    OrderDate = req.OrderDate ?? DateTimeOffset.UtcNow,
+                    DueDate = req.DueDate!.Value,
+                    PaymentMethod = req.PaymentMethod,
+                    PaymentStatus = req.PaymentStatus,
+                    CheckReceived = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckReceived,
+                    CheckReceivedDate = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckReceivedDate,
+                    CheckCashed = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckCashed,
+                    CheckCashedDate = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckCashedDate,
                     CreatedByUserId = user.UserId,
                     CreatedByUserDisplayName = user.UserDisplayName,
-                    Note = req.Note
+                    Note = req.Note,
+                    IsTaxInclusive = req.IsTaxInclusive,
+                    ApplyVat = req.ApplyVat,
+                    ApplyManufacturingTax = req.ApplyManufacturingTax
                 };
 
                 _db.SalesOrders.Add(salesOrder);
                 await _db.SaveChangesAsync(ct); // Save to get the ID
 
+                var inventoryTransactions = new List<InventoryTransaction>();
+
+                decimal totalVat = 0;
+                decimal totalManTax = 0;
+                decimal totalSubtotal = 0;
+                decimal totalOrderAmount = 0;
+
                 // Create order lines and update stock
                 foreach (var kvp in lineItems)
                 {
-                    var productId = kvp.Key;
-                    var quantity = kvp.Value;
+                    var productId = kvp.Key.ProductId;
+                    var batchNumber = kvp.Key.BatchNumber;
+                    var (quantity, unitPrice) = kvp.Value;
                     var product = products.First(p => p.Id == productId);
+
+                    // SIMPLIFIED TAX CALCULATION
+                    // Base is always unitPrice * quantity
+                    decimal baseAmount = unitPrice * quantity;
+                    decimal lineSubtotal = baseAmount;
+                    decimal lineVat = 0;
+                    decimal lineManTax = 0;
+                    decimal lineTotal;
+
+                    // Calculate VAT if enabled
+                    if (req.ApplyVat)
+                    {
+                        lineVat = Math.Round(baseAmount * TaxConstants.VatRate, 2, MidpointRounding.AwayFromZero);
+                    }
+
+                    // Calculate Manufacturing Tax if enabled
+                    if (req.ApplyManufacturingTax)
+                    {
+                        lineManTax = Math.Round(baseAmount * TaxConstants.ManufacturingTaxRate, 2, MidpointRounding.AwayFromZero);
+                    }
+
+                    // Total = Base + VAT - ManTax
+                    lineTotal = lineSubtotal + lineVat - lineManTax;
+
+                    totalSubtotal += lineSubtotal;
+                    totalVat += lineVat;
+                    totalManTax += lineManTax;
+                    totalOrderAmount += lineTotal;
 
                     // Create order line
                     var orderLine = new SalesOrderLine
@@ -143,26 +215,83 @@ namespace Inventory.Infrastructure.Services
                         ProductId = productId,
                         ProductNameSnapshot = product.Name,
                         UnitSnapshot = product.Unit,
-                        Quantity = quantity
+                        BatchNumber = batchNumber,
+                        Quantity = quantity,
+                        UnitPrice = unitPrice,
+                        IsTaxInclusive = req.IsTaxInclusive, // Keep for reference, but doesn't affect calculation
+                        LineSubtotal = lineSubtotal,
+                        LineVatAmount = lineVat,
+                        LineManufacturingTaxAmount = lineManTax,
+                        LineTotal = lineTotal
                     };
 
                     _db.SalesOrderLines.Add(orderLine);
 
-                    // Reserve stock (increase Reserved, OnHand stays the same)
+                    // Update stock snapshot
                     var snapshot = stockSnapshots.FirstOrDefault(s => s.ProductId == productId);
                     if (snapshot is null)
                     {
                         snapshot = new StockSnapshot
                         {
                             ProductId = productId,
-                            OnHand = 0,
-                            Reserved = 0
+                            OnHand = 0
                         };
                         _db.StockSnapshots.Add(snapshot);
                     }
 
-                    snapshot.Reserved += quantity; // Reserve stock for pending order
+                    snapshot.OnHand -= quantity; // Decrease stock for sale
+
+                    // Create inventory transaction (Issue) with cost tracking
+                    var inventoryTransaction = new InventoryTransaction
+                    {
+                        ProductId = productId,
+                        QuantityDelta = -quantity, // Negative for Issue
+                        UnitCost = product.Cost, // Cost for COGS calculation
+                        Type = InventoryTransactionType.Issue,
+                        TimestampUtc = DateTimeOffset.UtcNow,
+                        UserId = user.UserId,
+                        UserDisplayName = user.UserDisplayName,
+                        clientId = req.CustomerId,
+                        BatchNumber = batchNumber,
+                        Note = $"Sales order {orderNumber}"
+                    };
+
+                    _db.InventoryTransactions.Add(inventoryTransaction);
+                    inventoryTransactions.Add(inventoryTransaction);
                 }
+
+                await _db.SaveChangesAsync(ct); // Save to get inventory transaction IDs
+
+                // Create financial transactions for COGS (Cost of Goods Sold) for each line
+                for (int i = 0; i < inventoryTransactions.Count; i++)
+                {
+                    var inventoryTransaction = inventoryTransactions[i];
+                    var productId = inventoryTransaction.ProductId;
+                    var product = products.First(p => p.Id == productId);
+                    var quantity = lineItems[productId].Quantity;
+                    var cogsAmount = product.Cost * quantity;
+
+                    var cogsTransaction = new FinancialTransaction
+                    {
+                        Type = FinancialTransactionType.Expense, // Money going out (COGS)
+                        Amount = cogsAmount,
+                        InventoryTransactionId = inventoryTransaction.Id,
+                        SalesOrderId = salesOrder.Id,
+                        ProductId = productId,
+                        CustomerId = req.CustomerId,
+                        TimestampUtc = DateTimeOffset.UtcNow,
+                        UserId = user.UserId,
+                        UserDisplayName = user.UserDisplayName,
+                        Note = $"COGS for sales order {orderNumber} - {product.Name}"
+                    };
+
+                    _db.FinancialTransactions.Add(cogsTransaction);
+                }
+
+                salesOrder.Subtotal = totalSubtotal;
+                salesOrder.VatAmount = totalVat;
+                salesOrder.ManufacturingTaxAmount = totalManTax;
+                salesOrder.TotalAmount = totalOrderAmount;
 
                 await _db.SaveChangesAsync(ct);
 
@@ -175,9 +304,13 @@ namespace Inventory.Infrastructure.Services
                         OrderNumber = salesOrder.OrderNumber,
                         CustomerId = salesOrder.CustomerId,
                         CustomerName = salesOrder.CustomerNameSnapshot,
-                        Status = salesOrder.Status,
+                        OrderDate = salesOrder.OrderDate,
+                        DueDate = salesOrder.DueDate,
+                        PaymentMethod = salesOrder.PaymentMethod.ToString(),
+                        PaymentStatus = salesOrder.PaymentStatus.ToString(),
                         LineCount = lineItems.Count,
-                        Note = salesOrder.Note
+                        Note = salesOrder.Note,
+                        TotalAmount = salesOrder.TotalAmount
                     },
                     ct);
 
@@ -207,8 +340,18 @@ namespace Inventory.Infrastructure.Services
                     OrderNumber = o.OrderNumber,
                     CustomerId = o.CustomerId,
                     CustomerName = o.CustomerNameSnapshot,
-                    Status = o.Status,
                     CreatedUtc = o.CreatedUtc,
+                    OrderDate = o.OrderDate,
+                    DueDate = o.DueDate,
+                    Status = o.Status,
+                    PaymentMethod = o.PaymentMethod,
+                    PaymentStatus = o.PaymentStatus,
+                    CheckReceived = o.CheckReceived,
+                    CheckReceivedDate = o.CheckReceivedDate,
+                    CheckCashed = o.CheckCashed,
+                    CheckCashedDate = o.CheckCashedDate,
+                    PdfPath = o.PdfPath,
+                    PdfUploadedUtc = o.PdfUploadedUtc,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
@@ -217,7 +360,8 @@ namespace Inventory.Infrastructure.Services
                         ProductId = l.ProductId,
                         ProductName = l.ProductNameSnapshot,
                         Quantity = l.Quantity,
-                        Unit = l.UnitSnapshot
+                        Unit = l.UnitSnapshot,
+                        UnitPrice = l.UnitPrice
                     }).ToList()
                 })
                 .SingleOrDefaultAsync(ct);
@@ -240,8 +384,18 @@ namespace Inventory.Infrastructure.Services
                     OrderNumber = o.OrderNumber,
                     CustomerId = o.CustomerId,
                     CustomerName = o.CustomerNameSnapshot,
-                    Status = o.Status,
                     CreatedUtc = o.CreatedUtc,
+                    OrderDate = o.OrderDate,
+                    DueDate = o.DueDate,
+                    Status = o.Status,
+                    PaymentMethod = o.PaymentMethod,
+                    PaymentStatus = o.PaymentStatus,
+                    CheckReceived = o.CheckReceived,
+                    CheckReceivedDate = o.CheckReceivedDate,
+                    CheckCashed = o.CheckCashed,
+                    CheckCashedDate = o.CheckCashedDate,
+                    PdfPath = o.PdfPath,
+                    PdfUploadedUtc = o.PdfUploadedUtc,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
@@ -250,7 +404,8 @@ namespace Inventory.Infrastructure.Services
                         ProductId = l.ProductId,
                         ProductName = l.ProductNameSnapshot,
                         Quantity = l.Quantity,
-                        Unit = l.UnitSnapshot
+                        Unit = l.UnitSnapshot,
+                        UnitPrice = l.UnitPrice
                     }).ToList()
                 })
                 .ToListAsync(ct);
@@ -271,8 +426,18 @@ namespace Inventory.Infrastructure.Services
                     OrderNumber = o.OrderNumber,
                     CustomerId = o.CustomerId,
                     CustomerName = o.CustomerNameSnapshot,
-                    Status = o.Status,
                     CreatedUtc = o.CreatedUtc,
+                    OrderDate = o.OrderDate,
+                    DueDate = o.DueDate,
+                    Status = o.Status,
+                    PaymentMethod = o.PaymentMethod,
+                    PaymentStatus = o.PaymentStatus,
+                    CheckReceived = o.CheckReceived,
+                    CheckReceivedDate = o.CheckReceivedDate,
+                    CheckCashed = o.CheckCashed,
+                    CheckCashedDate = o.CheckCashedDate,
+                    PdfPath = o.PdfPath,
+                    PdfUploadedUtc = o.PdfUploadedUtc,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
@@ -281,15 +446,15 @@ namespace Inventory.Infrastructure.Services
                         ProductId = l.ProductId,
                         ProductName = l.ProductNameSnapshot,
                         Quantity = l.Quantity,
-                        Unit = l.UnitSnapshot
+                        Unit = l.UnitSnapshot,
+                        UnitPrice = l.UnitPrice
                     }).ToList()
                 })
                 .ToListAsync(ct);
         }
 
-        public async Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default)
+        public async Task CompleteOrderAsync(long orderId, UserContext user, CancellationToken ct = default)
         {
-            if (req is null) throw new ArgumentNullException(nameof(req));
             ValidateUser(user);
 
             if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
@@ -302,40 +467,104 @@ namespace Inventory.Infrastructure.Services
             if (salesOrder is null)
                 throw new NotFoundException($"Sales order id {orderId} was not found.");
 
-            var oldStatus = salesOrder.Status;
-            var newStatus = req.Status;
+            if (salesOrder.Status == SalesOrderStatus.Completed)
+                throw new ValidationException($"Sales order {orderId} is already completed.");
 
-            // If status hasn't changed, nothing to do
-            if (oldStatus == newStatus)
-                return;
-
-            // Validate status transitions
-            ValidateStatusTransition(oldStatus, newStatus);
+            if (salesOrder.Status == SalesOrderStatus.Cancelled)
+                throw new ValidationException($"Cannot complete a cancelled sales order {orderId}.");
 
             // Use transaction to ensure all operations are atomic
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
             {
-                // Handle stock changes based on status transition
-                await HandleStatusTransitionAsync(salesOrder, oldStatus, newStatus, user, ct);
+                decimal totalRevenue = 0;
 
-                // Update order status
-                salesOrder.Status = newStatus;
+                // Create financial transactions for revenue (money coming in)
+                foreach (var line in salesOrder.Lines)
+                {
+                    var lineRevenue = line.UnitPrice * line.Quantity;
+                    totalRevenue += lineRevenue;
+
+                    var revenueTransaction = new FinancialTransaction
+                    {
+                        Type = FinancialTransactionType.Revenue, // Money coming in
+                        Amount = lineRevenue,
+                        SalesOrderId = salesOrder.Id,
+                        ProductId = line.ProductId,
+                        CustomerId = salesOrder.CustomerId,
+                        TimestampUtc = DateTimeOffset.UtcNow,
+                        UserId = user.UserId,
+                        UserDisplayName = user.UserDisplayName,
+                        Note = $"Revenue from sales order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
+                    };
+
+                    _db.FinancialTransactions.Add(revenueTransaction);
+                }
+
+                // Update order status to Completed and mark as paid so it no longer counts as owed
+                var previousStatus = salesOrder.Status;
+                var previousPaymentStatus = salesOrder.PaymentStatus;
+                salesOrder.Status = SalesOrderStatus.Completed;
+                salesOrder.PaymentStatus = PaymentStatus.Paid;
 
                 await _db.SaveChangesAsync(ct);
 
-                // AUDIT LOG: Record the status change
+                // AUDIT LOG: Record the order completion
                 await _auditWriter.LogUpdateAsync<SalesOrder>(
                     salesOrder.Id,
                     user,
-                    beforeState: new
-                    {
-                        Status = oldStatus.ToString()
-                    },
+                    beforeState: new { Status = previousStatus.ToString(), PaymentStatus = previousPaymentStatus.ToString() },
                     afterState: new
                     {
-                        Status = newStatus.ToString()
+                        Status = SalesOrderStatus.Completed.ToString(),
+                        PaymentStatus = PaymentStatus.Paid.ToString(),
+                        TotalRevenue = totalRevenue
                     },
+                    ct);
+
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not complete order due to a database conflict.", ex);
+            }
+        }
+
+        public async Task UpdateOrderStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+            if (req is null) throw new ArgumentNullException(nameof(req));
+
+            // Load the order
+            var salesOrder = await _db.SalesOrders
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (salesOrder is null)
+                throw new NotFoundException($"Sales order id {orderId} was not found.");
+
+            // Validate status transition
+            if (salesOrder.Status == req.Status)
+                throw new ValidationException($"Sales order {orderId} is already in status {req.Status}.");
+
+            // Use transaction to ensure all operations are atomic
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousStatus = salesOrder.Status;
+                salesOrder.Status = req.Status;
+
+                await _db.SaveChangesAsync(ct);
+
+                // AUDIT LOG: Record the status update
+                await _auditWriter.LogUpdateAsync<SalesOrder>(
+                    salesOrder.Id,
+                    user,
+                    beforeState: new { Status = previousStatus.ToString() },
+                    afterState: new { Status = req.Status.ToString() },
                     ct);
 
                 await _db.SaveChangesAsync(ct);
@@ -348,103 +577,46 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
-        private static void ValidateStatusTransition(SalesOrderStatus oldStatus, SalesOrderStatus newStatus)
+        /// <summary>
+        /// Sets or updates the PDF attachment path for an existing sales order.
+        /// The web/UI layer should save the actual PDF file and pass the resolved path here.
+        /// </summary>
+        public async Task AttachPdfAsync(long orderId, string pdfPath, UserContext user, CancellationToken ct = default)
         {
-            // Define valid transitions
-            var validTransitions = new Dictionary<SalesOrderStatus, HashSet<SalesOrderStatus>>
+            ValidateUser(user);
+
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+            if (string.IsNullOrWhiteSpace(pdfPath)) throw new ValidationException("PDF path must be provided.");
+
+            var salesOrder = await _db.SalesOrders
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (salesOrder is null)
+                throw new NotFoundException($"Sales order id {orderId} was not found.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
             {
-                { SalesOrderStatus.Pending, new HashSet<SalesOrderStatus> { SalesOrderStatus.Completed, SalesOrderStatus.Cancelled } },
-                { SalesOrderStatus.Completed, new HashSet<SalesOrderStatus> { SalesOrderStatus.Cancelled } },
-                { SalesOrderStatus.Cancelled, new HashSet<SalesOrderStatus>() } // Cannot transition from cancelled
-            };
+                var previousPdfPath = salesOrder.PdfPath;
+                salesOrder.PdfPath = pdfPath;
+                salesOrder.PdfUploadedUtc = DateTimeOffset.UtcNow;
 
-            if (!validTransitions.ContainsKey(oldStatus))
-                throw new ValidationException($"Invalid current status: {oldStatus}");
+                await _db.SaveChangesAsync(ct);
 
-            if (!validTransitions[oldStatus].Contains(newStatus))
-                throw new ValidationException($"Invalid status transition from {oldStatus} to {newStatus}.");
-        }
+                await _auditWriter.LogUpdateAsync<SalesOrder>(
+                    salesOrder.Id,
+                    user,
+                    beforeState: new { PdfPath = previousPdfPath },
+                    afterState: new { PdfPath = salesOrder.PdfPath, PdfUploadedUtc = salesOrder.PdfUploadedUtc },
+                    ct);
 
-        private async Task HandleStatusTransitionAsync(
-            SalesOrder salesOrder,
-            SalesOrderStatus oldStatus,
-            SalesOrderStatus newStatus,
-            UserContext user,
-            CancellationToken ct)
-        {
-            // Load all stock snapshots for products in this order
-            var productIds = salesOrder.Lines.Select(l => l.ProductId).ToList();
-            var stockSnapshots = await _db.StockSnapshots
-                .Where(s => productIds.Contains(s.ProductId))
-                .ToListAsync(ct);
-
-            foreach (var line in salesOrder.Lines)
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateException ex)
             {
-                var snapshot = stockSnapshots.FirstOrDefault(s => s.ProductId == line.ProductId);
-                if (snapshot is null)
-                {
-                    snapshot = new StockSnapshot
-                    {
-                        ProductId = line.ProductId,
-                        OnHand = 0,
-                        Reserved = 0
-                    };
-                    _db.StockSnapshots.Add(snapshot);
-                }
-
-                // Handle transitions
-                if (oldStatus == SalesOrderStatus.Pending && newStatus == SalesOrderStatus.Completed)
-                {
-                    // Pending → Completed: Convert reserved stock to actual issue
-                    // Decrease Reserved and OnHand, create Issue transaction
-                    snapshot.Reserved -= line.Quantity;
-                    snapshot.OnHand -= line.Quantity;
-
-                    var inventoryTransaction = new InventoryTransaction
-                    {
-                        ProductId = line.ProductId,
-                        QuantityDelta = -line.Quantity, // Negative for Issue
-                        Type = InventoryTransactionType.Issue,
-                        TimestampUtc = DateTimeOffset.UtcNow,
-                        UserId = user.UserId,
-                        UserDisplayName = user.UserDisplayName,
-                        clientId = salesOrder.CustomerId,
-                        Note = $"Sales order {salesOrder.OrderNumber} - Status changed to Completed"
-                    };
-
-                    _db.InventoryTransactions.Add(inventoryTransaction);
-                }
-                else if (oldStatus == SalesOrderStatus.Pending && newStatus == SalesOrderStatus.Cancelled)
-                {
-                    // Pending → Cancelled: Release reservation
-                    // Decrease Reserved only, OnHand stays the same
-                    snapshot.Reserved -= line.Quantity;
-                }
-                else if (oldStatus == SalesOrderStatus.Completed && newStatus == SalesOrderStatus.Cancelled)
-                {
-                    // Completed → Cancelled: Return stock to inventory
-                    // Increase OnHand, decrease Reserved (if any was still reserved)
-                    snapshot.OnHand += line.Quantity;
-                    // Note: Reserved should already be 0 for completed orders, but handle edge cases
-                    if (snapshot.Reserved > 0)
-                    {
-                        snapshot.Reserved = Math.Max(0, snapshot.Reserved - line.Quantity);
-                    }
-
-                    var inventoryTransaction = new InventoryTransaction
-                    {
-                        ProductId = line.ProductId,
-                        QuantityDelta = line.Quantity, // Positive for Receive (return)
-                        Type = InventoryTransactionType.Receive,
-                        TimestampUtc = DateTimeOffset.UtcNow,
-                        UserId = user.UserId,
-                        UserDisplayName = user.UserDisplayName,
-                        clientId = salesOrder.CustomerId,
-                        Note = $"Sales order {salesOrder.OrderNumber} - Status changed to Cancelled (stock return)"
-                    };
-
-                    _db.InventoryTransactions.Add(inventoryTransaction);
-                }
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not attach PDF to sales order due to a database conflict.", ex);
             }
         }
 
