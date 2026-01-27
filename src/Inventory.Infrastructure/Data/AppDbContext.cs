@@ -90,16 +90,22 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.OrderNumber).HasMaxLength(50).IsRequired();
                 b.HasIndex(x => x.OrderNumber).IsUnique();
                 b.Property(x => x.CustomerNameSnapshot).HasMaxLength(200).IsRequired();
+                b.Property(x => x.OrderDate).IsRequired();
+                b.Property(x => x.DueDate).IsRequired();
+                b.Property(x => x.PdfPath).HasMaxLength(500);
                 b.Property(x => x.CreatedByUserId).HasMaxLength(450).IsRequired();
                 b.Property(x => x.CreatedByUserDisplayName).HasMaxLength(200).IsRequired();
                 b.Property(x => x.Note).HasMaxLength(500);
                 b.Property(x => x.Status).IsRequired().HasConversion<int>();
+                b.Property(x => x.PaymentMethod).IsRequired().HasConversion<int>();
+                b.Property(x => x.PaymentStatus).IsRequired().HasConversion<int>();
                 b.Property(x => x.Subtotal).HasPrecision(18, 2);
                 b.Property(x => x.VatAmount).HasPrecision(18, 2);
                 b.Property(x => x.ManufacturingTaxAmount).HasPrecision(18, 2);
                 b.Property(x => x.TotalAmount).HasPrecision(18, 2);
                 b.HasIndex(x => x.CreatedUtc);
                 b.HasIndex(x => x.Status);
+                b.HasIndex(x => x.PaymentStatus);
                 b.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
             });
 

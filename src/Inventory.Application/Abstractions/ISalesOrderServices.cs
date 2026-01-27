@@ -34,5 +34,17 @@ namespace Inventory.Application.Abstractions
         /// Updates the status of a sales order
         /// </summary>
         Task UpdateOrderStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Attaches or updates a PDF file reference for an existing sales order.
+        /// The caller is responsible for saving the actual file and providing its relative/absolute path.
+        /// </summary>
+        Task AttachPdfAsync(long orderId, string pdfPath, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Returns how much a customer owes, leveraging payment due dates.
+        /// TotalPending = all unpaid orders, TotalDueNow = unpaid orders with DueDate &lt;= AsOfUtc.
+        /// </summary>
+        Task<CustomerBalanceResponseDto> GetCustomerBalanceAsync(int customerId, DateTimeOffset? asOfUtc = null, CancellationToken ct = default);
     }
 }

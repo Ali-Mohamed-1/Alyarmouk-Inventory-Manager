@@ -64,6 +64,9 @@
                 var req = new CreateSalesOrderRequest
                 {
                     CustomerId = 1,
+                    DueDate = DateTimeOffset.UtcNow.AddDays(7),
+                    PaymentMethod = PaymentMethod.Cash,
+                    PaymentStatus = PaymentStatus.Pending,
                     IsTaxInclusive = true,
                     ApplyVat = true,
                     ApplyManufacturingTax = false,
@@ -90,6 +93,9 @@
                 var req = new CreateSalesOrderRequest
                 {
                     CustomerId = 1,
+                    DueDate = DateTimeOffset.UtcNow.AddDays(7),
+                    PaymentMethod = PaymentMethod.Cash,
+                    PaymentStatus = PaymentStatus.Pending,
                     IsTaxInclusive = false,
                     ApplyVat = true,
                     ApplyManufacturingTax = false,
@@ -120,6 +126,9 @@
                 var req = new CreateSalesOrderRequest
                 {
                     CustomerId = 1,
+                    DueDate = DateTimeOffset.UtcNow.AddDays(7),
+                    PaymentMethod = PaymentMethod.Cash,
+                    PaymentStatus = PaymentStatus.Pending,
                     IsTaxInclusive = true,
                     ApplyVat = true,
                     ApplyManufacturingTax = true,
@@ -176,6 +185,9 @@
                 var req = new CreateSalesOrderRequest
                 {
                     CustomerId = 1,
+                    DueDate = DateTimeOffset.UtcNow.AddDays(7),
+                    PaymentMethod = PaymentMethod.Cash,
+                    PaymentStatus = PaymentStatus.Pending,
                     IsTaxInclusive = true,
                     ApplyVat = false,
                     ApplyManufacturingTax = true,
@@ -203,6 +215,9 @@
                 var req = new CreateSalesOrderRequest
                 {
                     CustomerId = 1,
+                    DueDate = DateTimeOffset.UtcNow.AddDays(7),
+                    PaymentMethod = PaymentMethod.Cash,
+                    PaymentStatus = PaymentStatus.Pending,
                     IsTaxInclusive = false,
                     ApplyVat = false,
                     ApplyManufacturingTax = true,
@@ -229,6 +244,9 @@
                 var req = new CreateSalesOrderRequest
                 {
                     CustomerId = 1,
+                    DueDate = DateTimeOffset.UtcNow.AddDays(7),
+                    PaymentMethod = PaymentMethod.Cash,
+                    PaymentStatus = PaymentStatus.Pending,
                     IsTaxInclusive = false,
                     ApplyVat = false,
                     ApplyManufacturingTax = false,
@@ -256,6 +274,9 @@
             var req = new CreateSalesOrderRequest
             {
                 CustomerId = 1,
+                DueDate = DateTimeOffset.UtcNow.AddDays(7),
+                PaymentMethod = PaymentMethod.Cash,
+                PaymentStatus = PaymentStatus.Pending,
                 IsTaxInclusive = true,
                 ApplyVat = true,
                 ApplyManufacturingTax = true,
@@ -293,6 +314,9 @@
             var req = new CreateSalesOrderRequest
             {
                 CustomerId = 1,
+                DueDate = DateTimeOffset.UtcNow.AddDays(7),
+                PaymentMethod = PaymentMethod.Cash,
+                PaymentStatus = PaymentStatus.Pending,
                 Lines = new List<CreateSalesOrderLineRequest> { new() { ProductId = 1, Quantity = 0, UnitPrice = 100 } }
             };
 
@@ -306,6 +330,9 @@
             var req = new CreateSalesOrderRequest
             {
                 CustomerId = 1,
+                DueDate = DateTimeOffset.UtcNow.AddDays(7),
+                PaymentMethod = PaymentMethod.Cash,
+                PaymentStatus = PaymentStatus.Pending,
                 IsTaxInclusive = true,
                 ApplyVat = true,
                 ApplyManufacturingTax = true,
@@ -353,6 +380,9 @@
             var req = new CreateSalesOrderRequest
             {
                 CustomerId = 1,
+                DueDate = DateTimeOffset.UtcNow.AddDays(7),
+                PaymentMethod = PaymentMethod.Cash,
+                PaymentStatus = PaymentStatus.Pending,
                 IsTaxInclusive = true,
                 ApplyVat = true,
                 ApplyManufacturingTax = true,

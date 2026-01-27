@@ -33,6 +33,20 @@ namespace Inventory.Infrastructure.Services
             if (req is null) throw new ArgumentNullException(nameof(req));
             ValidateUser(user);
 
+            // Money flow / payment validation
+            if (!req.DueDate.HasValue)
+                throw new ValidationException("Due date is required for a sales order.");
+
+            if (req.PaymentMethod == PaymentMethod.Check)
+            {
+                // For check payments, track whether we received and cashed the check with corresponding dates.
+                if (req.CheckReceived == true && !req.CheckReceivedDate.HasValue)
+                    throw new ValidationException("Check received date is required when the check is marked as received.");
+
+                if (req.CheckCashed == true && !req.CheckCashedDate.HasValue)
+                    throw new ValidationException("Check cashed date is required when the check is marked as cashed.");
+            }
+
             if (req.CustomerId <= 0)
                 throw new ArgumentOutOfRangeException(nameof(req), "Customer ID must be positive.");
 
@@ -130,6 +144,14 @@ namespace Inventory.Infrastructure.Services
                     CustomerId = req.CustomerId,
                     CustomerNameSnapshot = customer.Name,
                     CreatedUtc = DateTimeOffset.UtcNow,
+                    OrderDate = req.OrderDate ?? DateTimeOffset.UtcNow,
+                    DueDate = req.DueDate!.Value,
+                    PaymentMethod = req.PaymentMethod,
+                    PaymentStatus = req.PaymentStatus,
+                    CheckReceived = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckReceived,
+                    CheckReceivedDate = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckReceivedDate,
+                    CheckCashed = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckCashed,
+                    CheckCashedDate = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckCashedDate,
                     CreatedByUserId = user.UserId,
                     CreatedByUserDisplayName = user.UserDisplayName,
                     Note = req.Note,
@@ -277,6 +299,10 @@ namespace Inventory.Infrastructure.Services
                         OrderNumber = salesOrder.OrderNumber,
                         CustomerId = salesOrder.CustomerId,
                         CustomerName = salesOrder.CustomerNameSnapshot,
+                        OrderDate = salesOrder.OrderDate,
+                        DueDate = salesOrder.DueDate,
+                        PaymentMethod = salesOrder.PaymentMethod.ToString(),
+                        PaymentStatus = salesOrder.PaymentStatus.ToString(),
                         LineCount = lineItems.Count,
                         Note = salesOrder.Note,
                         TotalAmount = salesOrder.TotalAmount
@@ -310,7 +336,17 @@ namespace Inventory.Infrastructure.Services
                     CustomerId = o.CustomerId,
                     CustomerName = o.CustomerNameSnapshot,
                     CreatedUtc = o.CreatedUtc,
+                    OrderDate = o.OrderDate,
+                    DueDate = o.DueDate,
                     Status = o.Status,
+                    PaymentMethod = o.PaymentMethod,
+                    PaymentStatus = o.PaymentStatus,
+                    CheckReceived = o.CheckReceived,
+                    CheckReceivedDate = o.CheckReceivedDate,
+                    CheckCashed = o.CheckCashed,
+                    CheckCashedDate = o.CheckCashedDate,
+                    PdfPath = o.PdfPath,
+                    PdfUploadedUtc = o.PdfUploadedUtc,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
@@ -344,7 +380,17 @@ namespace Inventory.Infrastructure.Services
                     CustomerId = o.CustomerId,
                     CustomerName = o.CustomerNameSnapshot,
                     CreatedUtc = o.CreatedUtc,
+                    OrderDate = o.OrderDate,
+                    DueDate = o.DueDate,
                     Status = o.Status,
+                    PaymentMethod = o.PaymentMethod,
+                    PaymentStatus = o.PaymentStatus,
+                    CheckReceived = o.CheckReceived,
+                    CheckReceivedDate = o.CheckReceivedDate,
+                    CheckCashed = o.CheckCashed,
+                    CheckCashedDate = o.CheckCashedDate,
+                    PdfPath = o.PdfPath,
+                    PdfUploadedUtc = o.PdfUploadedUtc,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
@@ -376,7 +422,17 @@ namespace Inventory.Infrastructure.Services
                     CustomerId = o.CustomerId,
                     CustomerName = o.CustomerNameSnapshot,
                     CreatedUtc = o.CreatedUtc,
+                    OrderDate = o.OrderDate,
+                    DueDate = o.DueDate,
                     Status = o.Status,
+                    PaymentMethod = o.PaymentMethod,
+                    PaymentStatus = o.PaymentStatus,
+                    CheckReceived = o.CheckReceived,
+                    CheckReceivedDate = o.CheckReceivedDate,
+                    CheckCashed = o.CheckCashed,
+                    CheckCashedDate = o.CheckCashedDate,
+                    PdfPath = o.PdfPath,
+                    PdfUploadedUtc = o.PdfUploadedUtc,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
@@ -440,9 +496,11 @@ namespace Inventory.Infrastructure.Services
                     _db.FinancialTransactions.Add(revenueTransaction);
                 }
 
-                // Update order status to Completed
+                // Update order status to Completed and mark as paid so it no longer counts as owed
                 var previousStatus = salesOrder.Status;
+                var previousPaymentStatus = salesOrder.PaymentStatus;
                 salesOrder.Status = SalesOrderStatus.Completed;
+                salesOrder.PaymentStatus = PaymentStatus.Paid;
 
                 await _db.SaveChangesAsync(ct);
 
@@ -450,10 +508,11 @@ namespace Inventory.Infrastructure.Services
                 await _auditWriter.LogUpdateAsync<SalesOrder>(
                     salesOrder.Id,
                     user,
-                    beforeState: new { Status = previousStatus.ToString() },
+                    beforeState: new { Status = previousStatus.ToString(), PaymentStatus = previousPaymentStatus.ToString() },
                     afterState: new
                     {
                         Status = SalesOrderStatus.Completed.ToString(),
+                        PaymentStatus = PaymentStatus.Paid.ToString(),
                         TotalRevenue = totalRevenue
                     },
                     ct);
@@ -510,6 +569,76 @@ namespace Inventory.Infrastructure.Services
             {
                 await transaction.RollbackAsync(ct);
                 throw new ConflictException("Could not update order status due to a database conflict.", ex);
+            }
+        }
+
+        public async Task<CustomerBalanceResponseDto> GetCustomerBalanceAsync(int customerId, DateTimeOffset? asOfUtc = null, CancellationToken ct = default)
+        {
+            if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId), "Customer ID must be positive.");
+
+            var asOf = asOfUtc ?? DateTimeOffset.UtcNow;
+
+            // Consider only orders that are still unpaid.
+            var query = _db.SalesOrders
+                .AsNoTracking()
+                .Where(o => o.CustomerId == customerId && o.PaymentStatus == PaymentStatus.Pending);
+
+            var totalPending = await query.SumAsync(o => o.TotalAmount, ct);
+
+            // Due now or overdue: unpaid and due date is on or before the "as of" timestamp.
+            var totalDueNow = await query
+                .Where(o => o.DueDate <= asOf)
+                .SumAsync(o => o.TotalAmount, ct);
+
+            return new CustomerBalanceResponseDto
+            {
+                CustomerId = customerId,
+                TotalPending = totalPending,
+                TotalDueNow = totalDueNow,
+                AsOfUtc = asOf
+            };
+        }
+
+        /// <summary>
+        /// Sets or updates the PDF attachment path for an existing sales order.
+        /// The web/UI layer should save the actual PDF file and pass the resolved path here.
+        /// </summary>
+        public async Task AttachPdfAsync(long orderId, string pdfPath, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+            if (string.IsNullOrWhiteSpace(pdfPath)) throw new ValidationException("PDF path must be provided.");
+
+            var salesOrder = await _db.SalesOrders
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (salesOrder is null)
+                throw new NotFoundException($"Sales order id {orderId} was not found.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousPdfPath = salesOrder.PdfPath;
+                salesOrder.PdfPath = pdfPath;
+                salesOrder.PdfUploadedUtc = DateTimeOffset.UtcNow;
+
+                await _db.SaveChangesAsync(ct);
+
+                await _auditWriter.LogUpdateAsync<SalesOrder>(
+                    salesOrder.Id,
+                    user,
+                    beforeState: new { PdfPath = previousPdfPath },
+                    afterState: new { PdfPath = salesOrder.PdfPath, PdfUploadedUtc = salesOrder.PdfUploadedUtc },
+                    ct);
+
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not attach PDF to sales order due to a database conflict.", ex);
             }
         }
 

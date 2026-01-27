@@ -6,6 +6,19 @@ public enum SalesOrderStatus
     Completed = 1,
     Cancelled = 2
 }
+
+public enum PaymentMethod
+{
+    Cash = 1,
+    Check = 2
+}
+
+public enum PaymentStatus
+{
+    Pending = 0,
+    Paid = 1
+}
+
 public  class SalesOrder
 {
     public long Id { get; set; }
@@ -13,7 +26,60 @@ public  class SalesOrder
     public int CustomerId { get; set; }
     public Customer? Customer { get; set; }
     public string CustomerNameSnapshot { get; set; } = "";
+
     public SalesOrderStatus Status { get; set; } = SalesOrderStatus.Pending;
+
+    /// <summary>
+    /// Order creation date (local business date).
+    /// </summary>
+    public DateTimeOffset OrderDate { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// When the customer is expected to pay.
+    /// </summary>
+    public DateTimeOffset DueDate { get; set; }
+
+    /// <summary>
+    /// Payment method used for this order (cash / check).
+    /// </summary>
+    public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.Cash;
+
+    /// <summary>
+    /// Overall payment status for this order.
+    /// </summary>
+    public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Pending;
+
+    /// <summary>
+    /// For check payments: whether we received the check.
+    /// </summary>
+    public bool? CheckReceived { get; set; }
+
+    /// <summary>
+    /// For check payments: date when the check was received.
+    /// </summary>
+    public DateTimeOffset? CheckReceivedDate { get; set; }
+
+    /// <summary>
+    /// For check payments: whether the check has been cashed.
+    /// </summary>
+    public bool? CheckCashed { get; set; }
+
+    /// <summary>
+    /// For check payments: date when the check was cashed.
+    /// </summary>
+    public DateTimeOffset? CheckCashedDate { get; set; }
+
+    /// <summary>
+    /// Optional path or identifier to a PDF attachment stored for this order.
+    /// The web layer is responsible for saving the actual file and providing the path.
+    /// </summary>
+    public string? PdfPath { get; set; }
+
+    /// <summary>
+    /// When the PDF attachment was last uploaded/updated.
+    /// </summary>
+    public DateTimeOffset? PdfUploadedUtc { get; set; }
+
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public string CreatedByUserId { get; set; } = "";
     public string CreatedByUserDisplayName { get; set; } = "";
