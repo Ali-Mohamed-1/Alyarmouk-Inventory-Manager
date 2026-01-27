@@ -41,10 +41,5 @@ namespace Inventory.Application.Abstractions
         /// </summary>
         Task AttachPdfAsync(long orderId, string pdfPath, UserContext user, CancellationToken ct = default);
 
-        /// <summary>
-        /// Returns how much a customer owes, leveraging payment due dates.
-        /// TotalPending = all unpaid orders, TotalDueNow = unpaid orders with DueDate &lt;= AsOfUtc.
-        /// </summary>
-        Task<CustomerBalanceResponseDto> GetCustomerBalanceAsync(int customerId, DateTimeOffset? asOfUtc = null, CancellationToken ct = default);
     }
 }

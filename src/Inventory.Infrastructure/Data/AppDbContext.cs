@@ -141,6 +141,8 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.OrderNumber).HasMaxLength(50).IsRequired();
                 b.HasIndex(x => x.OrderNumber).IsUnique();
                 b.Property(x => x.SupplierNameSnapshot).HasMaxLength(200).IsRequired();
+                b.Property(x => x.Status).IsRequired().HasConversion<int>();
+                b.Property(x => x.PaymentStatus).IsRequired().HasConversion<int>();
                 b.Property(x => x.CreatedByUserId).HasMaxLength(450).IsRequired();
                 b.Property(x => x.CreatedByUserDisplayName).HasMaxLength(200).IsRequired();
                 b.Property(x => x.Note).HasMaxLength(500);
@@ -150,6 +152,8 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.ReceiptExpenses).HasPrecision(18, 2);
                 b.Property(x => x.TotalAmount).HasPrecision(18, 2);
                 b.HasIndex(x => x.CreatedUtc);
+                b.HasIndex(x => x.Status);
+                b.HasIndex(x => x.PaymentStatus);
                 b.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
             });
 
@@ -179,10 +183,15 @@ namespace Inventory.Infrastructure.Data
                 b.HasIndex(x => x.Type);
                 b.HasIndex(x => x.ProductId);
                 b.HasIndex(x => x.SalesOrderId);
+                b.HasIndex(x => x.IsInternalExpense);
                 b.HasOne(x => x.InventoryTransaction).WithMany().HasForeignKey(x => x.InventoryTransactionId).OnDelete(DeleteBehavior.SetNull);
                 b.HasOne(x => x.SalesOrder).WithMany().HasForeignKey(x => x.SalesOrderId).OnDelete(DeleteBehavior.SetNull);
                 b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+                b.HasIndex(x => x.SupplierId);
+                b.HasIndex(x => x.PurchaseOrderId);
+                b.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+                b.HasOne(x => x.PurchaseOrder).WithMany().HasForeignKey(x => x.PurchaseOrderId).OnDelete(DeleteBehavior.SetNull);
             });
         }
     }

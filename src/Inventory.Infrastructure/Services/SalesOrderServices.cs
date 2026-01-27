@@ -577,33 +577,6 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
-        public async Task<CustomerBalanceResponseDto> GetCustomerBalanceAsync(int customerId, DateTimeOffset? asOfUtc = null, CancellationToken ct = default)
-        {
-            if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId), "Customer ID must be positive.");
-
-            var asOf = asOfUtc ?? DateTimeOffset.UtcNow;
-
-            // Consider only orders that are still unpaid.
-            var query = _db.SalesOrders
-                .AsNoTracking()
-                .Where(o => o.CustomerId == customerId && o.PaymentStatus == PaymentStatus.Pending);
-
-            var totalPending = await query.SumAsync(o => o.TotalAmount, ct);
-
-            // Due now or overdue: unpaid and due date is on or before the "as of" timestamp.
-            var totalDueNow = await query
-                .Where(o => o.DueDate <= asOf)
-                .SumAsync(o => o.TotalAmount, ct);
-
-            return new CustomerBalanceResponseDto
-            {
-                CustomerId = customerId,
-                TotalPending = totalPending,
-                TotalDueNow = totalDueNow,
-                AsOfUtc = asOf
-            };
-        }
-
         /// <summary>
         /// Sets or updates the PDF attachment path for an existing sales order.
         /// The web/UI layer should save the actual PDF file and pass the resolved path here.

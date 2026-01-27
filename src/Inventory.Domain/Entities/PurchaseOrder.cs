@@ -1,5 +1,18 @@
 namespace Inventory.Domain.Entities;
 
+public enum PurchaseOrderStatus
+{
+    Pending = 0,
+    Received = 1,
+    Cancelled = 2
+}
+
+public enum PurchasePaymentStatus
+{
+    Unpaid = 0,
+    Paid = 1
+}
+
 public class PurchaseOrder
 {
     public long Id { get; set; }
@@ -7,6 +20,10 @@ public class PurchaseOrder
     public int SupplierId { get; set; }
     public Supplier? Supplier { get; set; }
     public string SupplierNameSnapshot { get; set; } = "";
+
+    public PurchaseOrderStatus Status { get; set; } = PurchaseOrderStatus.Pending;
+    public PurchasePaymentStatus PaymentStatus { get; set; } = PurchasePaymentStatus.Unpaid;
+
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public string CreatedByUserId { get; set; } = "";
     public string CreatedByUserDisplayName { get; set; } = "";
