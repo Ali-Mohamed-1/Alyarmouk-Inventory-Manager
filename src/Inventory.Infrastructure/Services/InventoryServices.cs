@@ -56,17 +56,17 @@ namespace Inventory.Infrastructure.Services
         {
             if (req is null) throw new ArgumentNullException(nameof(req));
 
-            if (req.productId <= 0)
+            if (req.ProductId <= 0)
                 throw new ArgumentOutOfRangeException(nameof(req), "Product ID must be positive.");
 
-            if (req.Quantitiy <= 0)
+            if (req.Quantity <= 0)
                 throw new ValidationException("Quantity must be greater than zero.");
 
             // Create a Receive transaction
             var transactionRequest = new CreateInventoryTransactionRequest
             {
-                ProductId = req.productId,
-                Quantity = req.Quantitiy,
+                ProductId = req.ProductId,
+                Quantity = req.Quantity,
                 Type = Domain.Entities.InventoryTransactionType.Receive,
                 Note = req.Note
             };

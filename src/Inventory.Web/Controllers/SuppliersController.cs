@@ -2,47 +2,48 @@ using System.Threading;
 using System.Threading.Tasks;
 using Inventory.Application.Abstractions;
 using Inventory.Application.DTOs;
+using Inventory.Application.DTOs.Supplier;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Inventory.Web.Controllers;
 
-public sealed class CategoriesController : Controller
+public sealed class SuppliersController : Controller
 {
-    private readonly ICategoryServices _categories;
+    private readonly ISupplierServices _suppliers;
 
-    public CategoriesController(ICategoryServices categories)
+    public SuppliersController(ISupplierServices suppliers)
     {
-        _categories = categories;
+        _suppliers = suppliers;
     }
 
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
-        var items = await _categories.GetAllAsync(cancellationToken);
+        var items = await _suppliers.GetAllAsync(cancellationToken);
         return View(items);
     }
 
     [HttpGet]
     public async Task<IActionResult> Details(int id, CancellationToken cancellationToken)
     {
-        var category = await _categories.GetByIdAsync(id, cancellationToken);
-        if (category is null)
+        var supplier = await _suppliers.GetByIdAsync(id, cancellationToken);
+        if (supplier is null)
         {
             return NotFound();
         }
 
-        return View(category);
+        return View(supplier);
     }
 
     [HttpGet]
     public IActionResult Create()
     {
-        return View(new CreateCategoryRequest());
+        return View(new CreateSupplierRequest("", "", "", ""));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(CreateCategoryRequest model, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create(CreateSupplierRequest model, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
         {
@@ -50,31 +51,33 @@ public sealed class CategoriesController : Controller
         }
 
         var user = GetUserContext();
-        var id = await _categories.CreateAsync(model, user, cancellationToken);
+        var id = await _suppliers.CreateAsync(model, user, cancellationToken);
         return RedirectToAction(nameof(Details), new { id });
     }
 
     [HttpGet]
     public async Task<IActionResult> Edit(int id, CancellationToken cancellationToken)
     {
-        var existing = await _categories.GetByIdAsync(id, cancellationToken);
+        var existing = await _suppliers.GetByIdAsync(id, cancellationToken);
         if (existing is null)
         {
             return NotFound();
         }
 
-        var model = new UpdateCategoryRequest
-        {
-            Id = existing.Id,
-            Name = existing.Name,
-        };
+        var model = new UpdateSupplierRequest(
+            existing.Id,
+            existing.Name,
+            existing.Phone,
+            existing.Email,
+            existing.Address,
+            existing.IsActive);
 
         return View(model);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, UpdateCategoryRequest model, CancellationToken cancellationToken)
+    public async Task<IActionResult> Edit(int id, UpdateSupplierRequest model, CancellationToken cancellationToken)
     {
         if (id != model.Id)
         {
@@ -87,16 +90,23 @@ public sealed class CategoriesController : Controller
         }
 
         var user = GetUserContext();
-        await _categories.UpdateAsync(id, model, user, cancellationToken);
+        await _suppliers.UpdateAsync(id, model, user, cancellationToken);
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetActive(int id, bool isActive, CancellationToken cancellationToken)
+    {
+        var user = GetUserContext();
+        await _suppliers.SetActiveAsync(id, isActive, user, cancellationToken);
         return RedirectToAction(nameof(Details), new { id });
     }
 
     private UserContext GetUserContext()
     {
-        // For now we build a simple user context from the current principal.
         var userId = User?.Identity?.Name ?? "system";
         var displayName = User?.Identity?.Name ?? "System";
         return new UserContext(userId, displayName);
     }
 }
-

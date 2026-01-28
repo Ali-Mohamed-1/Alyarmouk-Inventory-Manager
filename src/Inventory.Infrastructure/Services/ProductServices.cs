@@ -40,6 +40,7 @@ namespace Inventory.Infrastructure.Services
                     CategoryName = p.Category != null ? p.Category.Name : string.Empty,
                     Unit = p.Unit,
                     Price = p.Price,
+                    Cost = p.Cost,
                     ReorderPoint = p.ReorderPoint,
                     IsActive = p.IsActive,
                     RowVersion = Convert.ToBase64String(p.RowVersion)
@@ -64,6 +65,7 @@ namespace Inventory.Infrastructure.Services
                     CategoryName = p.Category != null ? p.Category.Name : string.Empty,
                     Unit = p.Unit,
                     Price = p.Price,
+                    Cost = p.Cost,
                     ReorderPoint = p.ReorderPoint,
                     IsActive = p.IsActive,
                     RowVersion = Convert.ToBase64String(p.RowVersion)

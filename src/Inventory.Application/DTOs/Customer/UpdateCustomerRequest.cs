@@ -21,5 +21,7 @@ namespace Inventory.Application.DTOs.Customer
 
         [EmailAddress]
         public string? Email { get; init; }
+
+        public string? Address { get; init; }
     }
 }

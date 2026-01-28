@@ -1,0 +1,53 @@
+@model IEnumerable<Inventory.Application.DTOs.SalesOrder.SalesOrderResponseDto>
+@{
+    ViewData["Title"] = "Sales Orders";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Sales Orders</h1>
+    <a asp-action="Create" class="btn btn-primary">Create New Sales Order</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Order #</th>
+                        <th>Customer</th>
+                        <th>Date</th>
+                        <th>Total Amount</th>
+                        <th>Payment</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td><code>@item.OrderNumber</code></td>
+                            <td>@item.CustomerName</td>
+                            <td>@item.CreatedUtc.ToString("g")</td>
+                            <td>@item.TotalAmount.ToString("C2")</td>
+                            <td>
+                                <span class="badge @(item.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.Paid ? "bg-success" : "bg-warning")">
+                                    @item.PaymentStatus
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge @(item.Status == Inventory.Domain.Entities.SalesOrderStatus.Completed ? "bg-info" : "bg-secondary")">
+                                    @item.Status
+                                </span>
+                            </td>
+                            <td>
+                                <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-outline-info">Details</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -26,6 +26,26 @@ namespace Inventory.Infrastructure.Services
             _auditWriter = auditWriter ?? throw new ArgumentNullException(nameof(auditWriter));
         }
 
+        public async Task<IEnumerable<PurchaseOrderResponse>> GetRecentAsync(int count = 10, CancellationToken ct = default)
+        {
+            return await _db.PurchaseOrders
+                .AsNoTracking()
+                .OrderByDescending(o => o.CreatedUtc)
+                .Take(count)
+                .Select(o => MapToResponse(o))
+                .ToListAsync(ct);
+        }
+
+        public async Task<PurchaseOrderResponse?> GetByIdAsync(long id, CancellationToken ct = default)
+        {
+            var order = await _db.PurchaseOrders
+                .AsNoTracking()
+                .Include(o => o.Lines)
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
+
+            return order == null ? null : MapToResponse(order);
+        }
+
         public async Task<long> CreateAsync(CreatePurchaseOrderRequest req, UserContext user, CancellationToken ct = default)
         {
             if (req is null) throw new ArgumentNullException(nameof(req));
@@ -312,6 +332,49 @@ namespace Inventory.Infrastructure.Services
                 throw new ConflictException("Could not generate unique order number. Please try again.");
 
             return orderNumber;
+        }
+
+        public async Task UpdateStatusAsync(long id, PurchaseOrderStatus status, UserContext user, CancellationToken ct = default)
+        {
+            var order = await _db.PurchaseOrders.FindAsync(new object[] { id }, ct);
+            if (order == null) throw new NotFoundException($"Purchase order {id} not found.");
+
+            var before = new { order.Status };
+            order.Status = status;
+
+            await _db.SaveChangesAsync(ct);
+
+            await _auditWriter.LogUpdateAsync<PurchaseOrder>(id, user, before, new { Status = status }, ct);
+        }
+
+        private static PurchaseOrderResponse MapToResponse(PurchaseOrder o)
+        {
+            return new PurchaseOrderResponse(
+                o.Id,
+                o.OrderNumber,
+                o.SupplierId,
+                o.SupplierNameSnapshot,
+                o.CreatedUtc,
+                o.Status,
+                o.CreatedByUserDisplayName,
+                o.IsTaxInclusive,
+                o.Subtotal,
+                o.VatAmount,
+                o.ManufacturingTaxAmount,
+                o.ReceiptExpenses,
+                o.TotalAmount,
+                o.Note,
+                o.Lines.Select(l => new PurchaseOrderLineResponse(
+                    l.Id,
+                    l.ProductId,
+                    l.ProductNameSnapshot,
+                    l.BatchNumber,
+                    l.Quantity,
+                    l.UnitSnapshot,
+                    l.UnitPrice,
+                    l.LineSubtotal,
+                    l.LineVatAmount,
+                    l.LineTotal)).ToList());
         }
 
         #endregion

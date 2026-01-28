@@ -1,0 +1,41 @@
+@model IEnumerable<Inventory.Application.DTOs.PurchaseOrderResponse>
+@{
+    ViewData["Title"] = "Purchase Orders";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Purchase Orders</h1>
+    <a asp-action="Create" class="btn btn-primary">Create New Purchase Order</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Order #</th>
+                        <th>Supplier</th>
+                        <th>Date</th>
+                        <th>Total Amount</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td><code>@item.OrderNumber</code></td>
+                            <td>@item.SupplierName</td>
+                            <td>@item.CreatedUtc.ToString("g")</td>
+                            <td>@item.TotalAmount.ToString("C2")</td>
+                            <td>
+                                <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-outline-info">Details</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

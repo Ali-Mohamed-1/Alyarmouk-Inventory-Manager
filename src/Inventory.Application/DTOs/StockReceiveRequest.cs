@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 
 namespace Inventory.Application.DTOs
 {
-    public record StockReceiveRequest
-    (
-        int productId,
-        decimal Quantitiy,
-        string? Note
-    );
+    public class StockReceiveRequest
+    {
+        public int ProductId { get; set; }
+        public decimal Quantity { get; set; }
+        public string? Note { get; set; }
+    }
 }

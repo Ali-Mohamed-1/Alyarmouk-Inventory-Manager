@@ -355,6 +355,13 @@ namespace Inventory.Infrastructure.Services
                     PdfUploadedUtc = o.PdfUploadedUtc,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
+                    IsTaxInclusive = o.IsTaxInclusive,
+                    ApplyVat = o.ApplyVat,
+                    ApplyManufacturingTax = o.ApplyManufacturingTax,
+                    Subtotal = o.Subtotal,
+                    VatAmount = o.VatAmount,
+                    ManufacturingTaxAmount = o.ManufacturingTaxAmount,
+                    TotalAmount = o.TotalAmount,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
                     {
                         Id = l.Id,
@@ -362,7 +369,12 @@ namespace Inventory.Infrastructure.Services
                         ProductName = l.ProductNameSnapshot,
                         Quantity = l.Quantity,
                         Unit = l.UnitSnapshot,
-                        UnitPrice = l.UnitPrice
+                        UnitPrice = l.UnitPrice,
+                        IsTaxInclusive = l.IsTaxInclusive,
+                        LineSubtotal = l.LineSubtotal,
+                        LineVatAmount = l.LineVatAmount,
+                        LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
+                        LineTotal = l.LineTotal
                     }).ToList()
                 })
                 .SingleOrDefaultAsync(ct);
@@ -399,6 +411,13 @@ namespace Inventory.Infrastructure.Services
                     PdfUploadedUtc = o.PdfUploadedUtc,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
+                    IsTaxInclusive = o.IsTaxInclusive,
+                    ApplyVat = o.ApplyVat,
+                    ApplyManufacturingTax = o.ApplyManufacturingTax,
+                    Subtotal = o.Subtotal,
+                    VatAmount = o.VatAmount,
+                    ManufacturingTaxAmount = o.ManufacturingTaxAmount,
+                    TotalAmount = o.TotalAmount,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
                     {
                         Id = l.Id,
@@ -406,7 +425,12 @@ namespace Inventory.Infrastructure.Services
                         ProductName = l.ProductNameSnapshot,
                         Quantity = l.Quantity,
                         Unit = l.UnitSnapshot,
-                        UnitPrice = l.UnitPrice
+                        UnitPrice = l.UnitPrice,
+                        IsTaxInclusive = l.IsTaxInclusive,
+                        LineSubtotal = l.LineSubtotal,
+                        LineVatAmount = l.LineVatAmount,
+                        LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
+                        LineTotal = l.LineTotal
                     }).ToList()
                 })
                 .ToListAsync(ct);
@@ -441,6 +465,13 @@ namespace Inventory.Infrastructure.Services
                     PdfUploadedUtc = o.PdfUploadedUtc,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
+                    IsTaxInclusive = o.IsTaxInclusive,
+                    ApplyVat = o.ApplyVat,
+                    ApplyManufacturingTax = o.ApplyManufacturingTax,
+                    Subtotal = o.Subtotal,
+                    VatAmount = o.VatAmount,
+                    ManufacturingTaxAmount = o.ManufacturingTaxAmount,
+                    TotalAmount = o.TotalAmount,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
                     {
                         Id = l.Id,
@@ -448,7 +479,12 @@ namespace Inventory.Infrastructure.Services
                         ProductName = l.ProductNameSnapshot,
                         Quantity = l.Quantity,
                         Unit = l.UnitSnapshot,
-                        UnitPrice = l.UnitPrice
+                        UnitPrice = l.UnitPrice,
+                        IsTaxInclusive = l.IsTaxInclusive,
+                        LineSubtotal = l.LineSubtotal,
+                        LineVatAmount = l.LineVatAmount,
+                        LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
+                        LineTotal = l.LineTotal
                     }).ToList()
                 })
                 .ToListAsync(ct);
@@ -533,7 +569,7 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
-        public async Task UpdateOrderStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default)
+        public async Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default)
         {
             ValidateUser(user);
 

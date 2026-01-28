@@ -27,6 +27,8 @@ namespace Inventory.Infrastructure
             services.AddScoped<IReportingServices, ReportingServices>();
             services.AddScoped<IAuditLogServices, AuditLogServices>();
             services.AddScoped<IAuditLogWriter, AuditLogWriter>();
+            services.AddScoped<ISupplierServices, SupplierServices>();
+            services.AddScoped<IPurchaseOrderServices, PurchaseOrderServices>();
 
             return services;
         }

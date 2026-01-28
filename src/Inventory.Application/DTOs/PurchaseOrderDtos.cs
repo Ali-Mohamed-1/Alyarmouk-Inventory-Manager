@@ -16,6 +16,7 @@ namespace Inventory.Application.DTOs
         int SupplierId,
         string SupplierName,
         DateTimeOffset CreatedUtc,
+        Inventory.Domain.Entities.PurchaseOrderStatus Status,
         string CreatedByUserDisplayName,
         bool IsTaxInclusive,
         decimal Subtotal,

@@ -33,7 +33,7 @@ namespace Inventory.Application.Abstractions
         /// <summary>
         /// Updates the status of a sales order
         /// </summary>
-        Task UpdateOrderStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default);
+        Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default);
 
         /// <summary>
         /// Attaches or updates a PDF file reference for an existing sales order.

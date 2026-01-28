@@ -34,7 +34,7 @@ public sealed class InventoryTransactionsController : Controller
     [HttpGet]
     public async Task<IActionResult> ByCustomer(int customerId, CancellationToken cancellationToken)
     {
-        var items = await _transactions.GetTransactionsByCustomerAsync(customerId, cancellationToken: cancellationToken);
+        var items = await _transactions.GetTransactionsByCustomerAsync(customerId, ct: cancellationToken);
         ViewBag.CustomerId = customerId;
         return View(items);
     }

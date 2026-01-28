@@ -38,6 +38,7 @@ namespace Inventory.Infrastructure.Services
                     Name = c.Name,
                     Phone = c.Phone,
                     Email = c.Email,
+                    Address = c.Address,
                     CreatedUtc = c.CreatedUtc
                 })
                 .ToListAsync(ct);
@@ -83,6 +84,7 @@ namespace Inventory.Infrastructure.Services
                     Name = c.Name,
                     Phone = c.Phone,
                     Email = c.Email,
+                    Address = c.Address,
                     CreatedUtc = c.CreatedUtc
                 })
                 .ToListAsync(ct);
@@ -101,6 +103,7 @@ namespace Inventory.Infrastructure.Services
                     Name = c.Name,
                     Phone = c.Phone,
                     Email = c.Email,
+                    Address = c.Address,
                     CreatedUtc = c.CreatedUtc
                 })
                 .SingleOrDefaultAsync(ct);
@@ -120,6 +123,7 @@ namespace Inventory.Infrastructure.Services
                 Name = normalizedName,
                 Phone = normalizedPhone,
                 Email = normalizedEmail,
+                Address = req.Address,
                 CreatedUtc = DateTimeOffset.UtcNow
             };
 
@@ -139,7 +143,8 @@ namespace Inventory.Infrastructure.Services
                     {
                         Name = entity.Name,
                         Phone = entity.Phone,
-                        Email = entity.Email
+                        Email = entity.Email,
+                        Address = entity.Address
                     },
                     ct);
 
@@ -179,20 +184,23 @@ namespace Inventory.Infrastructure.Services
             {
                 Name = entity.Name,
                 Phone = entity.Phone,
-                Email = entity.Email
+                Email = entity.Email,
+                Address = entity.Address
             };
 
             // Update the entity
             entity.Name = normalizedName;
             entity.Phone = normalizedPhone;
             entity.Email = normalizedEmail;
+            entity.Address = req.Address;
 
             // AUDIT LOG: Capture AFTER state
             var afterState = new
             {
                 Name = entity.Name,
                 Phone = entity.Phone,
-                Email = entity.Email
+                Email = entity.Email,
+                Address = entity.Address
             };
 
             // Use transaction to ensure both customer update and audit log are saved atomically

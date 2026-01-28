@@ -40,6 +40,15 @@ namespace Inventory.Application.DTOs.SalesOrder
         public string CreatedByUserDisplayName { get; init; } = string.Empty;
         public string? Note { get; init; }
 
+        // Tax System Fields
+        public bool IsTaxInclusive { get; init; }
+        public bool ApplyVat { get; init; }
+        public bool ApplyManufacturingTax { get; init; }
+        public decimal Subtotal { get; init; }
+        public decimal VatAmount { get; init; }
+        public decimal ManufacturingTaxAmount { get; init; }
+        public decimal TotalAmount { get; init; }
+
         // Nested list of order items
         public List<SalesOrderLineResponseDto> Lines { get; init; } = new();
     }
