@@ -19,6 +19,8 @@ namespace Inventory.Application.DTOs.Product
         [Required]
         public decimal Price { get; init; }
 
+        public decimal Cost { get; init; }
+
         public string Unit { get; init; } = "pcs";
 
         [Range(0, 1000000)]

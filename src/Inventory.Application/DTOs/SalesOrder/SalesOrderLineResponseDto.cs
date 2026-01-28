@@ -8,8 +8,6 @@
         public decimal Quantity { get; init; }
         public string Unit { get; init; } = string.Empty; // Mapped from UnitSnapshot
         public decimal UnitPrice { get; init; }
-        
-        // Tax System Fields
         public bool IsTaxInclusive { get; init; }
         public decimal LineSubtotal { get; init; }
         public decimal LineVatAmount { get; init; }

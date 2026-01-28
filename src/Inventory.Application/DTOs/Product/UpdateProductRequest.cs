@@ -22,6 +22,8 @@ namespace Inventory.Application.DTOs.Product
         [Required]
         public decimal Price { get; init; }
 
+        public decimal Cost { get; init; }
+
         public int CategoryId { get; init; }
         public string Unit { get; init; } = "pcs";
         public decimal ReorderPoint { get; init; }
