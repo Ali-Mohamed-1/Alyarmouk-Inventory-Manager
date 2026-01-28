@@ -165,19 +165,12 @@ namespace Inventory.Infrastructure.Services
                 _db.SalesOrders.Add(salesOrder);
                 await _db.SaveChangesAsync(ct); // Save to get the ID
 
-                var inventoryTransactions = new List<InventoryTransaction>();
-
-                decimal totalVat = 0;
-                decimal totalManTax = 0;
-                decimal totalSubtotal = 0;
-                decimal totalOrderAmount = 0;
-
                 // Create order lines and update stock
                 foreach (var kvp in lineItems)
                 {
-                    var productId = kvp.Key.ProductId;
-                    var batchNumber = kvp.Key.BatchNumber;
-                    var (quantity, unitPrice) = kvp.Value;
+                    var productId = kvp.Key;
+                    var quantity = kvp.Value.Quantity;
+                    var unitPrice = kvp.Value.UnitPrice;
                     var product = products.First(p => p.Id == productId);
 
                     // SIMPLIFIED TAX CALCULATION
@@ -234,25 +227,29 @@ namespace Inventory.Infrastructure.Services
                         snapshot = new StockSnapshot
                         {
                             ProductId = productId,
-                            OnHand = 0
+                            OnHand = 0,
+                            Preserved = 0
                         };
                         _db.StockSnapshots.Add(snapshot);
                     }
 
-                    snapshot.OnHand -= quantity; // Decrease stock for sale
+                    // Reserve stock for the order (preserve it)
+                    snapshot.Preserved += quantity;
+                    
+                    // For demo purposes, we'll also decrease OnHand to simulate fulfillment
+                    // In production, you'd decrease OnHand only when order is fulfilled
+                    snapshot.OnHand -= quantity;
 
-                    // Create inventory transaction (Issue) with cost tracking
+                    // Create inventory transaction (Issue) directly in the same transaction
                     var inventoryTransaction = new InventoryTransaction
                     {
                         ProductId = productId,
                         QuantityDelta = -quantity, // Negative for Issue
-                        UnitCost = product.Cost, // Cost for COGS calculation
                         Type = InventoryTransactionType.Issue,
                         TimestampUtc = DateTimeOffset.UtcNow,
                         UserId = user.UserId,
                         UserDisplayName = user.UserDisplayName,
                         clientId = req.CustomerId,
-                        BatchNumber = batchNumber,
                         Note = $"Sales order {orderNumber}"
                     };
 
