@@ -421,3 +421,5 @@ FodyWeavers.xsd
 /plan_extracted.txt
 /src/Inventory.Infrastructure/Migrations
 /TAX_SYSTEM_SPECIFICATION.md
+/src/Inventory.Web/DataSeedExtensions.cs
+/src/Inventory.Web/IdentitySeedExtensions.cs
