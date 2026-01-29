@@ -32,15 +32,6 @@ public sealed class ProductBatchServices : IProductBatchServices
         if (product is null)
             return Array.Empty<ProductBatchResponseDto>();
 
-        // Get actual on-hand from StockSnapshot (source of truth)
-        var snapshot = await _db.StockSnapshots
-            .AsNoTracking()
-            .Where(s => s.ProductId == productId)
-            .Select(s => new { s.OnHand, s.Reserved })
-            .FirstOrDefaultAsync(ct);
-
-        var actualOnHand = snapshot?.OnHand ?? 0m;
-
         // Execute each query completely before starting the next one
         var poBatches = await _db.PurchaseOrderLines
             .AsNoTracking()
@@ -77,6 +68,7 @@ public sealed class ProductBatchServices : IProductBatchServices
             .ToList();
 
         // Get transaction aggregates per batch
+        // These are the actual inventory quantities (source of truth)
         var txAgg = await _db.InventoryTransactions
             .AsNoTracking()
             .Where(t => t.ProductId == productId)
@@ -102,10 +94,6 @@ public sealed class ProductBatchServices : IProductBatchServices
 
         var result = new List<ProductBatchResponseDto>();
 
-        // Calculate scaling factor to align batch totals with actual stock
-        var totalBatchDelta = txAgg.Sum(x => x.OnHand);
-        var scaleFactor = totalBatchDelta > 0 ? actualOnHand / totalBatchDelta : 1m;
-
         // Unbatched
         if (hasUnbatched)
         {
@@ -113,14 +101,11 @@ public sealed class ProductBatchServices : IProductBatchServices
             txAggByBatch.TryGetValue(key, out var unbatchedAgg);
             metaByBatch.TryGetValue(key, out var unbatchedMeta);
 
-            // Scale the batch quantity to match actual stock
-            var scaledOnHand = unbatchedAgg != null ? unbatchedAgg.OnHand * scaleFactor : 0m;
-
             result.Add(new ProductBatchResponseDto
             {
                 BatchNumber = "Unbatched",
                 IsUnbatched = true,
-                OnHand = Math.Round(scaledOnHand, 2),
+                OnHand = unbatchedAgg?.OnHand ?? 0m,
                 UnitCost = unbatchedMeta?.UnitCost ?? unbatchedAgg?.LastUnitCost ?? product.Cost,
                 UnitPrice = unbatchedMeta?.UnitPrice ?? product.Price,
                 LastMovementUtc = unbatchedAgg?.LastMovementUtc,
@@ -136,14 +121,11 @@ public sealed class ProductBatchServices : IProductBatchServices
             txAggByBatch.TryGetValue(batchNumber, out var agg);
             metaByBatch.TryGetValue(batchNumber, out var meta);
 
-            // Scale the batch quantity to match actual stock
-            var scaledOnHand = agg != null ? agg.OnHand * scaleFactor : 0m;
-
             result.Add(new ProductBatchResponseDto
             {
                 BatchNumber = batchNumber,
                 IsUnbatched = false,
-                OnHand = Math.Round(scaledOnHand, 2),
+                OnHand = agg?.OnHand ?? 0m,
                 UnitCost = meta?.UnitCost ?? agg?.LastUnitCost ?? product.Cost,
                 UnitPrice = meta?.UnitPrice ?? product.Price,
                 LastMovementUtc = agg?.LastMovementUtc,
@@ -210,15 +192,6 @@ public sealed class ProductBatchServices : IProductBatchServices
             throw new InvalidOperationException("Batch was updated by another user.", ex);
         }
 
-        // Get actual on-hand from StockSnapshot
-        var snapshot = await _db.StockSnapshots
-            .AsNoTracking()
-            .Where(s => s.ProductId == productId)
-            .Select(s => new { s.OnHand })
-            .FirstOrDefaultAsync(ct);
-
-        var actualOnHand = snapshot?.OnHand ?? 0m;
-
         // recompute aggregates for this single batch
         var key = normalized;
         var agg = await _db.InventoryTransactions
@@ -233,25 +206,13 @@ public sealed class ProductBatchServices : IProductBatchServices
             })
             .FirstOrDefaultAsync(ct);
 
-        // Get all batch totals to calculate scale factor
-        var allBatchTotals = await _db.InventoryTransactions
-            .AsNoTracking()
-            .Where(t => t.ProductId == productId)
-            .GroupBy(t => (t.BatchNumber ?? "").Trim())
-            .Select(g => new { g.Key, OnHand = g.Sum(x => x.QuantityDelta) })
-            .ToListAsync(ct);
-
-        var totalBatchDelta = allBatchTotals.Sum(x => x.OnHand);
-        var scaleFactor = totalBatchDelta > 0 ? actualOnHand / totalBatchDelta : 1m;
-
         var displayBatch = string.IsNullOrEmpty(normalized) ? "Unbatched" : normalized;
-        var scaledOnHand = agg != null ? Math.Round(agg.OnHand * scaleFactor, 2) : 0m;
 
         return new ProductBatchResponseDto
         {
             BatchNumber = displayBatch,
             IsUnbatched = string.IsNullOrEmpty(normalized),
-            OnHand = scaledOnHand,
+            OnHand = agg?.OnHand ?? 0m,
             UnitCost = entity.UnitCost ?? agg?.LastUnitCost ?? product.Cost,
             UnitPrice = entity.UnitPrice ?? product.Price,
             LastMovementUtc = agg?.LastMovementUtc,

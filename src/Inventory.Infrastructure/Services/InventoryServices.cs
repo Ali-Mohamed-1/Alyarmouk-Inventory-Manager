@@ -68,6 +68,7 @@ namespace Inventory.Infrastructure.Services
                 ProductId = req.ProductId,
                 Quantity = req.Quantity,
                 Type = Domain.Entities.InventoryTransactionType.Receive,
+                BatchNumber = req.BatchNumber,
                 Note = req.Note
             };
 
@@ -90,6 +91,7 @@ namespace Inventory.Infrastructure.Services
                 ProductId = req.ProductId,
                 Quantity = req.Quantity,
                 Type = Domain.Entities.InventoryTransactionType.Issue,
+                BatchNumber = req.BatchNumber,
                 Note = req.Note
             };
 

@@ -90,6 +90,16 @@
         border-color: #117a8b;
         color: white;
     }
+    .stock-op-btn.btn-primary {
+        background: #007bff;
+        border-color: #007bff;
+        color: white;
+    }
+    .stock-op-btn.btn-primary:hover {
+        background: #0056b3;
+        border-color: #004085;
+        color: white;
+    }
     .products-table-card {
         border-radius: 8px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -164,6 +174,9 @@
             <button type="button" class="btn stock-op-btn btn-adjust" id="btn-adjust-stock">
                 <i class="bi bi-sliders"></i> Adjust Stock
             </button>
+            <button type="button" class="btn stock-op-btn btn-primary" id="btn-add-product">
+                <i class="bi bi-plus-circle"></i> Add Product
+            </button>
         </div>
     </div>
 
@@ -172,9 +185,6 @@
         <div class="card-header bg-white border-bottom py-3">
             <div class="d-flex justify-content-between align-items-center">
                 <h5 class="mb-0 fw-bold">Products & Stock Levels</h5>
-                <a asp-controller="Products" asp-action="Create" class="btn btn-primary btn-sm">
-                    <i class="bi bi-plus-circle"></i> Add New Product
-                </a>
             </div>
         </div>
         <div class="card-body p-0">
@@ -229,6 +239,11 @@
                         <input type="number" id="receiveQuantity" name="Quantity" class="form-control" step="0.01" min="0.01" required />
                     </div>
                     <div class="mb-3">
+                        <label for="receiveBatchNumber" class="form-label fw-bold">Batch Number</label>
+                        <input type="text" id="receiveBatchNumber" name="BatchNumber" class="form-control" maxlength="100" placeholder="e.g. BATCH-2026-001" />
+                        <div class="form-text">Optional: Track this stock by batch/lot number</div>
+                    </div>
+                    <div class="mb-3">
                         <label for="receiveNote" class="form-label fw-bold">Notes</label>
                         <textarea id="receiveNote" name="Note" class="form-control" rows="2" placeholder="e.g. Supplier delivery"></textarea>
                     </div>
@@ -262,6 +277,11 @@
                     <div class="mb-3">
                         <label for="issueQuantity" class="form-label fw-bold">Quantity to Issue</label>
                         <input type="number" id="issueQuantity" name="Quantity" class="form-control" step="0.01" min="0.01" required />
+                    </div>
+                    <div class="mb-3">
+                        <label for="issueBatchNumber" class="form-label fw-bold">Batch Number</label>
+                        <input type="text" id="issueBatchNumber" name="BatchNumber" class="form-control" maxlength="100" placeholder="e.g. BATCH-2026-001" />
+                        <div class="form-text">Optional: Issue stock from specific batch</div>
                     </div>
                     <div class="mb-3">
                         <label for="issueNote" class="form-label fw-bold">Notes</label>
@@ -666,22 +686,35 @@
 
             // Modal Trigger Handlers
             document.getElementById('btn-receive-stock').addEventListener('click', function() {
+                document.getElementById('receiveStockForm').reset();
                 new bootstrap.Modal(document.getElementById('receiveStockModal')).show();
             });
             document.getElementById('btn-issue-stock').addEventListener('click', function() {
+                document.getElementById('issueStockForm').reset();
                 new bootstrap.Modal(document.getElementById('issueStockModal')).show();
             });
             document.getElementById('btn-adjust-stock').addEventListener('click', function() {
+                document.getElementById('adjustStockForm').reset();
                 new bootstrap.Modal(document.getElementById('adjustStockModal')).show();
             });
+            document.getElementById('btn-add-product').addEventListener('click', function() {
+                document.getElementById('addProductForm').reset();
+                new bootstrap.Modal(document.getElementById('addProductModal')).show();
+            });
 
-            const addProductTrigger = document.querySelector('a[asp-action="Create"]');
-            if (addProductTrigger) {
-                addProductTrigger.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    new bootstrap.Modal(document.getElementById('addProductModal')).show();
-                });
-            }
+            // Reset forms when modals are hidden (closed)
+            document.getElementById('receiveStockModal').addEventListener('hidden.bs.modal', function() {
+                document.getElementById('receiveStockForm').reset();
+            });
+            document.getElementById('issueStockModal').addEventListener('hidden.bs.modal', function() {
+                document.getElementById('issueStockForm').reset();
+            });
+            document.getElementById('adjustStockModal').addEventListener('hidden.bs.modal', function() {
+                document.getElementById('adjustStockForm').reset();
+            });
+            document.getElementById('addProductModal').addEventListener('hidden.bs.modal', function() {
+                document.getElementById('addProductForm').reset();
+            });
 
             // Adjust modal dynamic behavior
             document.getElementById('adjustProductId').addEventListener('change', function() {

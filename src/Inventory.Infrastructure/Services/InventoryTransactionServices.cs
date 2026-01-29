@@ -105,6 +105,7 @@ namespace Inventory.Infrastructure.Services
                     QuantityDelta = quantityDelta,
                     UnitCost = unitCost,
                     Type = req.Type,
+                    BatchNumber = req.BatchNumber,
                     TimestampUtc = DateTimeOffset.UtcNow,
                     UserId = user.UserId,
                     UserDisplayName = user.UserDisplayName,
