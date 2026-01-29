@@ -23,6 +23,7 @@ namespace Inventory.Infrastructure.Data
         public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
         public DbSet<PurchaseOrderLine> PurchaseOrderLines { get; set; }
         public DbSet<FinancialTransaction> FinancialTransactions { get; set; }
+        public DbSet<ProductBatch> ProductBatches { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -194,6 +195,24 @@ namespace Inventory.Infrastructure.Data
                 b.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.PurchaseOrder).WithMany().HasForeignKey(x => x.PurchaseOrderId).OnDelete(DeleteBehavior.SetNull);
             });
+
+            builder.Entity<ProductBatch>(b =>
+            {
+                b.HasKey(x => new { x.ProductId, x.BatchNumber });
+                b.Property(x => x.BatchNumber).HasMaxLength(100).IsRequired();
+                b.Property(x => x.UnitCost).HasPrecision(18, 2);
+                b.Property(x => x.UnitPrice).HasPrecision(18, 2);
+                b.Property(x => x.Notes).HasMaxLength(500);
+                b.Property(x => x.RowVersion).IsRowVersion();
+                b.HasIndex(x => x.ProductId);
+                b.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
+            });
+        }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            base.OnConfiguring(optionsBuilder);
+            optionsBuilder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
         }
     }
 }

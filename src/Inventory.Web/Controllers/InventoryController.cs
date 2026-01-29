@@ -37,8 +37,9 @@ public sealed class InventoryController : Controller
     }
 
     [HttpGet]
-    public IActionResult Receive()
+    public async Task<IActionResult> Receive(CancellationToken cancellationToken)
     {
+        ViewBag.Products = await _inventory.GetAllStockAsync(cancellationToken);
         return View(new StockReceiveRequest());
     }
 
@@ -53,7 +54,29 @@ public sealed class InventoryController : Controller
 
         var user = GetUserContext();
         await _inventory.ReceiveAsync(model, user, cancellationToken);
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index", "Dashboard");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Issue(CancellationToken cancellationToken)
+    {
+        ViewBag.Products = await _inventory.GetAllStockAsync(cancellationToken);
+        return View(new StockIssueRequest());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Issue(StockIssueRequest model, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            ViewBag.Products = await _inventory.GetAllStockAsync(cancellationToken);
+            return View(model);
+        }
+
+        var user = GetUserContext();
+        await _inventory.IssueAsync(model, user, cancellationToken);
+        return RedirectToAction("Index", "Dashboard");
     }
 
     [HttpGet]
@@ -73,7 +96,7 @@ public sealed class InventoryController : Controller
 
         var user = GetUserContext();
         await _inventory.UpdateStockAsync(model, user, cancellationToken);
-        return RedirectToAction(nameof(Details), new { productId = model.ProductId });
+        return RedirectToAction("Index", "Dashboard");
     }
 
     private UserContext GetUserContext()

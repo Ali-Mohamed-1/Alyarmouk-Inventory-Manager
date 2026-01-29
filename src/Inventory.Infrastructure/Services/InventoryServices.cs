@@ -74,6 +74,28 @@ namespace Inventory.Infrastructure.Services
             await _transactionServices.CreateAsync(transactionRequest, user, ct);
         }
 
+        public async Task IssueAsync(StockIssueRequest req, UserContext user, CancellationToken ct = default)
+        {
+            if (req is null) throw new ArgumentNullException(nameof(req));
+
+            if (req.ProductId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(req), "Product ID must be positive.");
+
+            if (req.Quantity <= 0)
+                throw new Exception("Quantity must be greater than zero.");
+
+            // Create an Issue transaction
+            var transactionRequest = new CreateInventoryTransactionRequest
+            {
+                ProductId = req.ProductId,
+                Quantity = req.Quantity,
+                Type = Domain.Entities.InventoryTransactionType.Issue,
+                Note = req.Note
+            };
+
+            await _transactionServices.CreateAsync(transactionRequest, user, ct);
+        }
+
         public async Task UpdateStockAsync(UpdateStockRequest req, UserContext user, CancellationToken ct = default)
         {
             await _snapshotServices.UpdateAsync(req, user, ct);

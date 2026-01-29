@@ -55,8 +55,8 @@ public sealed class ProductsController : Controller
         }
 
         var user = GetUserContext();
-        var id = await _products.CreateAsync(model, user, cancellationToken);
-        return RedirectToAction(nameof(Details), new { id });
+        await _products.CreateAsync(model, user, cancellationToken);
+        return RedirectToAction("Index", "Dashboard");
     }
 
     [HttpGet]
@@ -102,7 +102,7 @@ public sealed class ProductsController : Controller
 
         var user = GetUserContext();
         await _products.UpdateAsync(id, model, user, cancellationToken);
-        return RedirectToAction(nameof(Details), new { id });
+        return RedirectToAction("Index", "Dashboard");
     }
 
     [HttpPost]
@@ -111,7 +111,7 @@ public sealed class ProductsController : Controller
     {
         var user = GetUserContext();
         await _products.SetActiveAsync(id, isActive, user, cancellationToken);
-        return RedirectToAction(nameof(Details), new { id });
+        return RedirectToAction("Index", "Dashboard");
     }
 
     private UserContext GetUserContext()

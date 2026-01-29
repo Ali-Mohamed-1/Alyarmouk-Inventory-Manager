@@ -11,7 +11,7 @@ namespace Inventory.Infrastructure
     {
         public static IServiceCollection AddInfraStructure(this IServiceCollection services, IConfiguration config)
         {
-            services.AddDbContext<AppDbContext>(options => 
+            services.AddDbContext<AppDbContext>(options =>
             {
                 options.UseSqlServer(config.GetConnectionString("DefaultConnection"));
             });
@@ -29,6 +29,7 @@ namespace Inventory.Infrastructure
             services.AddScoped<IAuditLogWriter, AuditLogWriter>();
             services.AddScoped<ISupplierServices, SupplierServices>();
             services.AddScoped<IPurchaseOrderServices, PurchaseOrderServices>();
+            services.AddScoped<IProductBatchServices, ProductBatchServices>();
 
             return services;
         }

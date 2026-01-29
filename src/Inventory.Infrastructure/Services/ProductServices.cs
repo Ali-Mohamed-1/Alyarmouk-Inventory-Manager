@@ -108,7 +108,7 @@ namespace Inventory.Infrastructure.Services
                 Price = req.Price,
                 Cost = req.Cost,
                 ReorderPoint = req.ReorderPoint,
-                IsActive = req.isActive
+                IsActive = req.IsActive
             };
 
             _db.Products.Add(entity);

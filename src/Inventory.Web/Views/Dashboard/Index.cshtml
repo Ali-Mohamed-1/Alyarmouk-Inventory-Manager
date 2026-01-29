@@ -1,0 +1,846 @@
+@model Inventory.Application.DTOs.Reporting.DashboardResponseDto
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<style>
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .metric-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+    .metric-card.success {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    .metric-card.warning {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    .metric-card.info {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    .metric-card .metric-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 0.5rem 0;
+    }
+    .metric-card .metric-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .stock-ops-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .stock-ops-buttons {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .stock-op-btn {
+        flex: 1;
+        min-width: 150px;
+        padding: 1rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        border: 2px solid;
+        transition: all 0.2s;
+    }
+    .stock-op-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .btn-receive {
+        background: #28a745;
+        border-color: #28a745;
+        color: white;
+    }
+    .btn-receive:hover {
+        background: #218838;
+        border-color: #1e7e34;
+        color: white;
+    }
+    .btn-issue {
+        background: #ffc107;
+        border-color: #ffc107;
+        color: #212529;
+    }
+    .btn-issue:hover {
+        background: #e0a800;
+        border-color: #d39e00;
+        color: #212529;
+    }
+    .btn-adjust {
+        background: #17a2b8;
+        border-color: #17a2b8;
+        color: white;
+    }
+    .btn-adjust:hover {
+        background: #138496;
+        border-color: #117a8b;
+        color: white;
+    }
+    .products-table-card {
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .table thead th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .btn-batch-toggle {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(0,0,0,.15);
+        background: rgba(255,255,255,.8);
+    }
+    .btn-batch-toggle:hover { background: #fff; }
+    .batch-details-row td { background: #fbfcfe; }
+    .batch-table th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: .04em; }
+</style>
+
+<div class="container-fluid px-4 py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2 mb-0 fw-bold">Stock Management Dashboard</h1>
+    </div>
+
+    <!-- Top metric cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-md-6 col-lg-3">
+            <div class="metric-card info">
+                <div class="metric-label">Total Products</div>
+                <div class="metric-value" id="metric-total-products">@Model.TotalProducts</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+            <div class="metric-card success">
+                <div class="metric-label">Total Sales Orders</div>
+                <div class="metric-value" id="metric-total-sales-orders">-</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+            <div class="metric-card warning">
+                <div class="metric-label">Low Stock Items</div>
+                <div class="metric-value" id="metric-low-stock">@Model.LowStockCount</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-label">Total Purchase Orders</div>
+                <div class="metric-value" id="metric-total-purchase-orders">-</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Operations Section -->
+    <div class="stock-ops-section">
+        <h4 class="mb-3 fw-bold">Stock Operations</h4>
+        <div class="stock-ops-buttons">
+            <button type="button" class="btn stock-op-btn btn-receive" id="btn-receive-stock">
+                <i class="bi bi-box-arrow-in-down"></i> Receive Stock
+            </button>
+            <button type="button" class="btn stock-op-btn btn-issue" id="btn-issue-stock">
+                <i class="bi bi-box-arrow-up"></i> Issue Stock
+            </button>
+            <button type="button" class="btn stock-op-btn btn-adjust" id="btn-adjust-stock">
+                <i class="bi bi-sliders"></i> Adjust Stock
+            </button>
+        </div>
+    </div>
+
+    <!-- Products & Stock Levels Table -->
+    <div class="card products-table-card border-0 mb-4">
+        <div class="card-header bg-white border-bottom py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold">Products & Stock Levels</h5>
+                <a asp-controller="Products" asp-action="Create" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-circle"></i> Add New Product
+                </a>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="products-stock-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>SKU</th>
+                            <th>Category</th>
+                            <th class="text-end">Safe Stock</th>
+                            <th class="text-end">On Hand</th>
+                            <th class="text-end">Reserved</th>
+                            <th class="text-end">Available</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-5">
+                                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                Loading products &amp; stock levels...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Receive Stock Modal -->
+<div class="modal fade" id="receiveStockModal" tabindex="-1" aria-labelledby="receiveStockModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="receiveStockModalLabel fw-bold"><i class="bi bi-box-arrow-in-down me-2"></i>Receive Stock</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="receiveStockForm" action="/Inventory/Receive" method="post">
+                <div class="modal-body">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label for="receiveProductId" class="form-label fw-bold">Select Product</label>
+                        <select id="receiveProductId" name="ProductId" class="form-select product-dropdown" required>
+                            <option value="">-- Loading Products --</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="receiveQuantity" class="form-label fw-bold">Quantity to Receive</label>
+                        <input type="number" id="receiveQuantity" name="Quantity" class="form-control" step="0.01" min="0.01" required />
+                    </div>
+                    <div class="mb-3">
+                        <label for="receiveNote" class="form-label fw-bold">Notes</label>
+                        <textarea id="receiveNote" name="Note" class="form-control" rows="2" placeholder="e.g. Supplier delivery"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success fw-bold">Complete Receipt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Issue Stock Modal -->
+<div class="modal fade" id="issueStockModal" tabindex="-1" aria-labelledby="issueStockModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title fw-bold" id="issueStockModalLabel"><i class="bi bi-box-arrow-up me-2"></i>Issue Stock</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="issueStockForm" action="/Inventory/Issue" method="post">
+                <div class="modal-body">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label for="issueProductId" class="form-label fw-bold">Select Product</label>
+                        <select id="issueProductId" name="ProductId" class="form-select product-dropdown" required>
+                            <option value="">-- Loading Products --</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="issueQuantity" class="form-label fw-bold">Quantity to Issue</label>
+                        <input type="number" id="issueQuantity" name="Quantity" class="form-control" step="0.01" min="0.01" required />
+                    </div>
+                    <div class="mb-3">
+                        <label for="issueNote" class="form-label fw-bold">Notes</label>
+                        <textarea id="issueNote" name="Note" class="form-control" rows="2" placeholder="e.g. Customer order"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning fw-bold">Complete Issuance</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Adjust Stock Modal -->
+<div class="modal fade" id="adjustStockModal" tabindex="-1" aria-labelledby="adjustStockModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title fw-bold" id="adjustStockModalLabel"><i class="bi bi-sliders me-2"></i>Adjust Stock Level</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="adjustStockForm" action="/Inventory/Adjust" method="post">
+                <div class="modal-body">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="RowVersion" id="adjustRowVersion" />
+                    <div class="mb-3">
+                        <label for="adjustProductId" class="form-label fw-bold">Select Product</label>
+                        <select id="adjustProductId" name="ProductId" class="form-select product-dropdown" required>
+                            <option value="">-- Loading Products --</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="adjustQuantity" class="form-label fw-bold">New On-Hand Quantity</label>
+                        <input type="number" id="adjustQuantity" name="NewQuantity" class="form-control" step="0.01" min="0" required />
+                        <div class="form-text text-warning">
+                            <i class="bi bi-exclamation-triangle-fill"></i> This will directly overwrite the current stock level.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-info text-white fw-bold">Update Stock Level</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Product Modal -->
+<div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="addProductModalLabel"><i class="bi bi-plus-circle me-2"></i>Add New Product</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addProductForm" action="/Products/Create" method="post">
+                <div class="modal-body p-4">
+                    @Html.AntiForgeryToken()
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="addName" class="form-label fw-bold">Product Name</label>
+                            <input type="text" id="addName" name="Name" class="form-control" placeholder="Enter product name" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="addSku" class="form-label fw-bold">SKU</label>
+                            <input type="text" id="addSku" name="Sku" class="form-control" placeholder="e.g. LAP-001" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="addCategoryId" class="form-label fw-bold">Category</label>
+                            <select id="addCategoryId" name="CategoryId" class="form-select" required>
+                                <option value="">-- Loading Categories --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="addUnit" class="form-label fw-bold">Unit of Measure</label>
+                            <input type="text" id="addUnit" name="Unit" class="form-control" placeholder="e.g. Each, Box" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="addPrice" class="form-label fw-bold">Price</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" id="addPrice" name="Price" class="form-control" step="0.01" min="0" required />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="addReorderPoint" class="form-label fw-bold">Reorder Point</label>
+                            <input type="number" id="addReorderPoint" name="ReorderPoint" class="form-control" step="0.01" min="0" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="addCost" class="form-label fw-bold">Cost</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" id="addCost" name="Cost" class="form-control" step="0.01" min="0" required />
+                            </div>
+                        </div>
+                        <div class="col-12 mt-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="IsActive" id="addIsActive" value="true" checked>
+                                <label class="form-check-label fw-bold" for="addIsActive">Product is Active</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-bold">Save Product</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Product Modal -->
+<div class="modal fade" id="editProductModal" tabindex="-1" aria-labelledby="editProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="editProductModalLabel"><i class="bi bi-pencil me-2"></i>Edit Product</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editProductForm" method="post">
+                <div class="modal-body p-4">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Id" id="editProductId" />
+                    <input type="hidden" name="RowVersion" id="editRowVersion" />
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="editName" class="form-label fw-bold">Product Name</label>
+                            <input type="text" id="editName" name="Name" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editSku" class="form-label fw-bold">SKU</label>
+                            <input type="text" id="editSku" name="Sku" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editCategoryId" class="form-label fw-bold">Category</label>
+                            <select id="editCategoryId" name="CategoryId" class="form-select" required>
+                                <option value="">-- Loading Categories --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editUnit" class="form-label fw-bold">Unit of Measure</label>
+                            <input type="text" id="editUnit" name="Unit" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editPrice" class="form-label fw-bold">Price</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" id="editPrice" name="Price" class="form-control" step="0.01" min="0" required />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editReorderPoint" class="form-label fw-bold">Reorder Point</label>
+                            <input type="number" id="editReorderPoint" name="ReorderPoint" class="form-control" step="0.01" min="0" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editCost" class="form-label fw-bold">Cost</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" id="editCost" name="Cost" class="form-control" step="0.01" min="0" required />
+                            </div>
+                        </div>
+                        <div class="col-12 mt-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="IsActive" id="editIsActive" value="true" checked>
+                                <label class="form-check-label fw-bold" for="editIsActive">Product is Active</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-bold">Update Product</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+                (function () {
+            // Track in-flight requests per product
+            const pendingRequests = new Map();
+
+            // Refresh data helper
+            function refreshDashboard() {
+                // Refresh summary
+                fetch('@Url.Action("SummaryJson", "Dashboard")')
+                    .then(r => r.ok ? r.json() : Promise.reject())
+                    .then(data => {
+                        document.getElementById('metric-total-products').textContent = data.totalProducts || 0;
+                        document.getElementById('metric-total-sales-orders').textContent = data.totalSalesOrders || 0;
+                        document.getElementById('metric-low-stock').textContent = data.lowStockCount || 0;
+                        document.getElementById('metric-total-purchase-orders').textContent = data.totalPurchaseOrders || 0;
+                    });
+
+                // Refresh products table
+                loadProducts();
+            }
+
+            let allProductsForModals = [];
+
+            function loadProducts() {
+                const tbody = document.querySelector('#products-stock-table tbody');
+                fetch('/api/products/with-stock')
+                    .then(r => r.ok ? r.json() : Promise.reject())
+                    .then(items => {
+                        allProductsForModals = items;
+                        updateProductDropdowns(items);
+
+                        if (!Array.isArray(items) || items.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5">No products found. <button class="btn btn-link" data-bs-toggle="modal" data-bs-target="#addProductModal">Add your first product</button></td></tr>';
+                            return;
+                        }
+                        tbody.innerHTML = items.map(x => {
+                            const status = x.status || 'InStock';
+                            const badgeClass = status === 'NoStock'
+                                ? 'bg-danger'
+                                : (status === 'LowStock' ? 'bg-warning text-dark' : 'bg-success');
+                            const statusText = status === 'NoStock' ? 'No Stock' : (status === 'LowStock' ? 'Low Stock' : 'In Stock');
+                            return `<tr>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-batch-toggle me-2 btn-toggle-batches" title="Show batches"
+                                            aria-expanded="false" data-product-id="${x.productId}">
+                                        ▸
+                                    </button>
+                                    <strong>${escapeHtml(x.name)}</strong>
+                                </td>
+                                <td><code class="text-primary">${escapeHtml(x.sku)}</code></td>
+                                <td>${escapeHtml(x.categoryName)}</td>
+                                <td class="text-end">${formatNumber(x.reorderPoint)} ${escapeHtml(x.unit)}</td>
+                                <td class="text-end fw-bold">${formatNumber(x.onHand)}</td>
+                                <td class="text-end">${formatNumber(x.reserved)}</td>
+                                <td class="text-end fw-bold text-primary">${formatNumber(x.available)}</td>
+                                <td><span class="badge ${badgeClass}">${statusText}</span></td>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-outline-primary" href="/Products/Edit/${x.productId}">Edit</a>
+                                </td>
+                            </tr>`;
+                        }).join('');
+
+                        // Expand/collapse batches (event delegation)
+                        tbody.querySelectorAll('.btn-toggle-batches').forEach(btn => {
+                            btn.addEventListener('click', async function () {
+                                const productId = parseInt(this.dataset.productId);
+                                const tr = this.closest('tr');
+                                if (!tr) return;
+                                await toggleBatches(productId, tr, this);
+                            });
+                        });
+                    })
+                    .catch(err => {
+                        console.error('Failed to load products:', err);
+                        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-5">Failed to load products. Please refresh the page.</td></tr>';
+                    });
+            }
+
+            async function toggleBatches(productId, productRow, toggleBtn) {
+                const existing = productRow.nextElementSibling;
+                if (existing && existing.classList.contains('batch-details-row') && existing.dataset.productId === String(productId)) {
+                    const isHidden = existing.style.display === 'none';
+                    existing.style.display = isHidden ? '' : 'none';
+                    toggleBtn.textContent = isHidden ? '▾' : '▸';
+                    toggleBtn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+                    return;
+                }
+
+                // If already loading, don't make another request
+                if (pendingRequests.has(productId)) {
+                    console.log(`Request for product ${productId} already in progress`);
+                    return;
+                }
+
+                // Insert loading row
+                const detailsRow = document.createElement('tr');
+                detailsRow.className = 'batch-details-row';
+                detailsRow.dataset.productId = String(productId);
+                detailsRow.innerHTML = `<td colspan="9" class="p-3">
+                    <div class="d-flex align-items-center text-muted">
+                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                        Loading batches...
+                    </div>
+                </td>`;
+                productRow.insertAdjacentElement('afterend', detailsRow);
+
+                toggleBtn.textContent = '▾';
+                toggleBtn.setAttribute('aria-expanded', 'true');
+                toggleBtn.disabled = true; // Disable to prevent clicks while loading
+
+                // Track this request
+                const abortController = new AbortController();
+                pendingRequests.set(productId, abortController);
+
+                try {
+                    const resp = await fetch(`/api/products/${productId}/batches`, {
+                        signal: abortController.signal
+                    });
+
+                    if (!resp.ok) throw new Error('Failed to load batches');
+                    const batches = await resp.json();
+
+                    if (!Array.isArray(batches) || batches.length === 0) {
+                        detailsRow.innerHTML = `<td colspan="9" class="p-3 text-muted">No batches found for this product.</td>`;
+                        return;
+                    }
+
+                    detailsRow.innerHTML = `<td colspan="9" class="p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="fw-bold">Batches</div>
+                            <div class="text-muted small">Batch quantity is derived from inventory transactions.</div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0 batch-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Batch</th>
+                                        <th class="text-end">On Hand</th>
+                                        <th class="text-end">Cost</th>
+                                        <th class="text-end">Price</th>
+                                        <th>Last Movement</th>
+                                        <th>Notes</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${batches.map(b => `
+                                        <tr data-batch="${escapeHtml(b.batchNumber)}" data-rowversion="${escapeHtml(b.rowVersion || '')}">
+                                            <td class="fw-semibold">${escapeHtml(b.batchNumber)}</td>
+                                            <td class="text-end">${formatNumber(b.onHand)}</td>
+                                            <td class="text-end">${b.unitCost == null ? '-' : formatNumber(b.unitCost)}</td>
+                                            <td class="text-end">${b.unitPrice == null ? '-' : formatNumber(b.unitPrice)}</td>
+                                            <td>${b.lastMovementUtc ? formatDate(b.lastMovementUtc) : '-'}</td>
+                                            <td class="text-truncate" style="max-width: 360px;">${escapeHtml(b.notes || '')}</td>
+                                            <td class="text-end">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary btn-edit-batch"
+                                                        data-product-id="${productId}"
+                                                        data-batch="${escapeHtml(b.batchNumber)}"
+                                                        data-unitcost="${b.unitCost ?? ''}"
+                                                        data-unitprice="${b.unitPrice ?? ''}"
+                                                        data-notes="${escapeHtml(b.notes || '')}"
+                                                        data-rowversion="${escapeHtml(b.rowVersion || '')}">
+                                                    Edit batch
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </td>`;
+
+                    // attach batch edit handlers inside details row
+                    detailsRow.querySelectorAll('.btn-edit-batch').forEach(btn => {
+                        btn.addEventListener('click', function () {
+                            openBatchEditModal(this.dataset.productId, this.dataset.batch, this.dataset.unitcost, this.dataset.unitprice, this.dataset.notes, this.dataset.rowversion);
+                        });
+                    });
+                } catch (e) {
+                    if (e.name === 'AbortError') {
+                        console.log(`Request for product ${productId} was cancelled`);
+                    } else {
+                        console.error(e);
+                        detailsRow.innerHTML = `<td colspan="9" class="p-3 text-danger">Failed to load batches.</td>`;
+                    }
+                } finally {
+                    toggleBtn.disabled = false; // Re-enable button
+                    pendingRequests.delete(productId); // Clear tracking
+                }
+            }
+
+            function updateProductDropdowns(products) {
+                const dropdowns = document.querySelectorAll('.product-dropdown');
+                const options = '<option value="">-- Select Product --</option>' +
+                    products.map(p => `<option value="${p.productId}" data-onhand="${p.onHand}">${escapeHtml(p.name)} (${escapeHtml(p.sku)})</option>`).join('');
+
+                dropdowns.forEach(d => {
+                    d.innerHTML = options;
+                });
+            }
+
+            function loadCategories() {
+                fetch('/Lookups/Categories')
+                    .then(r => r.ok ? r.json() : Promise.reject())
+                    .then(cats => {
+                        const selectAdd = document.getElementById('addCategoryId');
+                        const selectEdit = document.getElementById('editCategoryId');
+                        const options = '<option value="">-- Select Category --</option>' +
+                            cats.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+
+                        selectAdd.innerHTML = options;
+                        selectEdit.innerHTML = options;
+                    });
+            }
+
+            // Initialization
+            refreshDashboard();
+            loadCategories();
+
+            // Modal Trigger Handlers
+            document.getElementById('btn-receive-stock').addEventListener('click', function() {
+                new bootstrap.Modal(document.getElementById('receiveStockModal')).show();
+            });
+            document.getElementById('btn-issue-stock').addEventListener('click', function() {
+                new bootstrap.Modal(document.getElementById('issueStockModal')).show();
+            });
+            document.getElementById('btn-adjust-stock').addEventListener('click', function() {
+                new bootstrap.Modal(document.getElementById('adjustStockModal')).show();
+            });
+
+            const addProductTrigger = document.querySelector('a[asp-action="Create"]');
+            if (addProductTrigger) {
+                addProductTrigger.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    new bootstrap.Modal(document.getElementById('addProductModal')).show();
+                });
+            }
+
+            // Adjust modal dynamic behavior
+            document.getElementById('adjustProductId').addEventListener('change', function() {
+                const productId = parseInt(this.value);
+                const product = allProductsForModals.find(p => p.productId === productId);
+                if (product) {
+                    document.getElementById('adjustQuantity').value = product.onHand;
+                    document.getElementById('adjustRowVersion').value = product.stockRowVersion;
+                }
+            });
+
+            function showEditModal(p) {
+                document.getElementById('editProductId').value = p.productId;
+                document.getElementById('editRowVersion').value = p.rowVersion;
+                document.getElementById('editName').value = p.name;
+                document.getElementById('editSku').value = p.sku;
+                document.getElementById('editCategoryId').value = p.categoryId || "";
+                document.getElementById('editUnit').value = p.unit;
+                document.getElementById('editPrice').value = p.price || 0;
+                document.getElementById('editCost').value = p.cost || 0;
+                document.getElementById('editReorderPoint').value = p.reorderPoint;
+                document.getElementById('editIsActive').checked = true; // Default
+
+                const form = document.getElementById('editProductForm');
+                form.action = `/Products/Edit/${p.productId}`;
+
+                new bootstrap.Modal(document.getElementById('editProductModal')).show();
+            }
+
+            function escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function formatNumber(num) {
+                return parseFloat(num).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            }
+
+            function formatDate(iso) {
+                try {
+                    const d = new Date(iso);
+                    return d.toLocaleString();
+                } catch {
+                    return iso;
+                }
+            }
+
+            // Batch edit modal plumbing
+            const batchModalEl = document.getElementById('batchEditModal');
+            const batchModal = batchModalEl ? new bootstrap.Modal(batchModalEl) : null;
+
+            function openBatchEditModal(productId, batchNumber, unitCost, unitPrice, notes, rowVersion) {
+                document.getElementById('batchEditProductId').value = productId;
+                document.getElementById('batchEditBatchNumber').value = batchNumber;
+                document.getElementById('batchEditRowVersion').value = rowVersion || '';
+                document.getElementById('batchEditUnitCost').value = unitCost || '';
+                document.getElementById('batchEditUnitPrice').value = unitPrice || '';
+                document.getElementById('batchEditNotes').value = notes || '';
+                document.getElementById('batchEditTitle').textContent = `Edit Batch: ${batchNumber}`;
+                batchModal?.show();
+            }
+
+            const batchSaveBtn = document.getElementById('batchEditSave');
+            if (batchSaveBtn) {
+                batchSaveBtn.addEventListener('click', async function () {
+                    const productId = document.getElementById('batchEditProductId').value;
+                    const batchNumber = document.getElementById('batchEditBatchNumber').value;
+                    const rowVersion = document.getElementById('batchEditRowVersion').value;
+                    const unitCostVal = document.getElementById('batchEditUnitCost').value;
+                    const unitPriceVal = document.getElementById('batchEditUnitPrice').value;
+                    const notesVal = document.getElementById('batchEditNotes').value;
+
+                    const payload = {
+                        unitCost: unitCostVal === '' ? null : parseFloat(unitCostVal),
+                        unitPrice: unitPriceVal === '' ? null : parseFloat(unitPriceVal),
+                        notes: notesVal || null,
+                        rowVersion: rowVersion || null
+                    };
+
+                    batchSaveBtn.disabled = true;
+                    batchSaveBtn.textContent = 'Saving...';
+                    try {
+                        const resp = await fetch(`/api/products/${productId}/batches/${encodeURIComponent(batchNumber)}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!resp.ok) {
+                            const err = await resp.json().catch(() => null);
+                            throw new Error(err?.message || 'Failed to save batch');
+                        }
+                        const updated = await resp.json();
+
+                        // Update the rendered batch row if present
+                        const detailsRow = document.querySelector(`tr.batch-details-row[data-product-id="${productId}"]`);
+                        if (detailsRow) {
+                            const row = detailsRow.querySelector(`tr[data-batch="${CSS.escape(batchNumber)}"]`);
+                            if (row) {
+                                const tds = row.querySelectorAll('td');
+                                // columns: 0 batch, 1 onhand, 2 cost, 3 price, 4 last, 5 notes, 6 actions
+                                if (tds[2]) tds[2].textContent = (updated.unitCost == null ? '-' : formatNumber(updated.unitCost));
+                                if (tds[3]) tds[3].textContent = (updated.unitPrice == null ? '-' : formatNumber(updated.unitPrice));
+                                if (tds[5]) tds[5].textContent = updated.notes || '';
+                                row.dataset.rowversion = updated.rowVersion || '';
+                            }
+                        }
+
+                        batchModal?.hide();
+                    } catch (e) {
+                        alert(e.message || 'Failed to save batch');
+                    } finally {
+                        batchSaveBtn.disabled = false;
+                        batchSaveBtn.textContent = 'Save';
+                    }
+                });
+            }
+        })();
+    </script>
+}
+
+<!-- Batch Edit Modal -->
+<div class="modal fade" id="batchEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="batchEditTitle">Edit Batch</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="batchEditProductId" />
+                <input type="hidden" id="batchEditBatchNumber" />
+                <input type="hidden" id="batchEditRowVersion" />
+
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold" for="batchEditUnitCost">Cost</label>
+                        <input class="form-control" id="batchEditUnitCost" type="number" step="0.01" min="0" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold" for="batchEditUnitPrice">Price</label>
+                        <input class="form-control" id="batchEditUnitPrice" type="number" step="0.01" min="0" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold" for="batchEditNotes">Notes</label>
+                        <textarea class="form-control" id="batchEditNotes" rows="3" maxlength="500"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-text">
+                            Batch cost/price/notes are saved in the database (table: <code>ProductBatches</code>).
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="batchEditSave">Save</button>
+            </div>
+        </div>
+    </div>
+</div>

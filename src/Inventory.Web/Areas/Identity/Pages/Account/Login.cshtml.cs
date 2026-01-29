@@ -43,7 +43,7 @@ public class LoginModel : PageModel
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {
-        ReturnUrl = returnUrl ?? Url.Content("~/");
+        ReturnUrl = returnUrl ?? Url.Action("Index", "Dashboard");
 
         if (!ModelState.IsValid)
         {

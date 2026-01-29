@@ -27,6 +27,11 @@ namespace Inventory.Application.Abstractions
         Task ReceiveAsync(StockReceiveRequest req, UserContext user, CancellationToken ct = default);
 
         /// <summary>
+        /// Records outgoing stock and attributes it to the requesting user
+        /// </summary>
+        Task IssueAsync(StockIssueRequest req, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
         /// Adjusts stock counts for a product, capturing who made the change
         /// </summary>
         Task UpdateStockAsync(UpdateStockRequest req, UserContext user, CancellationToken ct = default);

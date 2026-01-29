@@ -35,6 +35,7 @@ builder.Services.AddAuthorization(options =>
 var app = builder.Build();
 
 await app.SeedIdentityAsync();
+await app.SeedDataAsync();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -55,7 +56,7 @@ app.MapRazorPages();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
+    pattern: "{controller=Dashboard}/{action=Index}/{id?}")
     .WithStaticAssets();
 
 
