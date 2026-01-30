@@ -136,7 +136,8 @@ namespace Inventory.Infrastructure.Services
                     IsTaxInclusive = req.IsTaxInclusive,
                     ApplyVat = req.ApplyVat,
                     ApplyManufacturingTax = req.ApplyManufacturingTax,
-                    ReceiptExpenses = req.ReceiptExpenses
+                    ReceiptExpenses = req.ReceiptExpenses,
+                    Status = req.ConnectToReceiveStock ? PurchaseOrderStatus.Received : PurchaseOrderStatus.Draft
                 };
 
                 // Add to DB context to generate ID
@@ -156,28 +157,46 @@ namespace Inventory.Infrastructure.Services
                     var unitPrice = kvp.Value.UnitPrice;
                     var product = products.First(p => p.Id == productId);
 
-                    // SIMPLIFIED TAX CALCULATION
-                    // Base is always unitPrice * quantity
-                    decimal baseAmount = unitPrice * quantity;
-                    decimal lineSubtotal = baseAmount;
+                    // CONSOLIDATED TAX CALCULATION
+                    decimal lineTotal;
+                    decimal lineSubtotal;
                     decimal lineVat = 0;
                     decimal lineManTax = 0;
-                    decimal lineTotal;
 
-                    // Calculate VAT if enabled
-                    if (req.ApplyVat)
+                    if (req.IsTaxInclusive)
                     {
-                        lineVat = Math.Round(baseAmount * TaxConstants.VatRate, 2, MidpointRounding.AwayFromZero);
-                    }
+                        // UnitPrice is the total price including tax
+                        lineTotal = unitPrice * quantity;
+                        
+                        // Total = Base + (Base * VatRate) - (Base * ManTaxRate)
+                        // Total = Base * (1 + VatRate - ManTaxRate)
+                        decimal divisor = 1;
+                        if (req.ApplyVat) divisor += TaxConstants.VatRate;
+                        if (req.ApplyManufacturingTax) divisor -= TaxConstants.ManufacturingTaxRate;
 
-                    // Calculate Manufacturing Tax if enabled (1%)
-                    if (req.ApplyManufacturingTax)
+                        lineSubtotal = Math.Round(lineTotal / divisor, 2, MidpointRounding.AwayFromZero);
+                        
+                        // Recalculate taxes from base for consistency
+                        if (req.ApplyVat)
+                            lineVat = Math.Round(lineSubtotal * TaxConstants.VatRate, 2, MidpointRounding.AwayFromZero);
+                        if (req.ApplyManufacturingTax)
+                            lineManTax = Math.Round(lineSubtotal * TaxConstants.ManufacturingTaxRate, 2, MidpointRounding.AwayFromZero);
+                            
+                        // Adjust subtotal to ensure it adds up exactly to Total
+                        lineSubtotal = lineTotal - lineVat + lineManTax;
+                    }
+                    else
                     {
-                        lineManTax = Math.Round(baseAmount * TaxConstants.ManufacturingTaxRate, 2, MidpointRounding.AwayFromZero);
+                        // UnitPrice is the base price excluding tax
+                        lineSubtotal = unitPrice * quantity;
+                        
+                        if (req.ApplyVat)
+                            lineVat = Math.Round(lineSubtotal * TaxConstants.VatRate, 2, MidpointRounding.AwayFromZero);
+                        if (req.ApplyManufacturingTax)
+                            lineManTax = Math.Round(lineSubtotal * TaxConstants.ManufacturingTaxRate, 2, MidpointRounding.AwayFromZero);
+                            
+                        lineTotal = lineSubtotal + lineVat - lineManTax;
                     }
-
-                    // Total = Base + VAT - ManTax
-                    lineTotal = lineSubtotal + lineVat - lineManTax;
 
                     totalSubtotal += lineSubtotal;
                     totalVat += lineVat;
@@ -204,6 +223,34 @@ namespace Inventory.Infrastructure.Services
 
                     if (req.ConnectToReceiveStock)
                     {
+                        // ============================================================
+                        // ENSURE PRODUCT BATCH EXISTS
+                        // ============================================================
+                        if (!string.IsNullOrEmpty(batchNumber))
+                        {
+                            var batch = await _db.ProductBatches
+                                .FirstOrDefaultAsync(b => b.ProductId == productId && b.BatchNumber == batchNumber, ct);
+
+                            if (batch == null)
+                            {
+                                batch = new ProductBatch
+                                {
+                                    ProductId = productId,
+                                    BatchNumber = batchNumber,
+                                    UnitCost = unitPrice,
+                                    UnitPrice = product.Price, // Use current product price as default
+                                    UpdatedUtc = DateTimeOffset.UtcNow
+                                };
+                                _db.ProductBatches.Add(batch);
+                            }
+                            else
+                            {
+                                // Update cost if necessary? Or just notes
+                                batch.UnitCost = unitPrice;
+                                batch.UpdatedUtc = DateTimeOffset.UtcNow;
+                            }
+                        }
+
                         // ============================================================
                         // UPDATE PRODUCT COST using WEIGHTED AVERAGE
                         // ============================================================

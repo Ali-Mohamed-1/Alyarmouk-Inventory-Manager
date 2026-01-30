@@ -6,6 +6,7 @@ namespace Inventory.Domain.Entities;
 /// </summary>
 public sealed class ProductBatch
 {
+    public long Id { get; set; }
     public int ProductId { get; set; }
     public string BatchNumber { get; set; } = string.Empty;
 

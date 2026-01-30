@@ -28,6 +28,7 @@
                             <thead class="table-light text-muted small text-uppercase">
                                 <tr>
                                     <th>Product</th>
+                                    <th>Batch</th>
                                     <th class="text-center">Quantity</th>
                                     <th class="text-end">Unit Price</th>
                                     <th class="text-end">Total</th>
@@ -41,6 +42,16 @@
                                             <div class="fw-bold">@line.ProductName</div>
                                             <div class="small text-muted">@line.Unit</div>
                                         </td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(line.BatchNumber))
+                                            {
+                                                <span class="badge bg-light text-dark border">@line.BatchNumber</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">-</span>
+                                            }
+                                        </td>
                                         <td class="text-center">@line.Quantity</td>
                                         <td class="text-end">@line.UnitPrice.ToString("C2")</td>
                                         <td class="text-end fw-bold">@line.LineTotal.ToString("C2")</td>
@@ -49,25 +60,25 @@
                             </tbody>
                             <tfoot class="border-top-0">
                                 <tr>
-                                    <td colspan="3" class="text-end text-muted">Subtotal</td>
+                                    <td colspan="4" class="text-end text-muted">Subtotal</td>
                                     <td class="text-end">@Model.Subtotal.ToString("C2")</td>
                                 </tr>
                                 @if (Model.ApplyVat)
                                 {
                                     <tr>
-                                        <td colspan="3" class="text-end text-muted">VAT (14%)</td>
+                                        <td colspan="4" class="text-end text-muted">VAT (14%)</td>
                                         <td class="text-end">@Model.VatAmount.ToString("C2")</td>
                                     </tr>
                                 }
                                 @if (Model.ApplyManufacturingTax)
                                 {
                                     <tr>
-                                        <td colspan="3" class="text-end text-muted">Manufacturing Tax (1%)</td>
+                                        <td colspan="4" class="text-end text-muted">Manufacturing Tax (1%)</td>
                                         <td class="text-end text-danger">-@Model.ManufacturingTaxAmount.ToString("C2")</td>
                                     </tr>
                                 }
                                 <tr class="table-light">
-                                    <td colspan="3" class="text-end fw-bold fs-5">Total Amount</td>
+                                    <td colspan="4" class="text-end fw-bold fs-5">Total Amount</td>
                                     <td class="text-end fw-bold fs-5 text-success">@Model.TotalAmount.ToString("C2")</td>
                                 </tr>
                             </tfoot>

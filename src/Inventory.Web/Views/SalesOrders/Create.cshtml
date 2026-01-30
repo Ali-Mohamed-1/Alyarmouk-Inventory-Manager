@@ -173,8 +173,66 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <script>
         let lineCount = 0;
+        let products = [];
+
+        async function loadProducts() {
+            try {
+                const response = await fetch('/api/products/with-stock');
+                products = await response.json();
+                // Initial line after products loaded
+                if (lineCount === 0) addLineItem();
+            } catch (error) {
+                console.error('Error loading products:', error);
+            }
+        }
+
+        async function onProductChange(select, idx) {
+            const productId = select.value;
+            const batchSelect = document.getElementById(`batch-select-${idx}`);
+            const priceInput = document.getElementById(`price-input-${idx}`);
+            const unitInput = document.getElementById(`unit-input-${idx}`);
+            const productNameInput = document.getElementById(`product-name-input-${idx}`);
+
+            if (!productId) {
+                batchSelect.innerHTML = '<option value="">-- Batch --</option>';
+                priceInput.value = "0.00";
+                unitInput.value = "";
+                productNameInput.value = "";
+                calculateTotals();
+                return;
+            }
+
+            const product = products.find(p => p.productId == productId);
+            if (product) {
+                priceInput.value = product.price;
+                unitInput.value = product.unit;
+                productNameInput.value = product.name;
+            }
+
+            // Fetch batches
+            try {
+                const response = await fetch(`/api/products/${productId}/batches`);
+                const batches = await response.json();
+                batchSelect.innerHTML = '<option value="">None (General Stock)</option>';
+                batches.forEach(b => {
+                    const label = b.batchNumber + (b.onHand !== undefined ? ` (Available: ${b.onHand})` : '');
+                    batchSelect.innerHTML += `<option value="${b.batchNumber}" data-batch-id="${b.id}">${label}</option>`;
+                });
+            } catch (error) {
+                console.error('Error loading batches:', error);
+            }
+            calculateTotals();
+        }
+
+        function onBatchChange(select, idx) {
+            const selectedOption = select.options[select.selectedIndex];
+            const batchIdInput = document.getElementById(`batch-id-input-${idx}`);
+            batchIdInput.value = selectedOption.getAttribute('data-batch-id') || "";
+        }
 
         function addLineItem() {
+            if (products.length === 0) return; // Wait for products to load
+
             const container = document.getElementById('lineItemsContainer');
             const emptyState = document.getElementById('emptyState');
             emptyState.style.display = 'none';
@@ -184,19 +242,28 @@
             row.id = `line-row-${idx}`;
             row.innerHTML = `
                 <td>
-                    <input name="Lines[${idx}].ProductName" class="form-control form-control-sm" placeholder="Product name..." required />
-                    <input type="hidden" name="Lines[${idx}].ProductId" value="0" /> <!-- Fixed for now as per DTO -->
+                    <select name="Lines[${idx}].ProductId" class="form-select form-select-sm" required onchange="onProductChange(this, ${idx})">
+                        <option value="">-- Select Product --</option>
+                        ${products.map(p => `<option value="${p.productId}">${p.name} (${p.sku})</option>`).join('')}
+                    </select>
+                    <input type="hidden" name="Lines[${idx}].ProductName" id="product-name-input-${idx}" />
+                </td>
+                <td>
+                    <select name="Lines[${idx}].BatchNumber" id="batch-select-${idx}" class="form-select form-select-sm" onchange="onBatchChange(this, ${idx})">
+                        <option value="">None (General Stock)</option>
+                    </select>
+                    <input type="hidden" name="Lines[${idx}].ProductBatchId" id="batch-id-input-${idx}" />
                 </td>
                 <td>
                     <div class="input-group input-group-sm">
                         <input name="Lines[${idx}].Quantity" type="number" step="0.01" class="form-control item-qty" onchange="calculateTotals()" value="1.00" required />
-                        <input name="Lines[${idx}].Unit" class="form-control form-control-sm" style="width: 40px" value="pcs" />
+                        <input name="Lines[${idx}].Unit" id="unit-input-${idx}" class="form-control form-control-sm" style="width: 60px" readonly tabindex="-1" />
                     </div>
                 </td>
                 <td>
                     <div class="input-group input-group-sm">
                         <span class="input-group-text">$</span>
-                        <input name="Lines[${idx}].UnitPrice" type="number" step="0.01" class="form-control item-price" onchange="calculateTotals()" value="0.00" required />
+                        <input name="Lines[${idx}].UnitPrice" id="price-input-${idx}" type="number" step="0.01" class="form-control item-price" onchange="calculateTotals()" value="0.00" required />
                     </div>
                 </td>
                 <td class="text-end">
@@ -230,7 +297,6 @@
 
             document.getElementById('displaySubtotal').textContent = formatCurrency(subtotal);
             
-            // Simple calculation for UI display - Server will calculate precisely
             let total = subtotal;
             const applyVat = document.querySelector('[name="ApplyVat"]').checked;
             const applyMan = document.querySelector('[name="ApplyManufacturingTax"]').checked;
@@ -239,11 +305,7 @@
             if (!inclusive) {
                 if (applyVat) total += (subtotal * 0.14);
             }
-            // Man tax is usually deducted from supplier or added? 
-            // In Sales order, it's usually extra or deducted from revenue.
-            // Matching service logic: line.LineTotal = (line.Quantity * line.UnitPrice) + line.LineVatAmount - line.LineManufacturingTaxAmount;
-            
-            // Simplified display total
+            // Simplified display total - server handles exact rounding and man tax deduction
             document.getElementById('displayTotal').textContent = formatCurrency(total);
         }
 
@@ -260,7 +322,12 @@
             }).format(amount);
         }
 
-        // Initialize with one line
-        addLineItem();
+        // Initialize
+        loadProducts();
+
+        // Add event listeners for tax switches to recalculate
+        document.querySelectorAll('[name="IsTaxInclusive"], [name="ApplyVat"], [name="ApplyManufacturingTax"]').forEach(input => {
+            input.addEventListener('change', calculateTotals);
+        });
     </script>
 }

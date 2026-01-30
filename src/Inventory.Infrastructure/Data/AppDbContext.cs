@@ -127,6 +127,7 @@ namespace Inventory.Infrastructure.Data
                 b.HasIndex(x => x.SalesOrderId);
                 b.HasOne(x => x.SalesOrder).WithMany(o => o.Lines).HasForeignKey(x => x.SalesOrderId).OnDelete(DeleteBehavior.Cascade);
                 b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+                b.HasOne(x => x.ProductBatch).WithMany().HasForeignKey(x => x.ProductBatchId).OnDelete(DeleteBehavior.Restrict);
             });
 
 
@@ -199,13 +200,13 @@ namespace Inventory.Infrastructure.Data
 
             builder.Entity<ProductBatch>(b =>
             {
-                b.HasKey(x => new { x.ProductId, x.BatchNumber });
+                b.HasKey(x => x.Id);
                 b.Property(x => x.BatchNumber).HasMaxLength(100).IsRequired();
                 b.Property(x => x.UnitCost).HasPrecision(18, 2);
                 b.Property(x => x.UnitPrice).HasPrecision(18, 2);
                 b.Property(x => x.Notes).HasMaxLength(500);
                 b.Property(x => x.RowVersion).IsRowVersion();
-                b.HasIndex(x => x.ProductId);
+                b.HasIndex(x => new { x.ProductId, x.BatchNumber }).IsUnique();
                 b.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
             });
         }

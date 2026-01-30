@@ -13,6 +13,8 @@ namespace Inventory.Application.DTOs.SalesOrder
         /// </summary>
         public string? BatchNumber { get; init; }
 
+        public long? ProductBatchId { get; init; }
+
         [Required]
         [Range(0.001, 1000000, ErrorMessage = "Quantity must be greater than zero.")]
         public decimal Quantity { get; init; }

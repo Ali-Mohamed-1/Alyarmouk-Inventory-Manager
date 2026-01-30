@@ -187,33 +187,61 @@ namespace Inventory.Infrastructure.Services
                     var (quantity, unitPrice) = kvp.Value;
                     var product = products.First(p => p.Id == productId);
 
-                    // SIMPLIFIED TAX CALCULATION
-                    // Base is always unitPrice * quantity
-                    decimal baseAmount = unitPrice * quantity;
-                    decimal lineSubtotal = baseAmount;
+                    // CONSOLIDATED TAX CALCULATION
+                    decimal lineTotal;
+                    decimal lineSubtotal;
                     decimal lineVat = 0;
                     decimal lineManTax = 0;
-                    decimal lineTotal;
 
-                    // Calculate VAT if enabled
-                    if (req.ApplyVat)
+                    if (req.IsTaxInclusive)
                     {
-                        lineVat = Math.Round(baseAmount * TaxConstants.VatRate, 2, MidpointRounding.AwayFromZero);
-                    }
+                        // UnitPrice is the total price including tax
+                        lineTotal = unitPrice * quantity;
+                        
+                        // Total = Base + (Base * VatRate) - (Base * ManTaxRate)
+                        // Total = Base * (1 + VatRate - ManTaxRate)
+                        decimal divisor = 1;
+                        if (req.ApplyVat) divisor += TaxConstants.VatRate;
+                        if (req.ApplyManufacturingTax) divisor -= TaxConstants.ManufacturingTaxRate;
 
-                    // Calculate Manufacturing Tax if enabled
-                    if (req.ApplyManufacturingTax)
+                        lineSubtotal = Math.Round(lineTotal / divisor, 2, MidpointRounding.AwayFromZero);
+                        
+                        // Recalculate taxes from base for consistency
+                        if (req.ApplyVat)
+                            lineVat = Math.Round(lineSubtotal * TaxConstants.VatRate, 2, MidpointRounding.AwayFromZero);
+                        if (req.ApplyManufacturingTax)
+                            lineManTax = Math.Round(lineSubtotal * TaxConstants.ManufacturingTaxRate, 2, MidpointRounding.AwayFromZero);
+                            
+                        // Adjust subtotal to ensure it adds up exactly to Total
+                        lineSubtotal = lineTotal - lineVat + lineManTax;
+                    }
+                    else
                     {
-                        lineManTax = Math.Round(baseAmount * TaxConstants.ManufacturingTaxRate, 2, MidpointRounding.AwayFromZero);
+                        // UnitPrice is the base price excluding tax
+                        lineSubtotal = unitPrice * quantity;
+                        
+                        if (req.ApplyVat)
+                            lineVat = Math.Round(lineSubtotal * TaxConstants.VatRate, 2, MidpointRounding.AwayFromZero);
+                        if (req.ApplyManufacturingTax)
+                            lineManTax = Math.Round(lineSubtotal * TaxConstants.ManufacturingTaxRate, 2, MidpointRounding.AwayFromZero);
+                            
+                        lineTotal = lineSubtotal + lineVat - lineManTax;
                     }
-
-                    // Total = Base + VAT - ManTax
-                    lineTotal = lineSubtotal + lineVat - lineManTax;
 
                     totalSubtotal += lineSubtotal;
                     totalVat += lineVat;
                     totalManTax += lineManTax;
                     totalOrderAmount += lineTotal;
+
+                    // Lookup ProductBatchId if available
+                    long? productBatchId = null;
+                    if (!string.IsNullOrEmpty(batchNumber))
+                    {
+                        var batch = await _db.ProductBatches
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(b => b.ProductId == productId && b.BatchNumber == batchNumber, ct);
+                        productBatchId = batch?.Id;
+                    }
 
                     // Create order line
                     var orderLine = new SalesOrderLine
@@ -223,9 +251,9 @@ namespace Inventory.Infrastructure.Services
                         ProductNameSnapshot = product.Name,
                         UnitSnapshot = product.Unit,
                         BatchNumber = batchNumber,
+                        ProductBatchId = productBatchId,
                         Quantity = quantity,
                         UnitPrice = unitPrice,
-                        IsTaxInclusive = req.IsTaxInclusive, // Keep for reference, but doesn't affect calculation
                         LineSubtotal = lineSubtotal,
                         LineVatAmount = lineVat,
                         LineManufacturingTaxAmount = lineManTax,
@@ -380,7 +408,8 @@ namespace Inventory.Infrastructure.Services
                         Quantity = l.Quantity,
                         Unit = l.UnitSnapshot,
                         UnitPrice = l.UnitPrice,
-                        IsTaxInclusive = l.IsTaxInclusive,
+                        BatchNumber = l.BatchNumber,
+                        ProductBatchId = l.ProductBatchId,
                         LineSubtotal = l.LineSubtotal,
                         LineVatAmount = l.LineVatAmount,
                         LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
@@ -439,7 +468,8 @@ namespace Inventory.Infrastructure.Services
                         Quantity = l.Quantity,
                         Unit = l.UnitSnapshot,
                         UnitPrice = l.UnitPrice,
-                        IsTaxInclusive = l.IsTaxInclusive,
+                        BatchNumber = l.BatchNumber,
+                        ProductBatchId = l.ProductBatchId,
                         LineSubtotal = l.LineSubtotal,
                         LineVatAmount = l.LineVatAmount,
                         LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
@@ -496,7 +526,8 @@ namespace Inventory.Infrastructure.Services
                         Quantity = l.Quantity,
                         Unit = l.UnitSnapshot,
                         UnitPrice = l.UnitPrice,
-                        IsTaxInclusive = l.IsTaxInclusive,
+                        BatchNumber = l.BatchNumber,
+                        ProductBatchId = l.ProductBatchId,
                         LineSubtotal = l.LineSubtotal,
                         LineVatAmount = l.LineVatAmount,
                         LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,

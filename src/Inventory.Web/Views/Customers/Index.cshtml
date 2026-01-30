@@ -270,10 +270,10 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>Product</th>
+                                    <th>Batch</th>
                                     <th class="text-center">Qty</th>
                                     <th class="text-center">Unit</th>
                                     <th class="text-end">Unit Price</th>
-                                    <th class="text-center">Tax Inc.</th>
                                     <th class="text-end">VAT</th>
                                     <th class="text-end">Man. Tax</th>
                                     <th class="text-end">Subtotal</th>
@@ -769,10 +769,14 @@
                                 <td>
                                     <div class="fw-bold">${escapeHtml(line.productName)}</div>
                                 </td>
+                                <td>
+                                    ${line.batchNumber ? 
+                                        `<span class="badge bg-light text-dark border small">${escapeHtml(line.batchNumber)}</span>` : 
+                                        '<span class="text-muted small">-</span>'}
+                                </td>
                                 <td class="text-center">${line.quantity}</td>
                                 <td class="text-center small">${escapeHtml(line.unit)}</td>
                                 <td class="text-end">${formatCurrency(line.unitPrice)}</td>
-                                <td class="text-center">${line.isTaxInclusive ? '<i class="bi bi-check text-success"></i>' : '-'}</td>
                                 <td class="text-end small">${line.lineVatAmount > 0 ? formatCurrency(line.lineVatAmount) : '-'}</td>
                                 <td class="text-end small">${line.lineManufacturingTaxAmount > 0 ? formatCurrency(line.lineManufacturingTaxAmount) : '-'}</td>
                                 <td class="text-end">${formatCurrency(line.lineSubtotal)}</td>

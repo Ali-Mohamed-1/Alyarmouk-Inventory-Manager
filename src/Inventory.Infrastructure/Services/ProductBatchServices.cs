@@ -103,6 +103,7 @@ public sealed class ProductBatchServices : IProductBatchServices
 
             result.Add(new ProductBatchResponseDto
             {
+                Id = unbatchedMeta?.Id ?? 0,
                 BatchNumber = "Unbatched",
                 IsUnbatched = true,
                 OnHand = unbatchedAgg?.OnHand ?? 0m,
@@ -123,6 +124,7 @@ public sealed class ProductBatchServices : IProductBatchServices
 
             result.Add(new ProductBatchResponseDto
             {
+                Id = meta?.Id ?? 0,
                 BatchNumber = batchNumber,
                 IsUnbatched = false,
                 OnHand = agg?.OnHand ?? 0m,
@@ -210,6 +212,7 @@ public sealed class ProductBatchServices : IProductBatchServices
 
         return new ProductBatchResponseDto
         {
+            Id = entity.Id,
             BatchNumber = displayBatch,
             IsUnbatched = string.IsNullOrEmpty(normalized),
             OnHand = agg?.OnHand ?? 0m,

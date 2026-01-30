@@ -126,13 +126,15 @@ public class SalesOrderLine
     /// Optional batch/lot number for this line, when stock is tracked per batch.
     /// </summary>
     public string? BatchNumber { get; set; }
+    
+    public long? ProductBatchId { get; set; }
+    public ProductBatch? ProductBatch { get; set; }
 
     public decimal Quantity { get; set; }
     public string UnitSnapshot { get; set; } = "";
     public decimal UnitPrice { get; set; } // Price per unit at time of order (snapshot)
     
     // Tax System Fields
-    public bool IsTaxInclusive { get; set; }
     public decimal LineSubtotal { get; set; }
     public decimal LineVatAmount { get; set; }
     public decimal LineManufacturingTaxAmount { get; set; }

@@ -2,6 +2,7 @@ namespace Inventory.Application.DTOs.Batches;
 
 public sealed record ProductBatchResponseDto
 {
+    public long Id { get; init; }
     public string BatchNumber { get; init; } = string.Empty;
     public bool IsUnbatched { get; init; }
 
