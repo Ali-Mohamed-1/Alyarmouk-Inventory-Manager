@@ -160,7 +160,7 @@ namespace Inventory.Infrastructure.Services
             // ---- Sales side (revenue + output taxes) ----
             var salesQuery = _db.SalesOrders
                 .AsNoTracking()
-                .Where(o => o.Status == SalesOrderStatus.Completed &&
+                .Where(o => o.Status == SalesOrderStatus.Done &&
                             o.CreatedUtc >= fromUtc &&
                             o.CreatedUtc <= toUtc);
 

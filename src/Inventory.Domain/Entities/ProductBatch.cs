@@ -12,6 +12,7 @@ public sealed class ProductBatch
 
     public decimal? UnitCost { get; set; }
     public decimal? UnitPrice { get; set; }
+    public decimal OnHand { get; set; }
     public string? Notes { get; set; }
 
     public DateTimeOffset UpdatedUtc { get; set; } = DateTimeOffset.UtcNow;

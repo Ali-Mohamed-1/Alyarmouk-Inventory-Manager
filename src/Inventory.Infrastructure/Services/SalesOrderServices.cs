@@ -10,6 +10,7 @@ using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Inventory.Domain.Constants;
+using Inventory.Application.DTOs.Transaction;
 
 namespace Inventory.Infrastructure.Services
 {
@@ -19,13 +20,16 @@ namespace Inventory.Infrastructure.Services
         private const int MaxTake = 1000;
         private readonly AppDbContext _db;
         private readonly IAuditLogWriter _auditWriter;
+        private readonly IInventoryTransactionServices _inventoryTxServices;
 
         public SalesOrderServices(
             AppDbContext db,
-            IAuditLogWriter auditWriter)
+            IAuditLogWriter auditWriter,
+            IInventoryTransactionServices inventoryTxServices)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
             _auditWriter = auditWriter ?? throw new ArgumentNullException(nameof(auditWriter));
+            _inventoryTxServices = inventoryTxServices ?? throw new ArgumentNullException(nameof(inventoryTxServices));
         }
 
         public async Task<long> CreateAsync(CreateSalesOrderRequest req, UserContext user, CancellationToken ct = default)
@@ -122,7 +126,9 @@ namespace Inventory.Infrastructure.Services
                 .Where(s => productIdsList.Contains(s.ProductId))
                 .ToListAsync(ct);
 
-            // Verify sufficient stock for all products
+            // Verify sufficient stock for all products (Optional at creation, but good to check)
+            /* 
+            // We can keep this as a soft check or remove it if we want to allow drafting orders without stock
             foreach (var kvp in lineItems)
             {
                 var productId = kvp.Key.ProductId;
@@ -137,6 +143,7 @@ namespace Inventory.Infrastructure.Services
                     throw new ValidationException($"Insufficient stock for product '{product.Name}'. Available: {availableStock}, Requested: {quantity}");
                 }
             }
+            */
 
             // Generate unique order number
             var orderNumber = await GenerateUniqueOrderNumberAsync(ct);
@@ -179,7 +186,7 @@ namespace Inventory.Infrastructure.Services
                 decimal totalSubtotal = 0;
                 decimal totalOrderAmount = 0;
 
-                // Create order lines and update stock
+                // Create order lines
                 foreach (var kvp in lineItems)
                 {
                     var productId = kvp.Key.ProductId;
@@ -261,67 +268,6 @@ namespace Inventory.Infrastructure.Services
                     };
 
                     _db.SalesOrderLines.Add(orderLine);
-
-                    // Update stock snapshot
-                    var snapshot = stockSnapshots.FirstOrDefault(s => s.ProductId == productId);
-                    if (snapshot is null)
-                    {
-                        snapshot = new StockSnapshot
-                        {
-                            ProductId = productId,
-                            OnHand = 0
-                        };
-                        _db.StockSnapshots.Add(snapshot);
-                    }
-
-                    snapshot.OnHand -= quantity; // Decrease stock for sale
-
-                    // Create inventory transaction (Issue) with cost tracking
-                    var inventoryTransaction = new InventoryTransaction
-                    {
-                        ProductId = productId,
-                        QuantityDelta = -quantity, // Negative for Issue
-                        UnitCost = product.Cost, // Cost for COGS calculation
-                        Type = InventoryTransactionType.Issue,
-                        TimestampUtc = DateTimeOffset.UtcNow,
-                        UserId = user.UserId,
-                        UserDisplayName = user.UserDisplayName,
-                        clientId = req.CustomerId,
-                        BatchNumber = batchNumber,
-                        Note = $"Sales order {orderNumber}"
-                    };
-
-                    _db.InventoryTransactions.Add(inventoryTransaction);
-                    inventoryTransactions.Add(inventoryTransaction);
-                }
-
-                await _db.SaveChangesAsync(ct); // Save to get inventory transaction IDs
-
-                // Create financial transactions for COGS (Cost of Goods Sold) for each line
-                for (int i = 0; i < inventoryTransactions.Count; i++)
-                {
-                    var inventoryTransaction = inventoryTransactions[i];
-                    var productId = inventoryTransaction.ProductId;
-                    var product = products.First(p => p.Id == productId);
-                    var batchNumber = inventoryTransaction.BatchNumber;
-                    var quantity = lineItems[(productId, batchNumber)].Quantity;
-                    var cogsAmount = product.Cost * quantity;
-
-                    var cogsTransaction = new FinancialTransaction
-                    {
-                        Type = FinancialTransactionType.Expense, // Money going out (COGS)
-                        Amount = cogsAmount,
-                        InventoryTransactionId = inventoryTransaction.Id,
-                        SalesOrderId = salesOrder.Id,
-                        ProductId = productId,
-                        CustomerId = req.CustomerId,
-                        TimestampUtc = DateTimeOffset.UtcNow,
-                        UserId = user.UserId,
-                        UserDisplayName = user.UserDisplayName,
-                        Note = $"COGS for sales order {orderNumber} - {product.Name}"
-                    };
-
-                    _db.FinancialTransactions.Add(cogsTransaction);
                 }
 
                 salesOrder.Subtotal = totalSubtotal;
@@ -539,94 +485,7 @@ namespace Inventory.Infrastructure.Services
 
         public async Task CompleteOrderAsync(long orderId, UserContext user, CancellationToken ct = default)
         {
-            ValidateUser(user);
-
-            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
-
-            // Load the order with lines
-            var salesOrder = await _db.SalesOrders
-                .Include(o => o.Lines)
-                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
-
-            if (salesOrder is null)
-                throw new NotFoundException($"Sales order id {orderId} was not found.");
-
-            if (salesOrder.Status == SalesOrderStatus.Completed)
-                throw new ValidationException($"Sales order {orderId} is already completed.");
-
-            if (salesOrder.Status == SalesOrderStatus.Cancelled)
-                throw new ValidationException($"Cannot complete a cancelled sales order {orderId}.");
-
-            // Use transaction to ensure all operations are atomic
-            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-            try
-            {
-                decimal totalRevenue = 0;
-
-                // Only record revenue if payment is Cash, BankTransfer, or if Check is already Cashed
-                if (salesOrder.PaymentMethod == PaymentMethod.Cash || 
-                    salesOrder.PaymentMethod == PaymentMethod.BankTransfer || 
-                    (salesOrder.CheckCashed == true))
-                {
-                    // Create financial transactions for revenue (money coming in)
-                    foreach (var line in salesOrder.Lines)
-                    {
-                        var lineRevenue = line.UnitPrice * line.Quantity;
-                        totalRevenue += lineRevenue;
-
-                        var revenueTransaction = new FinancialTransaction
-                        {
-                            Type = FinancialTransactionType.Revenue, // Money coming in
-                            Amount = lineRevenue,
-                            SalesOrderId = salesOrder.Id,
-                            ProductId = line.ProductId,
-                            CustomerId = salesOrder.CustomerId,
-                            TimestampUtc = DateTimeOffset.UtcNow,
-                            UserId = user.UserId,
-                            UserDisplayName = user.UserDisplayName,
-                            Note = $"Revenue from sales order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
-                        };
-
-                        _db.FinancialTransactions.Add(revenueTransaction);
-                    }
-                }
-
-                // Update order status to Completed
-                var previousStatus = salesOrder.Status;
-                var previousPaymentStatus = salesOrder.PaymentStatus;
-                salesOrder.Status = SalesOrderStatus.Completed;
-                
-                // Only mark as Paid if Cash, BankTransfer, or Check Cashed
-                if (salesOrder.PaymentMethod == PaymentMethod.Cash || 
-                    salesOrder.PaymentMethod == PaymentMethod.BankTransfer || 
-                    (salesOrder.CheckCashed == true))
-                {
-                    salesOrder.PaymentStatus = PaymentStatus.Paid;
-                }
-
-                await _db.SaveChangesAsync(ct);
-
-                // AUDIT LOG: Record the order completion
-                await _auditWriter.LogUpdateAsync<SalesOrder>(
-                    salesOrder.Id,
-                    user,
-                    beforeState: new { Status = previousStatus.ToString(), PaymentStatus = previousPaymentStatus.ToString() },
-                    afterState: new
-                    {
-                        Status = SalesOrderStatus.Completed.ToString(),
-                        PaymentStatus = PaymentStatus.Paid.ToString(),
-                        TotalRevenue = totalRevenue
-                    },
-                    ct);
-
-                await _db.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
-            }
-            catch (DbUpdateException ex)
-            {
-                await transaction.RollbackAsync(ct);
-                throw new ConflictException("Could not complete order due to a database conflict.", ex);
-            }
+            await UpdateStatusAsync(orderId, new UpdateSalesOrderStatusRequest { OrderId = orderId, Status = SalesOrderStatus.Done }, user, ct);
         }
 
         public async Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default)
@@ -636,8 +495,10 @@ namespace Inventory.Infrastructure.Services
             if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
             if (req is null) throw new ArgumentNullException(nameof(req));
 
-            // Load the order
+            // Load the order with lines and products
             var salesOrder = await _db.SalesOrders
+                .Include(o => o.Lines)
+                .ThenInclude(l => l.Product)
                 .FirstOrDefaultAsync(o => o.Id == orderId, ct);
 
             if (salesOrder is null)
@@ -645,14 +506,45 @@ namespace Inventory.Infrastructure.Services
 
             // Validate status transition
             if (salesOrder.Status == req.Status)
-                throw new ValidationException($"Sales order {orderId} is already in status {req.Status}.");
+                return; // Idempotent
+
+            if (salesOrder.Status == SalesOrderStatus.Done && req.Status != SalesOrderStatus.Done)
+            {
+                // Reversing from Done is allowed
+            }
+            else if (salesOrder.Status == SalesOrderStatus.Cancelled)
+            {
+                 throw new ValidationException("Cannot change status of a cancelled order.");
+            }
 
             // Use transaction to ensure all operations are atomic
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
             {
                 var previousStatus = salesOrder.Status;
+                
+                // 1. If moving FROM Done -> Restore inventory
+                if (previousStatus == SalesOrderStatus.Done)
+                {
+                    await ReverseInventoryAndFinancialsAsync(salesOrder, user, ct);
+                }
+
+                // 2. Update status
                 salesOrder.Status = req.Status;
+
+                // 3. If moving TO Done -> Deduct inventory
+                if (req.Status == SalesOrderStatus.Done)
+                {
+                    await ApplyInventoryAndFinancialsAsync(salesOrder, user, ct);
+                    
+                    // Also mark as Paid if suitable
+                    if (salesOrder.PaymentMethod == PaymentMethod.Cash || 
+                        salesOrder.PaymentMethod == PaymentMethod.BankTransfer || 
+                        (salesOrder.CheckCashed == true))
+                    {
+                        salesOrder.PaymentStatus = PaymentStatus.Paid;
+                    }
+                }
 
                 await _db.SaveChangesAsync(ct);
 
@@ -667,10 +559,122 @@ namespace Inventory.Infrastructure.Services
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
             }
-            catch (DbUpdateException ex)
+            catch (Exception ex)
             {
                 await transaction.RollbackAsync(ct);
+                if (ex is ValidationException or NotFoundException) throw;
                 throw new ConflictException("Could not update order status due to a database conflict.", ex);
+            }
+        }
+
+        private async Task ApplyInventoryAndFinancialsAsync(SalesOrder salesOrder, UserContext user, CancellationToken ct)
+        {
+            foreach (var line in salesOrder.Lines)
+            {
+                // Check stock (including batch if specified)
+                if (line.ProductBatchId.HasValue)
+                {
+                    var batch = await _db.ProductBatches.AsNoTracking().FirstOrDefaultAsync(b => b.Id == line.ProductBatchId.Value, ct);
+                    if (batch == null || batch.OnHand < line.Quantity)
+                    {
+                        throw new ValidationException($"Insufficient stock in batch {batch?.BatchNumber ?? line.BatchNumber} for product {line.ProductNameSnapshot}. Available: {batch?.OnHand ?? 0}, Requested: {line.Quantity}");
+                    }
+                }
+                else
+                {
+                    var snapshot = await _db.StockSnapshots.AsNoTracking().FirstOrDefaultAsync(s => s.ProductId == line.ProductId, ct);
+                    if (snapshot == null || snapshot.OnHand < line.Quantity)
+                    {
+                        throw new ValidationException($"Insufficient stock for product {line.ProductNameSnapshot}. Available: {snapshot?.OnHand ?? 0}, Requested: {line.Quantity}");
+                    }
+                }
+
+                // Create Inventory Transaction (Issue)
+                // This will also create the COGS financial transaction automatically
+                var txReq = new CreateInventoryTransactionRequest
+                {
+                    ProductId = line.ProductId,
+                    Quantity = line.Quantity,
+                    Type = InventoryTransactionType.Issue,
+                    BatchNumber = line.BatchNumber,
+                    ProductBatchId = line.ProductBatchId,
+                    CustomerId = salesOrder.CustomerId,
+                    Note = $"Sales Order {salesOrder.OrderNumber}"
+                };
+
+                await _inventoryTxServices.CreateAsync(txReq, user, ct);
+
+                // Create Revenue Financial Transaction
+                var revenueAmount = line.UnitPrice * line.Quantity;
+                var revenueTx = new FinancialTransaction
+                {
+                    Type = FinancialTransactionType.Revenue,
+                    Amount = revenueAmount,
+                    SalesOrderId = salesOrder.Id,
+                    ProductId = line.ProductId,
+                    CustomerId = salesOrder.CustomerId,
+                    TimestampUtc = DateTimeOffset.UtcNow,
+                    UserId = user.UserId,
+                    UserDisplayName = user.UserDisplayName,
+                    Note = $"Revenue from Sales Order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
+                };
+                _db.FinancialTransactions.Add(revenueTx);
+            }
+        }
+
+        private async Task ReverseInventoryAndFinancialsAsync(SalesOrder salesOrder, UserContext user, CancellationToken ct)
+        {
+            foreach (var line in salesOrder.Lines)
+            {
+                // Create Inventory Transaction (Adjust positive) to restore stock
+                // We use Adjust to skip automatic COGS creation in InventoryTransactionServices
+                var txReq = new CreateInventoryTransactionRequest
+                {
+                    ProductId = line.ProductId,
+                    Quantity = line.Quantity, // Positive delta for Adjust
+                    Type = InventoryTransactionType.Adjust,
+                    BatchNumber = line.BatchNumber,
+                    ProductBatchId = line.ProductBatchId,
+                    CustomerId = salesOrder.CustomerId,
+                    Note = $"Reversal of Sales Order {salesOrder.OrderNumber}"
+                };
+
+                await _inventoryTxServices.CreateAsync(txReq, user, ct);
+
+                // Reverse Revenue -> Create an Expense transaction
+                var revenueAmount = line.UnitPrice * line.Quantity;
+                var revenueReversalTx = new FinancialTransaction
+                {
+                    Type = FinancialTransactionType.Expense,
+                    Amount = revenueAmount,
+                    SalesOrderId = salesOrder.Id,
+                    ProductId = line.ProductId,
+                    CustomerId = salesOrder.CustomerId,
+                    TimestampUtc = DateTimeOffset.UtcNow,
+                    UserId = user.UserId,
+                    UserDisplayName = user.UserDisplayName,
+                    Note = $"Revenue Reversal for Sales Order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
+                };
+                _db.FinancialTransactions.Add(revenueReversalTx);
+
+                // Reverse COGS -> Create a Revenue transaction
+                // Need to find product cost
+                var product = line.Product ?? await _db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == line.ProductId, ct);
+                var cogsAmount = (product?.Cost ?? 0) * line.Quantity;
+                
+                var cogsReversalTx = new FinancialTransaction
+                {
+                    Type = FinancialTransactionType.Revenue,
+                    Amount = cogsAmount,
+                    SalesOrderId = salesOrder.Id,
+                    ProductId = line.ProductId,
+                    CustomerId = salesOrder.CustomerId,
+                    TimestampUtc = DateTimeOffset.UtcNow,
+                    UserId = user.UserId,
+                    UserDisplayName = user.UserDisplayName,
+                    Note = $"COGS Reversal for Sales Order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
+                };
+                _db.FinancialTransactions.Add(cogsReversalTx);
             }
         }
 

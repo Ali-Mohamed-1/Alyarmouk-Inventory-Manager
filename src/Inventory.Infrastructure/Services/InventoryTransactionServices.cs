@@ -110,8 +110,19 @@ namespace Inventory.Infrastructure.Services
                     UserId = user.UserId,
                     UserDisplayName = user.UserDisplayName,
                     clientId = req.CustomerId ?? 0,
+                    ProductBatchId = req.ProductBatchId,
                     Note = req.Note
                 };
+
+                // Update ProductBatch OnHand if applicable
+                if (req.ProductBatchId.HasValue && req.ProductBatchId.Value > 0)
+                {
+                    var batch = await _db.ProductBatches.FindAsync(new object[] { req.ProductBatchId.Value }, ct);
+                    if (batch != null)
+                    {
+                        batch.OnHand += quantityDelta;
+                    }
+                }
 
                 _db.InventoryTransactions.Add(inventoryTransaction);
                 await _db.SaveChangesAsync(ct); // Save to get the ID
@@ -188,6 +199,8 @@ namespace Inventory.Infrastructure.Services
                     Type = t.Type.ToString(),
                     TimestampUtc = t.TimestampUtc,
                     UserDisplayName = t.UserDisplayName,
+                    ProductBatchId = t.ProductBatchId,
+                    BatchNumber = t.BatchNumber,
                     Note = t.Note
                 })
                 .ToListAsync(ct);
@@ -214,6 +227,8 @@ namespace Inventory.Infrastructure.Services
                     Type = t.Type.ToString(),
                     TimestampUtc = t.TimestampUtc,
                     UserDisplayName = t.UserDisplayName,
+                    ProductBatchId = t.ProductBatchId,
+                    BatchNumber = t.BatchNumber,
                     Note = t.Note
                 })
                 .ToListAsync(ct);
@@ -242,6 +257,8 @@ namespace Inventory.Infrastructure.Services
                     Type = t.Type.ToString(),
                     TimestampUtc = t.TimestampUtc,
                     UserDisplayName = t.UserDisplayName,
+                    ProductBatchId = t.ProductBatchId,
+                    BatchNumber = t.BatchNumber,
                     Note = t.Note
                 })
                 .ToListAsync(ct);

@@ -3,7 +3,7 @@ namespace Inventory.Domain.Entities;
 public enum SalesOrderStatus
 {
     Pending = 0,
-    Completed = 1,
+    Done = 1,
     Cancelled = 2
 }
 

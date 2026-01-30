@@ -25,6 +25,8 @@ namespace Inventory.Application.DTOs.Transaction
         [StringLength(100)]
         public string? BatchNumber { get; init; }
 
+        public long? ProductBatchId { get; init; }
+
         [StringLength(500)]
         public string? Note { get; init; }
     }

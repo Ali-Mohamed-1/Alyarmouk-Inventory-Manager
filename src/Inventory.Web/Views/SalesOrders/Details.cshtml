@@ -114,15 +114,42 @@
             </div>
 
             <!-- Status Info -->
-            <div class="card shadow-sm mb-4 border-start border-4 @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Completed ? "border-success" : "border-info")">
+            <div class="card shadow-sm mb-4 border-start border-4 @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done ? "border-success" : "border-info")">
                 <div class="card-body">
                     <h6 class="text-muted text-uppercase small fw-bold mb-3">Order Status</h6>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="badge @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Completed ? "bg-success" : "bg-info") fs-6">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="badge @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done ? "bg-success" : "bg-info") fs-6">
                             @Model.Status
                         </span>
                         <span class="text-muted small">Updated: @Model.CreatedUtc.ToString("g")</span>
                     </div>
+
+                    @if (Model.Status != Inventory.Domain.Entities.SalesOrderStatus.Cancelled)
+                    {
+                        <form asp-action="UpdateStatus" asp-route-id="@Model.Id" method="post" class="d-flex gap-2">
+                            <input type="hidden" name="OrderId" value="@Model.Id" />
+                            <select name="Status" class="form-select form-select-sm">
+                                @foreach (var status in Enum.GetValues<Inventory.Domain.Entities.SalesOrderStatus>())
+                                {
+                                    if (status == Model.Status)
+                                    {
+                                        <option value="@status" selected>@status</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@status">@status</option>
+                                    }
+                                }
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline-primary">Update</button>
+                        </form>
+                        if (Model.Status != Inventory.Domain.Entities.SalesOrderStatus.Done)
+                        {
+                            <div class="mt-2 small text-warning">
+                                <i class="bi bi-exclamation-triangle"></i> Inventory will be reduced when set to Done.
+                            </div>
+                        }
+                    }
                 </div>
             </div>
 

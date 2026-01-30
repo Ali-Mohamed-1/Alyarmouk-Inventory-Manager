@@ -188,7 +188,12 @@
                             <div class="mb-4">
                                 <h6 class="text-muted text-uppercase small fw-bold">General Info</h6>
                                 <div class="mb-1"><strong>Date:</strong> <span id="detail-order-date"></span></div>
-                                <div class="mb-1"><strong>Status:</strong> <span id="detail-order-status"></span></div>
+                                <div class="mb-1 d-flex align-items-center gap-2">
+                                    <strong>Status:</strong> <span id="detail-order-status"></span>
+                                    <button class="btn btn-link btn-sm p-0 text-primary" onclick="openStatusModal()" title="Change Status">
+                                        <i class="bi bi-pencil"></i> Edit
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Documents -->
@@ -437,6 +442,37 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-success fw-bold" id="btn-save-customer">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Change Status Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-dark">
+                <h5 class="modal-title fw-bold" id="statusModalLabel">
+                    <i class="bi bi-arrow-repeat me-2"></i>Order Status
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="updateStatusSelect" class="form-label fw-bold">Select Status</label>
+                    <select class="form-select" id="updateStatusSelect">
+                        <option value="0">Pending</option>
+                        <option value="1">Done</option>
+                        <option value="2">Cancelled</option>
+                    </select>
+                </div>
+                <div id="status-warning" class="alert alert-warning small p-2 mb-0" style="display: none;">
+                    <i class="bi bi-exclamation-triangle"></i> Inventory will be reduced when set to <strong>Done</strong>.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary fw-bold" onclick="updateOrderStatus()">Update</button>
             </div>
         </div>
     </div>
@@ -706,9 +742,9 @@
                     document.getElementById('detail-order-number').textContent = order.orderNumber;
                     document.getElementById('detail-order-date').textContent = formatDate(order.orderDate);
                     
-                    // Status Badge
-                    const statusText = order.status === 0 ? 'Draft' : order.status === 1 ? 'Confirmed' : order.status === 2 ? 'Completed' : 'Cancelled';
-                    const statusClass = order.status === 0 ? 'text-secondary' : order.status === 1 ? 'text-info' : order.status === 2 ? 'text-success' : 'text-danger';
+                    // Status Badge: 0=Pending, 1=Done, 2=Cancelled
+                    const statusText = order.status === 0 ? 'Pending' : order.status === 1 ? 'Done' : 'Cancelled';
+                    const statusClass = order.status === 0 ? 'text-info' : order.status === 1 ? 'text-success' : 'text-danger';
                     document.getElementById('detail-order-status').innerHTML = `<span class="fw-bold ${statusClass}">${statusText}</span>`;
 
                     // Payment Info
@@ -797,6 +833,58 @@
                 } catch (error) {
                     console.error('Error loading order details:', error);
                     alert('Failed to load order details. Please try again.');
+                }
+            };
+            
+            // Status Management
+            window.openStatusModal = function() {
+                const order = window.currentDetailOrder;
+                if (!order) return;
+                
+                const select = document.getElementById('updateStatusSelect');
+                select.value = order.status;
+                
+                // Show warning if moving from Pending/something to Done
+                const warning = document.getElementById('status-warning');
+                warning.style.display = (order.status !== 1) ? 'block' : 'none';
+                
+                new bootstrap.Modal(document.getElementById('statusModal')).show();
+            };
+
+            window.updateOrderStatus = async function() {
+                const order = window.currentDetailOrder;
+                if (!order) return;
+                
+                const newStatus = parseInt(document.getElementById('updateStatusSelect').value);
+                const orderId = order.id;
+
+                try {
+                    const antiForgeryToken = document.querySelector('[name="__RequestVerificationToken"]').value;
+                    const formData = new FormData();
+                    formData.append('__RequestVerificationToken', antiForgeryToken);
+                    formData.append('OrderId', orderId);
+                    formData.append('Status', newStatus);
+
+                    const response = await fetch(`/SalesOrders/UpdateStatus?id=${orderId}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errorMsg = await response.text();
+                        throw new Error(errorMsg || 'Failed to update order status');
+                    }
+
+                    bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
+                    
+                    // Refresh details and history
+                    await viewOrderDetails(orderId);
+                    if (currentCustomerId) {
+                        viewCustomerHistory(currentCustomerId);
+                    }
+                } catch (error) {
+                    console.error('Error updating status:', error);
+                    alert('Error: ' + error.message);
                 }
             };
             
@@ -1099,13 +1187,11 @@
                 }
 
                 tbody.innerHTML = orders.map(order => {
-                    // Order Status: Draft=0, Confirmed=1, Completed=2, Cancelled=3
-                    const statusBadge = order.status === 0 ? 'bg-secondary' : 
-                                       order.status === 1 ? 'bg-info' : 
-                                       order.status === 2 ? 'bg-success' : 'bg-danger';
-                    const statusText = order.status === 0 ? 'Draft' : 
-                                      order.status === 1 ? 'Confirmed' : 
-                                      order.status === 2 ? 'Completed' : 'Cancelled';
+                    // Order Status: Pending=0, Done=1, Cancelled=2
+                    const statusBadge = order.status === 0 ? 'bg-info' : 
+                                       order.status === 1 ? 'bg-success' : 'bg-danger';
+                    const statusText = order.status === 0 ? 'Pending' : 
+                                      order.status === 1 ? 'Done' : 'Cancelled';
                     
                     // Payment Status: Pending=0, Paid=1
                     const paymentBadge = order.paymentStatus === 0 ? 'bg-warning text-dark' : 'bg-success';
@@ -1125,7 +1211,7 @@
                             <td class="text-truncate" style="max-width: 300px;" title="${escapeHtml(products)}">${escapeHtml(products)}</td>
                             <td class="text-end">
                                 <button class="btn btn-sm btn-outline-info" onclick="viewOrderDetails(${order.id})">View</button>
-                                ${order.status === 2 ? `<button class="btn btn-sm btn-outline-warning" onclick="cancelOrder(${order.id})">Cancel</button>` : ''}
+                                ${order.status !== 2 ? `<button class="btn btn-sm btn-outline-warning" onclick="cancelOrder(${order.id})">Cancel</button>` : ''}
                             </td>
                         </tr>
                     `;
