@@ -32,10 +32,16 @@ namespace Inventory.Application.DTOs.SalesOrder
         public DateTimeOffset? CheckCashedDate { get; init; }
 
         /// <summary>
-        /// Path or identifier of the PDF attachment for this order, if any.
+        /// Path or identifier of the Invoice PDF attachment for this order, if any.
         /// </summary>
-        public string? PdfPath { get; init; }
-        public DateTimeOffset? PdfUploadedUtc { get; init; }
+        public string? InvoicePath { get; init; }
+        public DateTimeOffset? InvoiceUploadedUtc { get; init; }
+
+        /// <summary>
+        /// Path or identifier of the Receipt PDF attachment for this order, if any.
+        /// </summary>
+        public string? ReceiptPath { get; init; }
+        public DateTimeOffset? ReceiptUploadedUtc { get; init; }
 
         public string CreatedByUserDisplayName { get; init; } = string.Empty;
         public string? Note { get; init; }

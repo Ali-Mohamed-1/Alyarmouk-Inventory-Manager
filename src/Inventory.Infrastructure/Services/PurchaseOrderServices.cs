@@ -46,6 +46,17 @@ namespace Inventory.Infrastructure.Services
             return order == null ? null : MapToResponse(order);
         }
 
+        public async Task<IEnumerable<PurchaseOrderResponse>> GetBySupplierAsync(int supplierId, CancellationToken ct = default)
+        {
+            return await _db.PurchaseOrders
+                .AsNoTracking()
+                .Include(o => o.Lines)
+                .Where(o => o.SupplierId == supplierId)
+                .OrderByDescending(o => o.CreatedUtc)
+                .Select(o => MapToResponse(o))
+                .ToListAsync(ct);
+        }
+
         public async Task<long> CreateAsync(CreatePurchaseOrderRequest req, UserContext user, CancellationToken ct = default)
         {
             if (req is null) throw new ArgumentNullException(nameof(req));
@@ -356,8 +367,11 @@ namespace Inventory.Infrastructure.Services
                 o.SupplierNameSnapshot,
                 o.CreatedUtc,
                 o.Status,
+                o.PaymentStatus,
                 o.CreatedByUserDisplayName,
                 o.IsTaxInclusive,
+                o.ApplyVat,
+                o.ApplyManufacturingTax,
                 o.Subtotal,
                 o.VatAmount,
                 o.ManufacturingTaxAmount,
@@ -372,8 +386,10 @@ namespace Inventory.Infrastructure.Services
                     l.Quantity,
                     l.UnitSnapshot,
                     l.UnitPrice,
+                    l.IsTaxInclusive,
                     l.LineSubtotal,
                     l.LineVatAmount,
+                    l.LineManufacturingTaxAmount,
                     l.LineTotal)).ToList());
         }
 

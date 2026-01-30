@@ -17,8 +17,11 @@ namespace Inventory.Application.DTOs
         string SupplierName,
         DateTimeOffset CreatedUtc,
         Inventory.Domain.Entities.PurchaseOrderStatus Status,
+        Inventory.Domain.Entities.PurchasePaymentStatus PaymentStatus,
         string CreatedByUserDisplayName,
         bool IsTaxInclusive,
+        bool ApplyVat,
+        bool ApplyManufacturingTax,
         decimal Subtotal,
         decimal VatAmount,
         decimal ManufacturingTaxAmount,
@@ -35,7 +38,9 @@ namespace Inventory.Application.DTOs
         decimal Quantity,
         string Unit,
         decimal UnitPrice,
+        bool IsTaxInclusive,
         decimal LineSubtotal,
         decimal LineVatAmount,
+        decimal LineManufacturingTaxAmount,
         decimal LineTotal);
 }

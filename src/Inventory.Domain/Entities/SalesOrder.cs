@@ -70,15 +70,25 @@ public  class SalesOrder
     public DateTimeOffset? CheckCashedDate { get; set; }
 
     /// <summary>
-    /// Optional path or identifier to a PDF attachment stored for this order.
+    /// Optional path or identifier to an Invoice PDF attachment stored for this order.
     /// The web layer is responsible for saving the actual file and providing the path.
     /// </summary>
-    public string? PdfPath { get; set; }
+    public string? InvoicePath { get; set; }
 
     /// <summary>
-    /// When the PDF attachment was last uploaded/updated.
+    /// When the Invoice PDF attachment was last uploaded/updated.
     /// </summary>
-    public DateTimeOffset? PdfUploadedUtc { get; set; }
+    public DateTimeOffset? InvoiceUploadedUtc { get; set; }
+
+    /// <summary>
+    /// Optional path or identifier to a Receipt PDF attachment stored for this order.
+    /// </summary>
+    public string? ReceiptPath { get; set; }
+
+    /// <summary>
+    /// When the Receipt PDF attachment was last uploaded/updated.
+    /// </summary>
+    public DateTimeOffset? ReceiptUploadedUtc { get; set; }
 
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public string CreatedByUserId { get; set; } = "";

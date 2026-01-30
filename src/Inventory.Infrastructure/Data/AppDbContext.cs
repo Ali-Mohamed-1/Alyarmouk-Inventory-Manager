@@ -95,7 +95,8 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.CustomerNameSnapshot).HasMaxLength(200).IsRequired();
                 b.Property(x => x.OrderDate).IsRequired();
                 b.Property(x => x.DueDate).IsRequired();
-                b.Property(x => x.PdfPath).HasMaxLength(500);
+                b.Property(x => x.InvoicePath).HasMaxLength(500);
+                b.Property(x => x.ReceiptPath).HasMaxLength(500);
                 b.Property(x => x.CreatedByUserId).HasMaxLength(450).IsRequired();
                 b.Property(x => x.CreatedByUserDisplayName).HasMaxLength(200).IsRequired();
                 b.Property(x => x.Note).HasMaxLength(500);

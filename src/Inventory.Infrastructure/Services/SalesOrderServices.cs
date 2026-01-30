@@ -351,8 +351,10 @@ namespace Inventory.Infrastructure.Services
                     CheckReceivedDate = o.CheckReceivedDate,
                     CheckCashed = o.CheckCashed,
                     CheckCashedDate = o.CheckCashedDate,
-                    PdfPath = o.PdfPath,
-                    PdfUploadedUtc = o.PdfUploadedUtc,
+                    InvoicePath = o.InvoicePath,
+                    InvoiceUploadedUtc = o.InvoiceUploadedUtc,
+                    ReceiptPath = o.ReceiptPath,
+                    ReceiptUploadedUtc = o.ReceiptUploadedUtc,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
                     IsTaxInclusive = o.IsTaxInclusive,
@@ -407,8 +409,10 @@ namespace Inventory.Infrastructure.Services
                     CheckReceivedDate = o.CheckReceivedDate,
                     CheckCashed = o.CheckCashed,
                     CheckCashedDate = o.CheckCashedDate,
-                    PdfPath = o.PdfPath,
-                    PdfUploadedUtc = o.PdfUploadedUtc,
+                    InvoicePath = o.InvoicePath,
+                    InvoiceUploadedUtc = o.InvoiceUploadedUtc,
+                    ReceiptPath = o.ReceiptPath,
+                    ReceiptUploadedUtc = o.ReceiptUploadedUtc,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
                     IsTaxInclusive = o.IsTaxInclusive,
@@ -461,8 +465,10 @@ namespace Inventory.Infrastructure.Services
                     CheckReceivedDate = o.CheckReceivedDate,
                     CheckCashed = o.CheckCashed,
                     CheckCashedDate = o.CheckCashedDate,
-                    PdfPath = o.PdfPath,
-                    PdfUploadedUtc = o.PdfUploadedUtc,
+                    InvoicePath = o.InvoicePath,
+                    InvoiceUploadedUtc = o.InvoiceUploadedUtc,
+                    ReceiptPath = o.ReceiptPath,
+                    ReceiptUploadedUtc = o.ReceiptUploadedUtc,
                     CreatedByUserDisplayName = o.CreatedByUserDisplayName,
                     Note = o.Note,
                     IsTaxInclusive = o.IsTaxInclusive,
@@ -516,33 +522,42 @@ namespace Inventory.Infrastructure.Services
             {
                 decimal totalRevenue = 0;
 
-                // Create financial transactions for revenue (money coming in)
-                foreach (var line in salesOrder.Lines)
+                // Only record revenue if payment is Cash or if Check is already Cashed
+                if (salesOrder.PaymentMethod == PaymentMethod.Cash || (salesOrder.CheckCashed == true))
                 {
-                    var lineRevenue = line.UnitPrice * line.Quantity;
-                    totalRevenue += lineRevenue;
-
-                    var revenueTransaction = new FinancialTransaction
+                    // Create financial transactions for revenue (money coming in)
+                    foreach (var line in salesOrder.Lines)
                     {
-                        Type = FinancialTransactionType.Revenue, // Money coming in
-                        Amount = lineRevenue,
-                        SalesOrderId = salesOrder.Id,
-                        ProductId = line.ProductId,
-                        CustomerId = salesOrder.CustomerId,
-                        TimestampUtc = DateTimeOffset.UtcNow,
-                        UserId = user.UserId,
-                        UserDisplayName = user.UserDisplayName,
-                        Note = $"Revenue from sales order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
-                    };
+                        var lineRevenue = line.UnitPrice * line.Quantity;
+                        totalRevenue += lineRevenue;
 
-                    _db.FinancialTransactions.Add(revenueTransaction);
+                        var revenueTransaction = new FinancialTransaction
+                        {
+                            Type = FinancialTransactionType.Revenue, // Money coming in
+                            Amount = lineRevenue,
+                            SalesOrderId = salesOrder.Id,
+                            ProductId = line.ProductId,
+                            CustomerId = salesOrder.CustomerId,
+                            TimestampUtc = DateTimeOffset.UtcNow,
+                            UserId = user.UserId,
+                            UserDisplayName = user.UserDisplayName,
+                            Note = $"Revenue from sales order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
+                        };
+
+                        _db.FinancialTransactions.Add(revenueTransaction);
+                    }
                 }
 
-                // Update order status to Completed and mark as paid so it no longer counts as owed
+                // Update order status to Completed
                 var previousStatus = salesOrder.Status;
                 var previousPaymentStatus = salesOrder.PaymentStatus;
                 salesOrder.Status = SalesOrderStatus.Completed;
-                salesOrder.PaymentStatus = PaymentStatus.Paid;
+                
+                // Only mark as Paid if Cash or Check Cashed
+                if (salesOrder.PaymentMethod == PaymentMethod.Cash || (salesOrder.CheckCashed == true))
+                {
+                    salesOrder.PaymentStatus = PaymentStatus.Paid;
+                }
 
                 await _db.SaveChangesAsync(ct);
 
@@ -615,15 +630,15 @@ namespace Inventory.Infrastructure.Services
         }
 
         /// <summary>
-        /// Sets or updates the PDF attachment path for an existing sales order.
+        /// Sets or updates the Invoice PDF attachment path for an existing sales order.
         /// The web/UI layer should save the actual PDF file and pass the resolved path here.
         /// </summary>
-        public async Task AttachPdfAsync(long orderId, string pdfPath, UserContext user, CancellationToken ct = default)
+        public async Task AttachInvoiceAsync(long orderId, string invoicePath, UserContext user, CancellationToken ct = default)
         {
             ValidateUser(user);
 
             if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
-            if (string.IsNullOrWhiteSpace(pdfPath)) throw new ValidationException("PDF path must be provided.");
+            if (string.IsNullOrWhiteSpace(invoicePath)) throw new ValidationException("Invoice path must be provided.");
 
             var salesOrder = await _db.SalesOrders
                 .FirstOrDefaultAsync(o => o.Id == orderId, ct);
@@ -634,17 +649,17 @@ namespace Inventory.Infrastructure.Services
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
             {
-                var previousPdfPath = salesOrder.PdfPath;
-                salesOrder.PdfPath = pdfPath;
-                salesOrder.PdfUploadedUtc = DateTimeOffset.UtcNow;
+                var previousInvoicePath = salesOrder.InvoicePath;
+                salesOrder.InvoicePath = invoicePath;
+                salesOrder.InvoiceUploadedUtc = DateTimeOffset.UtcNow;
 
                 await _db.SaveChangesAsync(ct);
 
                 await _auditWriter.LogUpdateAsync<SalesOrder>(
                     salesOrder.Id,
                     user,
-                    beforeState: new { PdfPath = previousPdfPath },
-                    afterState: new { PdfPath = salesOrder.PdfPath, PdfUploadedUtc = salesOrder.PdfUploadedUtc },
+                    beforeState: new { InvoicePath = previousInvoicePath },
+                    afterState: new { InvoicePath = salesOrder.InvoicePath, InvoiceUploadedUtc = salesOrder.InvoiceUploadedUtc },
                     ct);
 
                 await _db.SaveChangesAsync(ct);
@@ -653,7 +668,237 @@ namespace Inventory.Infrastructure.Services
             catch (DbUpdateException ex)
             {
                 await transaction.RollbackAsync(ct);
-                throw new ConflictException("Could not attach PDF to sales order due to a database conflict.", ex);
+                throw new ConflictException("Could not attach Invoice to sales order due to a database conflict.", ex);
+            }
+        }
+
+        public async Task RemoveInvoiceAsync(long orderId, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+
+            var salesOrder = await _db.SalesOrders
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (salesOrder is null)
+                throw new NotFoundException($"Sales order id {orderId} was not found.");
+
+            if (salesOrder.InvoicePath == null)
+                return; // Already removed
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousInvoicePath = salesOrder.InvoicePath;
+                salesOrder.InvoicePath = null;
+                salesOrder.InvoiceUploadedUtc = null;
+
+                await _db.SaveChangesAsync(ct);
+
+                await _auditWriter.LogUpdateAsync<SalesOrder>(
+                    salesOrder.Id,
+                    user,
+                    beforeState: new { InvoicePath = previousInvoicePath },
+                    afterState: new { InvoicePath = (string?)null, InvoiceUploadedUtc = (DateTimeOffset?)null },
+                    ct);
+
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not remove Invoice from sales order due to a database conflict.", ex);
+            }
+        }
+
+        public async Task AttachReceiptAsync(long orderId, string receiptPath, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+            if (string.IsNullOrWhiteSpace(receiptPath)) throw new ValidationException("Receipt path must be provided.");
+
+            var salesOrder = await _db.SalesOrders
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (salesOrder is null)
+                throw new NotFoundException($"Sales order id {orderId} was not found.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousReceiptPath = salesOrder.ReceiptPath;
+                salesOrder.ReceiptPath = receiptPath;
+                salesOrder.ReceiptUploadedUtc = DateTimeOffset.UtcNow;
+
+                await _db.SaveChangesAsync(ct);
+
+                await _auditWriter.LogUpdateAsync<SalesOrder>(
+                    salesOrder.Id,
+                    user,
+                    beforeState: new { ReceiptPath = previousReceiptPath },
+                    afterState: new { ReceiptPath = salesOrder.ReceiptPath, ReceiptUploadedUtc = salesOrder.ReceiptUploadedUtc },
+                    ct);
+
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not attach Receipt to sales order due to a database conflict.", ex);
+            }
+        }
+
+        public async Task RemoveReceiptAsync(long orderId, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+
+            var salesOrder = await _db.SalesOrders
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (salesOrder is null)
+                throw new NotFoundException($"Sales order id {orderId} was not found.");
+
+            if (salesOrder.ReceiptPath == null)
+                return; // Already removed
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousReceiptPath = salesOrder.ReceiptPath;
+                salesOrder.ReceiptPath = null;
+                salesOrder.ReceiptUploadedUtc = null;
+
+                await _db.SaveChangesAsync(ct);
+
+                await _auditWriter.LogUpdateAsync<SalesOrder>(
+                    salesOrder.Id,
+                    user,
+                    beforeState: new { ReceiptPath = previousReceiptPath },
+                    afterState: new { ReceiptPath = (string?)null, ReceiptUploadedUtc = (DateTimeOffset?)null },
+                    ct);
+
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not remove Receipt from sales order due to a database conflict.", ex);
+            }
+        }
+
+        public async Task UpdatePaymentInfoAsync(long orderId, UpdateSalesOrderPaymentRequest req, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+            if (req is null) throw new ArgumentNullException(nameof(req));
+            if (req.OrderId != orderId) throw new ValidationException("Order ID mismatch.");
+
+            var salesOrder = await _db.SalesOrders
+                .Include(o => o.Lines)
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (salesOrder is null)
+                throw new NotFoundException($"Sales order id {orderId} was not found.");
+
+            // Validate logic for checks
+            if (salesOrder.PaymentMethod == PaymentMethod.Check)
+            {
+                if (req.CheckReceived == true && !req.CheckReceivedDate.HasValue)
+                    throw new ValidationException("Check received date is required when marking check as received.");
+                
+                if (req.CheckCashed == true && !req.CheckCashedDate.HasValue)
+                    throw new ValidationException("Check cashed date is required when marking check as cashed.");
+            }
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var beforeState = new 
+                { 
+                    salesOrder.PaymentStatus, 
+                    salesOrder.CheckReceived, 
+                    salesOrder.CheckReceivedDate,
+                    salesOrder.CheckCashed,
+                    salesOrder.CheckCashedDate,
+                    salesOrder.Note
+                };
+
+                if (req.PaymentMethod.HasValue)
+                {
+                    salesOrder.PaymentMethod = req.PaymentMethod.Value;
+                }
+
+                salesOrder.PaymentStatus = req.PaymentStatus;
+                
+                if (salesOrder.PaymentMethod == PaymentMethod.Check)
+                {
+                    salesOrder.CheckReceived = req.CheckReceived;
+                    salesOrder.CheckReceivedDate = req.CheckReceivedDate;
+
+                    // If transitioning to Check Cashed, create revenue transactions
+                    if (req.CheckCashed == true && salesOrder.CheckCashed != true)
+                    {
+                        foreach (var line in salesOrder.Lines)
+                        {
+                            var revenueAmount = line.UnitPrice * line.Quantity;
+                            var revenueTransaction = new FinancialTransaction
+                            {
+                                Type = FinancialTransactionType.Revenue,
+                                Amount = revenueAmount,
+                                SalesOrderId = salesOrder.Id,
+                                ProductId = line.ProductId,
+                                CustomerId = salesOrder.CustomerId,
+                                TimestampUtc = DateTimeOffset.UtcNow,
+                                UserId = user.UserId,
+                                UserDisplayName = user.UserDisplayName,
+                                Note = $"Revenue from Check Cashing - Order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
+                            };
+                            _db.FinancialTransactions.Add(revenueTransaction);
+                        }
+                        salesOrder.PaymentStatus = PaymentStatus.Paid;
+                    }
+
+                    salesOrder.CheckCashed = req.CheckCashed;
+                    salesOrder.CheckCashedDate = req.CheckCashedDate;
+                }
+
+                if (!string.IsNullOrWhiteSpace(req.Note))
+                {
+                    salesOrder.Note = req.Note;
+                }
+
+                await _db.SaveChangesAsync(ct);
+
+                await _auditWriter.LogUpdateAsync<SalesOrder>(
+                    salesOrder.Id,
+                    user,
+                    beforeState: beforeState,
+                    afterState: new 
+                    { 
+                        salesOrder.PaymentStatus, 
+                        salesOrder.CheckReceived, 
+                        salesOrder.CheckReceivedDate,
+                        salesOrder.CheckCashed,
+                        salesOrder.CheckCashedDate,
+                        salesOrder.Note
+                    },
+                    ct);
+
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not update payment info due to a database conflict.", ex);
             }
         }
 
