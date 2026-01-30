@@ -10,7 +10,8 @@ public enum SalesOrderStatus
 public enum PaymentMethod
 {
     Cash = 1,
-    Check = 2
+    Check = 2,
+    BankTransfer = 3
 }
 
 public enum PaymentStatus
@@ -68,6 +69,11 @@ public  class SalesOrder
     /// For check payments: date when the check was cashed.
     /// </summary>
     public DateTimeOffset? CheckCashedDate { get; set; }
+    
+    /// <summary>
+    /// For bank transfer payments: unique transfer identifier/reference.
+    /// </summary>
+    public string? TransferId { get; set; }
 
     /// <summary>
     /// Optional path or identifier to an Invoice PDF attachment stored for this order.

@@ -1,0 +1,266 @@
+@model Inventory.Application.DTOs.SalesOrder.CreateSalesOrderRequest
+@{
+    ViewData["Title"] = "Create Sales Order";
+    var customers = ViewBag.Customers as IEnumerable<Inventory.Application.DTOs.Customer.CustomerResponseDto> ?? new List<Inventory.Application.DTOs.Customer.CustomerResponseDto>();
+}
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2 mb-0">Create <span class="text-primary">Sales Order</span></h1>
+        <a asp-action="Index" class="btn btn-outline-secondary">Back to List</a>
+    </div>
+
+    <form asp-action="Create" method="post" id="createOrderForm">
+        @Html.AntiForgeryToken()
+        <div class="row">
+            <!-- Left Side: Basic Info & Payment -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">Order Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label asp-for="CustomerId" class="form-label fw-bold">Customer</label>
+                            <select asp-for="CustomerId" class="form-select" required>
+                                <option value="">-- Select Customer --</option>
+                                @foreach (var c in customers)
+                                {
+                                    <option value="@c.Id">@c.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="CustomerId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="OrderDate" class="form-label fw-bold">Order Date</label>
+                            <input asp-for="OrderDate" type="date" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="DueDate" class="form-label fw-bold">Due Date</label>
+                            <input asp-for="DueDate" type="date" class="form-control" value="@DateTime.Today.AddDays(7).ToString("yyyy-MM-dd")" required />
+                            <span asp-validation-for="DueDate" class="text-danger small"></span>
+                        </div>
+
+                        <div class="mb-0">
+                            <label asp-for="Note" class="form-label fw-bold">Notes</label>
+                            <textarea asp-for="Note" class="form-control" rows="3" placeholder="Additional instructions..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Details -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">Payment & Tax</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label asp-for="PaymentMethod" class="form-label fw-bold">Payment Method</label>
+                            <select asp-for="PaymentMethod" class="form-select" id="paymentMethodSelect" onchange="togglePaymentFields()">
+                                <option value="1">Cash</option>
+                                <option value="2">Check</option>
+                                <option value="3">Bank Transfer</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="PaymentStatus" class="form-label fw-bold">Initial Status</label>
+                            <select asp-for="PaymentStatus" class="form-select">
+                                <option value="0">Pending</option>
+                                <option value="1">Paid</option>
+                            </select>
+                        </div>
+
+                        <!-- Check Fields -->
+                        <div id="checkFields" style="display: none;" class="p-3 bg-light rounded border mb-3">
+                            <h6 class="small fw-bold text-uppercase text-muted mb-3">Check Details</h6>
+                            <div class="form-check form-switch mb-2">
+                                <input asp-for="CheckReceived" class="form-check-input" type="checkbox" id="checkReceived">
+                                <label class="form-check-label" for="checkReceived">Received</label>
+                            </div>
+                            <div class="mb-3">
+                                <label asp-for="CheckReceivedDate" class="form-label small">Received Date</label>
+                                <input asp-for="CheckReceivedDate" type="date" class="form-control form-control-sm">
+                            </div>
+                        </div>
+
+                        <!-- Bank Transfer Fields -->
+                        <div id="bankFields" style="display: none;" class="p-3 bg-light rounded border mb-3">
+                            <h6 class="small fw-bold text-uppercase text-muted mb-3">Transfer Details</h6>
+                            <div class="mb-0">
+                                <label asp-for="TransferId" class="form-label small">Transfer ID / Ref</label>
+                                <input asp-for="TransferId" class="form-control form-control-sm" placeholder="e.g. TR-123456">
+                                <span asp-validation-for="TransferId" class="text-danger small"></span>
+                            </div>
+                        </div>
+
+                        <hr />
+
+                        <div class="form-check form-switch mb-2">
+                            <input asp-for="IsTaxInclusive" class="form-check-input" type="checkbox" checked>
+                            <label class="form-check-label fw-bold" asp-for="IsTaxInclusive">Price Includes Tax</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input asp-for="ApplyVat" class="form-check-input" type="checkbox" checked>
+                            <label class="form-check-label fw-bold" asp-for="ApplyVat">Apply VAT (14%)</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input asp-for="ApplyManufacturingTax" class="form-check-input" type="checkbox" checked>
+                            <label class="form-check-label fw-bold" asp-for="ApplyManufacturingTax">Apply Manufacturing Tax (1%)</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Order Items -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Order Items</h5>
+                        <button type="button" class="btn btn-sm btn-success" onclick="addLineItem()">
+                            <i class="bi bi-plus-lg"></i> Add Item
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0" id="itemsTable">
+                                <thead class="table-light text-muted small text-uppercase">
+                                    <tr>
+                                        <th style="width: 40%">Product Name</th>
+                                        <th style="width: 20%">Quantity</th>
+                                        <th style="width: 25%">Unit Price</th>
+                                        <th style="width: 15%" class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lineItemsContainer">
+                                    <!-- Lines added here via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div id="emptyState" class="text-center py-5">
+                            <i class="bi bi-cart-x text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2">No items added yet.</p>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="addLineItem()">Add your first item</button>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white border-top-0 p-4">
+                        <div class="row justify-content-end">
+                            <div class="col-md-5">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-muted">Estimated Subtotal:</span>
+                                    <span id="displaySubtotal" class="fw-bold">$0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-3 text-success fs-4 fw-bold border-top pt-2">
+                                    <span>Total Amount:</span>
+                                    <span id="displayTotal">$0.00</span>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold">
+                                    <i class="bi bi-check2-circle me-1"></i> Create Order
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <script>
+        let lineCount = 0;
+
+        function addLineItem() {
+            const container = document.getElementById('lineItemsContainer');
+            const emptyState = document.getElementById('emptyState');
+            emptyState.style.display = 'none';
+
+            const idx = lineCount++;
+            const row = document.createElement('tr');
+            row.id = `line-row-${idx}`;
+            row.innerHTML = `
+                <td>
+                    <input name="Lines[${idx}].ProductName" class="form-control form-control-sm" placeholder="Product name..." required />
+                    <input type="hidden" name="Lines[${idx}].ProductId" value="0" /> <!-- Fixed for now as per DTO -->
+                </td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <input name="Lines[${idx}].Quantity" type="number" step="0.01" class="form-control item-qty" onchange="calculateTotals()" value="1.00" required />
+                        <input name="Lines[${idx}].Unit" class="form-control form-control-sm" style="width: 40px" value="pcs" />
+                    </div>
+                </td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text">$</span>
+                        <input name="Lines[${idx}].UnitPrice" type="number" step="0.01" class="form-control item-price" onchange="calculateTotals()" value="0.00" required />
+                    </div>
+                </td>
+                <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeLineItem(${idx})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            `;
+            container.appendChild(row);
+            calculateTotals();
+        }
+
+        function removeLineItem(idx) {
+            const row = document.getElementById(`line-row-${idx}`);
+            row.remove();
+            
+            if (document.querySelectorAll('#lineItemsContainer tr').length === 0) {
+                document.getElementById('emptyState').style.display = 'block';
+            }
+            calculateTotals();
+        }
+
+        function calculateTotals() {
+            let subtotal = 0;
+            const qtys = document.querySelectorAll('.item-qty');
+            const prices = document.querySelectorAll('.item-price');
+
+            for (let i = 0; i < qtys.length; i++) {
+                subtotal += (parseFloat(qtys[i].value) || 0) * (parseFloat(prices[i].value) || 0);
+            }
+
+            document.getElementById('displaySubtotal').textContent = formatCurrency(subtotal);
+            
+            // Simple calculation for UI display - Server will calculate precisely
+            let total = subtotal;
+            const applyVat = document.querySelector('[name="ApplyVat"]').checked;
+            const applyMan = document.querySelector('[name="ApplyManufacturingTax"]').checked;
+            const inclusive = document.querySelector('[name="IsTaxInclusive"]').checked;
+
+            if (!inclusive) {
+                if (applyVat) total += (subtotal * 0.14);
+            }
+            // Man tax is usually deducted from supplier or added? 
+            // In Sales order, it's usually extra or deducted from revenue.
+            // Matching service logic: line.LineTotal = (line.Quantity * line.UnitPrice) + line.LineVatAmount - line.LineManufacturingTaxAmount;
+            
+            // Simplified display total
+            document.getElementById('displayTotal').textContent = formatCurrency(total);
+        }
+
+        function togglePaymentFields() {
+            const method = document.getElementById('paymentMethodSelect').value;
+            document.getElementById('checkFields').style.display = (method === '2') ? 'block' : 'none';
+            document.getElementById('bankFields').style.display = (method === '3') ? 'block' : 'none';
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(amount);
+        }
+
+        // Initialize with one line
+        addLineItem();
+    </script>
+}

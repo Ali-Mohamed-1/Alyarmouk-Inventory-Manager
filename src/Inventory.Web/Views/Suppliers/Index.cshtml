@@ -492,6 +492,11 @@
 
             // View supplier history
             window.viewSupplierHistory = async function(id) {
+                // Reset views: Show list, hide details
+                document.getElementById('orders-list-section').style.display = 'block';
+                document.getElementById('order-details-section').style.display = 'none';
+                document.querySelector('#purchase-orders-table tbody').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm text-primary me-2"></div> Loading orders...</td></tr>';
+
                 currentSupplierId = id;
                 const supplier = allSuppliers.find(s => s.id === id);
 
@@ -508,10 +513,6 @@
 
                     // Show detail panel
                     document.getElementById('detail-supplier-name').textContent = supplier.name;
-                    
-                    // Reset views: Show list, hide details
-                    document.getElementById('orders-list-section').style.display = 'block';
-                    document.getElementById('order-details-section').style.display = 'none';
                     
                     // Render supplier info
                     document.getElementById('supplier-info').innerHTML = `

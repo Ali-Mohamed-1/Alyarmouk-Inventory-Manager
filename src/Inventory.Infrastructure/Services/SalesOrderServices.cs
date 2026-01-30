@@ -46,6 +46,12 @@ namespace Inventory.Infrastructure.Services
                 if (req.CheckCashed == true && !req.CheckCashedDate.HasValue)
                     throw new ValidationException("Check cashed date is required when the check is marked as cashed.");
             }
+            
+            if (req.PaymentMethod == PaymentMethod.BankTransfer)
+            {
+                if (req.PaymentStatus == PaymentStatus.Paid && string.IsNullOrWhiteSpace(req.TransferId))
+                    throw new ValidationException("Transfer ID is required for bank transfer when payment status is Paid.");
+            }
 
             if (req.CustomerId <= 0)
                 throw new ArgumentOutOfRangeException(nameof(req), "Customer ID must be positive.");
@@ -154,6 +160,7 @@ namespace Inventory.Infrastructure.Services
                     CheckReceivedDate = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckReceivedDate,
                     CheckCashed = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckCashed,
                     CheckCashedDate = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckCashedDate,
+                    TransferId = req.PaymentMethod == PaymentMethod.BankTransfer ? req.TransferId : null,
                     CreatedByUserId = user.UserId,
                     CreatedByUserDisplayName = user.UserDisplayName,
                     Note = req.Note,
@@ -351,6 +358,7 @@ namespace Inventory.Infrastructure.Services
                     CheckReceivedDate = o.CheckReceivedDate,
                     CheckCashed = o.CheckCashed,
                     CheckCashedDate = o.CheckCashedDate,
+                    TransferId = o.TransferId,
                     InvoicePath = o.InvoicePath,
                     InvoiceUploadedUtc = o.InvoiceUploadedUtc,
                     ReceiptPath = o.ReceiptPath,
@@ -409,6 +417,7 @@ namespace Inventory.Infrastructure.Services
                     CheckReceivedDate = o.CheckReceivedDate,
                     CheckCashed = o.CheckCashed,
                     CheckCashedDate = o.CheckCashedDate,
+                    TransferId = o.TransferId,
                     InvoicePath = o.InvoicePath,
                     InvoiceUploadedUtc = o.InvoiceUploadedUtc,
                     ReceiptPath = o.ReceiptPath,
@@ -465,6 +474,7 @@ namespace Inventory.Infrastructure.Services
                     CheckReceivedDate = o.CheckReceivedDate,
                     CheckCashed = o.CheckCashed,
                     CheckCashedDate = o.CheckCashedDate,
+                    TransferId = o.TransferId,
                     InvoicePath = o.InvoicePath,
                     InvoiceUploadedUtc = o.InvoiceUploadedUtc,
                     ReceiptPath = o.ReceiptPath,
@@ -522,8 +532,10 @@ namespace Inventory.Infrastructure.Services
             {
                 decimal totalRevenue = 0;
 
-                // Only record revenue if payment is Cash or if Check is already Cashed
-                if (salesOrder.PaymentMethod == PaymentMethod.Cash || (salesOrder.CheckCashed == true))
+                // Only record revenue if payment is Cash, BankTransfer, or if Check is already Cashed
+                if (salesOrder.PaymentMethod == PaymentMethod.Cash || 
+                    salesOrder.PaymentMethod == PaymentMethod.BankTransfer || 
+                    (salesOrder.CheckCashed == true))
                 {
                     // Create financial transactions for revenue (money coming in)
                     foreach (var line in salesOrder.Lines)
@@ -553,8 +565,10 @@ namespace Inventory.Infrastructure.Services
                 var previousPaymentStatus = salesOrder.PaymentStatus;
                 salesOrder.Status = SalesOrderStatus.Completed;
                 
-                // Only mark as Paid if Cash or Check Cashed
-                if (salesOrder.PaymentMethod == PaymentMethod.Cash || (salesOrder.CheckCashed == true))
+                // Only mark as Paid if Cash, BankTransfer, or Check Cashed
+                if (salesOrder.PaymentMethod == PaymentMethod.Cash || 
+                    salesOrder.PaymentMethod == PaymentMethod.BankTransfer || 
+                    (salesOrder.CheckCashed == true))
                 {
                     salesOrder.PaymentStatus = PaymentStatus.Paid;
                 }
@@ -818,6 +832,12 @@ namespace Inventory.Infrastructure.Services
                     throw new ValidationException("Check cashed date is required when marking check as cashed.");
             }
 
+            if (salesOrder.PaymentMethod == PaymentMethod.BankTransfer || req.PaymentMethod == PaymentMethod.BankTransfer)
+            {
+                if (req.PaymentStatus == PaymentStatus.Paid && string.IsNullOrWhiteSpace(req.TransferId))
+                    throw new ValidationException("Transfer ID is required for bank transfer when marking as Paid.");
+            }
+
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
             {
@@ -828,6 +848,7 @@ namespace Inventory.Infrastructure.Services
                     salesOrder.CheckReceivedDate,
                     salesOrder.CheckCashed,
                     salesOrder.CheckCashedDate,
+                    salesOrder.TransferId,
                     salesOrder.Note
                 };
 
@@ -836,6 +857,8 @@ namespace Inventory.Infrastructure.Services
                     salesOrder.PaymentMethod = req.PaymentMethod.Value;
                 }
 
+                var oldPaymentStatus = salesOrder.PaymentStatus;
+                var oldCheckCashed = salesOrder.CheckCashed;
                 salesOrder.PaymentStatus = req.PaymentStatus;
                 
                 if (salesOrder.PaymentMethod == PaymentMethod.Check)
@@ -844,7 +867,7 @@ namespace Inventory.Infrastructure.Services
                     salesOrder.CheckReceivedDate = req.CheckReceivedDate;
 
                     // If transitioning to Check Cashed, create revenue transactions
-                    if (req.CheckCashed == true && salesOrder.CheckCashed != true)
+                    if (req.CheckCashed == true && oldCheckCashed != true)
                     {
                         foreach (var line in salesOrder.Lines)
                         {
@@ -870,6 +893,32 @@ namespace Inventory.Infrastructure.Services
                     salesOrder.CheckCashedDate = req.CheckCashedDate;
                 }
 
+                if (salesOrder.PaymentMethod == PaymentMethod.BankTransfer)
+                {
+                    // If transitioning to Paid via Bank Transfer, record revenue
+                    if (req.PaymentStatus == PaymentStatus.Paid && oldPaymentStatus != PaymentStatus.Paid)
+                    {
+                        foreach (var line in salesOrder.Lines)
+                        {
+                            var revenueAmount = line.UnitPrice * line.Quantity;
+                            var revenueTransaction = new FinancialTransaction
+                            {
+                                Type = FinancialTransactionType.Revenue,
+                                Amount = revenueAmount,
+                                SalesOrderId = salesOrder.Id,
+                                ProductId = line.ProductId,
+                                CustomerId = salesOrder.CustomerId,
+                                TimestampUtc = DateTimeOffset.UtcNow,
+                                UserId = user.UserId,
+                                UserDisplayName = user.UserDisplayName,
+                                Note = $"Revenue from Bank Transfer - Order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
+                            };
+                            _db.FinancialTransactions.Add(revenueTransaction);
+                        }
+                    }
+                    salesOrder.TransferId = req.TransferId;
+                }
+
                 if (!string.IsNullOrWhiteSpace(req.Note))
                 {
                     salesOrder.Note = req.Note;
@@ -888,6 +937,7 @@ namespace Inventory.Infrastructure.Services
                         salesOrder.CheckReceivedDate,
                         salesOrder.CheckCashed,
                         salesOrder.CheckCashedDate,
+                        salesOrder.TransferId,
                         salesOrder.Note
                     },
                     ct);

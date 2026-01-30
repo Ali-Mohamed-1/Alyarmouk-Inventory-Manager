@@ -57,6 +57,11 @@ namespace Inventory.Application.DTOs.SalesOrder
         /// For check payments: date when the check was cashed.
         /// </summary>
         public DateTimeOffset? CheckCashedDate { get; init; }
+        
+        /// <summary>
+        /// For bank transfer payments: unique transfer identifier.
+        /// </summary>
+        public string? TransferId { get; init; }
 
         // Tax Configuration
         public bool IsTaxInclusive { get; init; } = true;

@@ -253,6 +253,14 @@
                                     <span id="detail-check-cashed-date"></span>
                                 </div>
                             </div>
+
+                            <!-- Bank Transfer Details -->
+                            <div id="bank-transfer-details" class="mt-2 p-2 bg-light rounded border" style="display: none; font-size: 0.9em;">
+                                <div class="mb-1 d-flex justify-content-between">
+                                    <span>Transfer ID:</span>
+                                    <span id="detail-transfer-id" class="fw-bold"></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -301,9 +309,10 @@
                 
                 <div class="mb-3">
                     <label for="editPaymentMethod" class="form-label fw-bold">Payment Method</label>
-                    <select class="form-select" id="editPaymentMethod" onchange="toggleCheckFields()">
+                    <select class="form-select" id="editPaymentMethod" onchange="togglePaymentMethodFields()">
                         <option value="1">Cash</option>
                         <option value="2">Check</option>
+                        <option value="3">Bank Transfer</option>
                     </select>
                 </div>
                 <div class="mb-3">
@@ -337,6 +346,15 @@
                     <div class="mb-2">
                         <label for="editCheckCashedDate" class="form-label small">Cashed Date</label>
                         <input type="date" class="form-control" id="editCheckCashedDate">
+                    </div>
+                </div>
+
+                <!-- Bank Transfer Fields -->
+                <div id="edit-bank-transfer-fields" style="display: none;" class="border p-3 rounded bg-light mb-3">
+                    <h6 class="text-muted text-uppercase small fw-bold mb-3">Transfer Details</h6>
+                    <div class="mb-3">
+                        <label for="editTransferId" class="form-label small">Transfer ID / Reference</label>
+                        <input type="text" class="form-control" id="editTransferId" placeholder="e.g. TR-123456">
                     </div>
                 </div>
             </div>
@@ -607,6 +625,11 @@
 
             // View customer history
             window.viewCustomerHistory = async function(id) {
+                // Reset visibility states to show list and hide details
+                document.getElementById('order-details-section').style.display = 'none';
+                document.getElementById('orders-list-section').style.display = 'block';
+                document.querySelector('#sales-orders-table tbody').innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm text-success me-2"></div> Loading orders...</td></tr>';
+
                 currentCustomerId = id;
                 const customer = allCustomers.find(c => c.id === id);
 
@@ -693,7 +716,7 @@
                     const paymentStatusClass = order.paymentStatus === 0 ? 'text-warning' : 'text-success';
                     document.getElementById('detail-payment-status').innerHTML = `<span class="fw-bold ${paymentStatusClass}">${paymentStatusText}</span>`;
                     
-                    const paymentMethodText = order.paymentMethod === 0 ? 'Cash' : 'Check';
+                    const paymentMethodText = order.paymentMethod === 1 ? 'Cash' : order.paymentMethod === 2 ? 'Check' : order.paymentMethod === 3 ? 'Bank Transfer' : 'Unknown';
                     document.getElementById('detail-payment-method').textContent = paymentMethodText;
                      
                     document.getElementById('detail-due-date').textContent = formatDate(order.dueDate);
@@ -716,6 +739,15 @@
                         document.getElementById('detail-check-cashed-date').textContent = order.checkCashedDate ? formatDate(order.checkCashedDate) : '-';
                     } else {
                         checkSection.style.display = 'none';
+                    }
+
+                    // Bank Transfer Details
+                    const bankSection = document.getElementById('bank-transfer-details');
+                    if (order.paymentMethod === 3) { // Bank Transfer
+                        bankSection.style.display = 'block';
+                        document.getElementById('detail-transfer-id').textContent = order.transferId || '-';
+                    } else {
+                        bankSection.style.display = 'none';
                     }
 
                     // Documents Section
@@ -777,7 +809,7 @@
                 // Default to Cash (1) if not set, or use order's method
                 methodSelect.value = order.paymentMethod || 1; 
                 
-                toggleCheckFields(); 
+                togglePaymentMethodFields(); 
                 
                 // Populate Check Fields (even if hidden, so they are ready if toggled)
                 document.getElementById('editCheckReceived').checked = order.checkReceived;
@@ -786,18 +818,19 @@
                 document.getElementById('editCheckCashed').checked = order.checkCashed;
                 document.getElementById('editCheckCashedDate').value = order.checkCashedDate ? order.checkCashedDate.split('T')[0] : '';
                 
+                document.getElementById('editTransferId').value = order.transferId || '';
+                
                 new bootstrap.Modal(document.getElementById('editPaymentModal')).show();
             };
             
-            // Toggle Check Fields based on Method
-            window.toggleCheckFields = function() {
+            // Toggle Method-specific Fields
+            window.togglePaymentMethodFields = function() {
                 const method = parseInt(document.getElementById('editPaymentMethod').value);
                 const checkSection = document.getElementById('edit-check-fields');
-                if (method === 2) { // Check
-                    checkSection.style.display = 'block';
-                } else {
-                    checkSection.style.display = 'none';
-                }
+                const bankSection = document.getElementById('edit-bank-transfer-fields');
+                
+                checkSection.style.display = method === 2 ? 'block' : 'none';
+                bankSection.style.display = method === 3 ? 'block' : 'none';
             };
             
             // Save Payment Info
@@ -819,12 +852,15 @@
                     data.checkCashed = document.getElementById('editCheckCashed').checked;
                     const cDate = document.getElementById('editCheckCashedDate').value;
                     data.checkCashedDate = cDate ? new Date(cDate).toISOString() : null;
+                } else if (paymentMethod === 3) { // Bank Transfer
+                    data.transferId = document.getElementById('editTransferId').value;
                 } else {
-                    // Start fresh if not check
+                    // Start fresh if not check or bank transfer
                     data.checkReceived = false;
                     data.checkCashed = false;
                     data.checkReceivedDate = null;
                     data.checkCashedDate = null;
+                    data.transferId = null;
                 }
                 
                 try {

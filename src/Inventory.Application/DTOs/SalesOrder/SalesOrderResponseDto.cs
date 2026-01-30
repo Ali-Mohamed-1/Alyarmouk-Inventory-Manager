@@ -30,6 +30,7 @@ namespace Inventory.Application.DTOs.SalesOrder
         public DateTimeOffset? CheckReceivedDate { get; init; }
         public bool? CheckCashed { get; init; }
         public DateTimeOffset? CheckCashedDate { get; init; }
+        public string? TransferId { get; init; }
 
         /// <summary>
         /// Path or identifier of the Invoice PDF attachment for this order, if any.
