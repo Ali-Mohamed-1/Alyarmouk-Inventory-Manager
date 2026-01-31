@@ -68,6 +68,27 @@ public sealed class SuppliersApiController : ControllerBase
     }
 
     /// <summary>
+    /// Get all products supplied by a specific supplier
+    /// </summary>
+    [HttpGet("{id:int}/products")]
+    public async Task<IActionResult> GetProducts(int id, CancellationToken cancellationToken)
+    {
+        var products = await _suppliers.GetSupplierProductsAsync(id, cancellationToken);
+        return Ok(products);
+    }
+
+    /// <summary>
+    /// Update associated products for a supplier
+    /// </summary>
+    [HttpPost("{id:int}/products")]
+    public async Task<IActionResult> UpdateProducts(int id, [FromBody] List<int> productIds, CancellationToken cancellationToken)
+    {
+        var user = GetUserContext();
+        await _suppliers.UpdateSupplierProductsAsync(id, productIds, user, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>
     /// Create a new supplier
     /// </summary>
     [HttpPost]

@@ -139,27 +139,28 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.Email).HasMaxLength(200);
                 b.Property(x => x.Address).HasMaxLength(500);
                 b.HasIndex(x => x.Name);
+
+                b.HasMany(x => x.Products)
+                 .WithMany(x => x.Suppliers)
+                 .UsingEntity(j => j.ToTable("SupplierProducts"));
             });
 
             builder.Entity<PurchaseOrder>(b =>
             {
-                b.Property(x => x.OrderNumber).HasMaxLength(50).IsRequired();
-                b.HasIndex(x => x.OrderNumber).IsUnique();
-                b.Property(x => x.SupplierNameSnapshot).HasMaxLength(200).IsRequired();
-                b.Property(x => x.Status).IsRequired().HasConversion<int>();
-                b.Property(x => x.PaymentStatus).IsRequired().HasConversion<int>();
-                b.Property(x => x.CreatedByUserId).HasMaxLength(450).IsRequired();
-                b.Property(x => x.CreatedByUserDisplayName).HasMaxLength(200).IsRequired();
-                b.Property(x => x.Note).HasMaxLength(500);
-                b.Property(x => x.Subtotal).HasPrecision(18, 2);
-                b.Property(x => x.VatAmount).HasPrecision(18, 2);
-                b.Property(x => x.ManufacturingTaxAmount).HasPrecision(18, 2);
-                b.Property(x => x.ReceiptExpenses).HasPrecision(18, 2);
-                b.Property(x => x.TotalAmount).HasPrecision(18, 2);
-                b.HasIndex(x => x.CreatedUtc);
-                b.HasIndex(x => x.Status);
-                b.HasIndex(x => x.PaymentStatus);
-                b.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+                b.HasKey(o => o.Id);
+                b.Property(o => o.OrderNumber).IsRequired().HasMaxLength(50);
+                b.Property(o => o.SupplierNameSnapshot).HasMaxLength(200);
+                b.Property(o => o.TotalAmount).HasPrecision(18, 2);
+                b.Property(o => o.Subtotal).HasPrecision(18, 2);
+                b.Property(o => o.VatAmount).HasPrecision(18, 2);
+                b.Property(o => o.ManufacturingTaxAmount).HasPrecision(18, 2);
+                b.Property(o => o.ReceiptExpenses).HasPrecision(18, 2);
+                b.Property(o => o.RefundedAmount).HasPrecision(18, 2);
+
+                b.HasOne(o => o.Supplier)
+                 .WithMany()
+                 .HasForeignKey(o => o.SupplierId)
+                 .OnDelete(DeleteBehavior.Restrict);
             });
 
             builder.Entity<PurchaseOrderLine>(b =>

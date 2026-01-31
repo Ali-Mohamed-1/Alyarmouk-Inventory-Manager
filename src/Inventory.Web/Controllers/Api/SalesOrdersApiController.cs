@@ -158,4 +158,15 @@ public class SalesOrdersApiController : ControllerBase
         
         return NoContent();
     }
+
+    [HttpPost("{id}/refund")]
+    public async Task<IActionResult> Refund(long id, [FromBody] RefundSalesOrderRequest request, CancellationToken ct)
+    {
+        if (id != request.OrderId) return BadRequest("Order ID mismatch.");
+        
+        var user = GetUserContext();
+        await _salesOrderServices.RefundAsync(request, user, ct);
+        
+        return Ok();
+    }
 }

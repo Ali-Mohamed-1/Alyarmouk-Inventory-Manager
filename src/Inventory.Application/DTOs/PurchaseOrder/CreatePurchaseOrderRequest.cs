@@ -11,6 +11,7 @@ namespace Inventory.Application.DTOs.PurchaseOrder
 
         public string? Note { get; set; }
 
+        public DateTimeOffset? DueDate { get; set; }
         public bool ConnectToReceiveStock { get; set; } = true;
 
         // Tax Configuration

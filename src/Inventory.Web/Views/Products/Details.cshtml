@@ -3,53 +3,48 @@
     ViewData["Title"] = "Product Details";
 }
 
-<div class="container py-4">
-    <div class="row">
-        <div class="col-md-12 mb-4">
-            <div class="d-flex justify-content-between align-items-center">
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item"><a asp-controller="Dashboard" asp-action="Index">Dashboard</a></li>
-                        <li class="breadcrumb-item"><a asp-controller="Products" asp-action="Index">Products</a></li>
-                        <li class="breadcrumb-item active">@Model.Name</li>
-                    </ol>
-                </nav>
-                <div>
-                    <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary shadow-sm">
-                        <i class="bi bi-pencil me-1"></i> Edit Product
-                    </a>
-                </div>
-            </div>
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div class="d-flex align-items-center gap-4">
+            <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Record Trace: @Model.Name</h1>
         </div>
+        <div class="d-flex gap-2">
+            <a asp-action="Index" class="neo-btn">BACK TO CATALOG</a>
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="neo-btn neo-btn-primary">
+                <i class="bi bi-pencil me-1"></i> MODIFY RECORD
+            </a>
+        </div>
+    </div>
 
-        <div class="col-lg-4 mb-4">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-white border-bottom py-3">
-                    <h5 class="mb-0 fw-bold text-primary">Core Information</h5>
+    <div class="row g-5">
+        <div class="col-lg-4">
+            <div class="neo-card h-100 p-0 overflow-hidden">
+                <div class="p-4 bg-black text-white">
+                    <h5 class="mb-0 fw-black text-uppercase">Identification Record</h5>
                 </div>
-                <div class="card-body">
-                    <div class="mb-4">
-                        <label class="text-muted small text-uppercase fw-bold mb-1 d-block">Full Name</label>
-                        <h4 class="fw-bold mb-0">@Model.Name</h4>
+                <div class="p-4" style="background: white;">
+                    <div class="mb-5">
+                        <label class="fw-black text-uppercase small text-muted d-block mb-1">Official Name</label>
+                        <h2 class="fw-black text-uppercase mb-0">@Model.Name</h2>
                     </div>
-                    <div class="mb-4">
-                        <label class="text-muted small text-uppercase fw-bold mb-1 d-block">SKU</label>
-                        <code class="fs-5 text-primary">@Model.Sku</code>
+                    <div class="mb-5">
+                        <label class="fw-black text-uppercase small text-muted d-block mb-1">Stock ID (SKU)</label>
+                        <code class="fs-4 fw-black text-black">@Model.Sku</code>
                     </div>
-                    <div class="row mb-4">
+                    <div class="row g-4 mb-4">
                         <div class="col-6">
-                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block">Category</label>
-                            <span class="badge bg-light text-dark border p-2">@Model.CategoryName</span>
+                            <label class="fw-black text-uppercase small text-muted d-block mb-1">Category</label>
+                            <span class="badge neo-btn-info w-100 py-2">@Model.CategoryName.ToUpper()</span>
                         </div>
                         <div class="col-6">
-                            <label class="text-muted small text-uppercase fw-bold mb-1 d-block">Status</label>
+                            <label class="fw-black text-uppercase small text-muted d-block mb-1">Operational State</label>
                             @if (Model.IsActive)
                             {
-                                <span class="badge bg-success p-2 px-3">Active</span>
+                                <span class="badge neo-btn-success w-100 py-2">ACTIVE</span>
                             }
                             else
                             {
-                                <span class="badge bg-danger p-2 px-3">Inactive</span>
+                                <span class="badge neo-btn-danger w-100 py-2">INACTIVE</span>
                             }
                         </div>
                     </div>
@@ -58,33 +53,37 @@
         </div>
 
         <div class="col-lg-8">
-            <div class="row g-4">
-                <div class="col-md-6 col-lg-4">
-                    <div class="card border-0 shadow-sm bg-light text-center p-3 h-100">
-                        <div class="text-muted small text-uppercase fw-bold mb-2">Price</div>
-                        <div class="h3 fw-bold mb-0">@Model.Price.ToString("C")</div>
+            <div class="row g-4 mb-5">
+                <div class="col-md-4">
+                    <div class="neo-card text-center p-4 h-100" style="background: var(--neo-lime);">
+                        <div class="fw-black text-uppercase small mb-2">Market Price</div>
+                        <div class="display-6 fw-black">@Model.Price.ToString("C")</div>
                     </div>
                 </div>
-                <div class="col-md-6 col-lg-4">
-                    <div class="card border-0 shadow-sm bg-light text-center p-3 h-100">
-                        <div class="text-muted small text-uppercase fw-bold mb-2">Unit</div>
-                        <div class="h3 fw-bold mb-0">@Model.Unit</div>
+                <div class="col-md-4">
+                    <div class="neo-card text-center p-4 h-100" style="background: var(--neo-aqua);">
+                        <div class="fw-black text-uppercase small mb-2">Measurement</div>
+                        <div class="display-6 fw-black">@Model.Unit.ToUpper()</div>
                     </div>
                 </div>
-                <div class="col-md-12 col-lg-4">
-                    <div class="card border-0 shadow-sm bg-light text-center p-3 h-100">
-                        <div class="text-muted small text-uppercase fw-bold mb-2">Reorder Point</div>
-                        <div class="h3 fw-bold mb-0">@Model.ReorderPoint</div>
+                <div class="col-md-4">
+                    <div class="neo-card text-center p-4 h-100" style="background: var(--neo-yellow);">
+                        <div class="fw-black text-uppercase small mb-2">Reorder Trigger</div>
+                        <div class="display-6 fw-black">@Model.ReorderPoint</div>
                     </div>
                 </div>
             </div>
 
-            <div class="card shadow-sm border-0 mt-4">
-                <div class="card-header bg-white border-bottom py-3">
-                    <h5 class="mb-0 fw-bold">Stock Timeline</h5>
+            <div class="neo-card p-0 overflow-hidden">
+                <div class="p-4 bg-black text-white">
+                    <h5 class="mb-0 fw-black text-uppercase">Movement Audit Log</h5>
                 </div>
-                <div class="card-body">
-                    <p class="text-center text-muted py-4">Transaction history for this product will be displayed here.</p>
+                <div class="p-5 text-center" style="background: white;">
+                    <div class="py-5">
+                        <i class="bi bi-clock-history text-muted" style="font-size: 3rem; opacity: 0.3;"></i>
+                        <p class="mt-4 fw-bold text-muted">HISTORICAL DATA TRACE IS CURRENTLY OFFLINE FOR THIS NODE.</p>
+                        <p class="small text-muted mb-0">TRANSACTION SYNC WILL APPEAR AUTOMATICALLY ON NEXT REVISION.</p>
+                    </div>
                 </div>
             </div>
         </div>

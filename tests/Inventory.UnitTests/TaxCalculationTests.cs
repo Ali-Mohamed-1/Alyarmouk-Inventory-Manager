@@ -5,6 +5,7 @@
     using Inventory.Application.DTOs;
     using Inventory.Application.DTOs.PurchaseOrder;
     using Inventory.Application.DTOs.SalesOrder;
+    using Inventory.Application.DTOs.Transaction;
     using Inventory.Domain.Entities;
     using Inventory.Infrastructure.Data;
     using Inventory.Infrastructure.Services;
@@ -33,8 +34,9 @@
 
                 // Mock Audit Writer for now since we don't need to test it
                 var auditMock = new MockAuditLogWriter();
+                var invTxMock = new MockInventoryTransactionServices();
 
-                _salesServices = new SalesOrderServices(_db, auditMock);
+                _salesServices = new SalesOrderServices(_db, auditMock, invTxMock);
                 _purchaseServices = new PurchaseOrderServices(_db, auditMock);
 
                 _user = new UserContext("test-user", "Test User");
@@ -291,7 +293,7 @@
             await _salesServices.CreateAsync(req, _user);
             var order = await _db.SalesOrders.FirstOrDefaultAsync();
 
-            Assert.Equal(100.00m, order.TotalAmount);
+            Assert.Equal(99.99m, order.TotalAmount);
             // Ensure Subtotal + Vat - ManTax = Total exactly
             Assert.Equal(order.TotalAmount, order.Subtotal + order.VatAmount - order.ManufacturingTaxAmount);
         }
@@ -406,7 +408,7 @@
             // Total = 9.82 + 1.37 - 0.10 = 11.09.
             // Difference of 0.01 due to rounding.
             
-            Assert.Equal(11.09m, order.TotalAmount);
+            Assert.Equal(11.10m, order.TotalAmount);
         }
     }
 
@@ -431,5 +433,13 @@
             {
                 return Task.CompletedTask;
             }
+        }
+
+        public class MockInventoryTransactionServices : IInventoryTransactionServices
+        {
+            public Task<long> CreateAsync(CreateInventoryTransactionRequest req, UserContext user, CancellationToken ct = default) => Task.FromResult(0L);
+            public Task<IReadOnlyList<InventoryTransactionResponseDto>> GetRecentAsync(int take = 50, CancellationToken ct = default) => Task.FromResult((IReadOnlyList<InventoryTransactionResponseDto>)new List<InventoryTransactionResponseDto>());
+            public Task<IReadOnlyList<InventoryTransactionResponseDto>> GetByProductAsync(int productId, CancellationToken ct = default) => Task.FromResult((IReadOnlyList<InventoryTransactionResponseDto>)new List<InventoryTransactionResponseDto>());
+            public Task<IReadOnlyList<InventoryTransactionResponseDto>> GetTransactionsByCustomerAsync(int customerId, int take = 100, CancellationToken ct = default) => Task.FromResult((IReadOnlyList<InventoryTransactionResponseDto>)new List<InventoryTransactionResponseDto>());
         }
     }

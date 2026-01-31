@@ -67,7 +67,10 @@ namespace Inventory.Infrastructure.Services
             };
 
             // Use transaction to ensure stock snapshot and transaction record are updated atomically
-            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            // Check if we already have an active transaction (e.g. from SalesOrderServices.RefundAsync)
+            var existingTransaction = _db.Database.CurrentTransaction;
+            var transaction = existingTransaction == null ? await _db.Database.BeginTransactionAsync(ct) : null;
+            
             try
             {
                 // Load or create stock snapshot
@@ -167,14 +170,28 @@ namespace Inventory.Infrastructure.Services
                     ct);
 
                 await _db.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
+
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync(ct);
+                }
 
                 return inventoryTransaction.Id;
             }
-            catch (DbUpdateException ex)
+            catch (Exception)
             {
-                await transaction.RollbackAsync(ct);
-                throw new ConflictException("Could not create inventory transaction due to a database conflict.", ex);
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync(ct);
+                }
+                throw;
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
             }
         }
 

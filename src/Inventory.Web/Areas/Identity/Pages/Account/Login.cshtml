@@ -10,286 +10,242 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Alyarmouk Inventory</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <title>Login - AlYarmouk</title>
+    <!-- Use CDN for robustness in Identity Area -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+    
     <style>
         :root {
-            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            --accent-gradient: linear-gradient(90deg, #6366f1 0%, #a855f7 100%);
-            --glass-white: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
+            --neo-charcoal: #1A1A1A;
+            --neo-offwhite: #F9FAFB;
+            --neo-white: #FFFFFF;
+            --neo-bg: #F3F4F6;
+            --neo-primary: #1E40AF;
+            --neo-border-width: 2px;
+            --neo-border: var(--neo-border-width) solid var(--neo-charcoal);
+            --neo-shadow: 8px 8px 0px 0px var(--neo-charcoal);
+            --neo-shadow-sm: 4px 4px 0px 0px var(--neo-charcoal);
+            --neo-transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1);
         }
 
         body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background: #0f172a;
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.2) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.2) 0px, transparent 50%),
-                radial-gradient(at 50% 50%, rgba(99, 102, 241, 0.1) 0px, transparent 50%);
-            background-size: 200% 200%;
-            animation: gradientBG 15s ease infinite;
+            font-family: 'Public Sans', sans-serif;
+            background-color: var(--neo-bg);
+            background-image: radial-gradient(var(--neo-charcoal) 1px, transparent 1px);
+            background-size: 40px 40px;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0;
-            color: #f8fafc;
+            padding: 20px;
         }
 
-        @@keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+        .login-wrapper {
+            width: 100%;
+            max-width: 440px;
         }
 
         .login-container {
-            width: 100%;
-            max-width: 460px;
-            padding: 24px;
-            animation: slideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        @@keyframes slideIn {
-            from { opacity: 0; transform: translateY(30px) scale(0.95); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .glass-card {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 32px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            background: var(--neo-white);
+            border: var(--neo-border);
+            box-shadow: var(--neo-shadow);
+            position: relative;
             overflow: hidden;
-        }
-
-        .card-login-header {
-            padding: 60px 40px 40px;
-            text-align: center;
-            background: rgba(255, 255, 255, 0.02);
-            border-bottom: 1px solid var(--glass-border);
-        }
-
-        .logo-icon {
-            width: 80px;
-            height: 80px;
-            background: var(--accent-gradient);
-            border-radius: 24px;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 24px;
-            font-size: 2.5rem;
-            color: white;
-            box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.5);
-            transform: rotate(-5deg);
+            flex-direction: column;
         }
 
-        .card-body {
-            padding: 48px;
+        .brand-stripe {
+            height: 10px;
+            background: var(--neo-primary);
+            width: 100%;
+        }
+
+        .login-header {
+            background: var(--neo-charcoal);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+            border-bottom: var(--neo-border);
+        }
+
+        .login-header h1 {
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            margin: 0;
+            font-size: 2.5rem;
+            line-height: 1;
+            color: white !important;
+        }
+
+        .login-body {
+            padding: 3rem 2.5rem;
         }
 
         .form-label {
-            font-weight: 600;
-            font-size: 0.85rem;
-            color: #94a3b8;
-            margin-bottom: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
             letter-spacing: 0.05em;
-        }
-
-        .input-group {
-            background: rgba(15, 23, 42, 0.5);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            transition: all 0.2s ease;
-            overflow: hidden;
-        }
-
-        .input-group:focus-within {
-            border-color: #6366f1;
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
-        }
-
-        .input-group-text {
-            background: transparent;
-            border: none;
+            margin-bottom: 0.5rem;
             color: #64748b;
-            padding-left: 20px;
-            font-size: 1.25rem;
         }
 
         .form-control {
-            background: transparent;
-            border: none;
-            color: white;
-            padding: 16px 20px 16px 10px;
-            font-size: 1rem;
+            border: var(--neo-border);
+            border-radius: 0;
+            padding: 0.75rem 1rem;
+            font-weight: 700;
+            background: var(--neo-white);
+            transition: var(--neo-transition);
         }
 
         .form-control:focus {
-            background: transparent;
+            box-shadow: var(--neo-shadow-sm);
+            border-color: var(--neo-charcoal);
+            outline: none;
+        }
+
+        .neo-btn {
+            background: var(--neo-primary);
             color: white;
-            box-shadow: none;
+            border: var(--neo-border);
+            border-radius: 0;
+            padding: 1.25rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 1.1rem;
+            letter-spacing: 0.1em;
+            width: 100%;
+            transition: var(--neo-transition);
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
         }
 
-        .form-control::placeholder {
-            color: #475569;
-        }
-
-        /* Fix browser autofill "white box" */
-        input:-webkit-autofill,
-        input:-webkit-autofill:hover, 
-        input:-webkit-autofill:focus, 
-        input:-webkit-autofill:active {
-            -webkit-box-shadow: 0 0 0 100px #1e293b inset !important;
-            -webkit-text-fill-color: #f8fafc !important;
-            transition: background-color 5000s ease-in-out 0s;
-            caret-color: white !important;
-        }
-
-        /* Improved input focus */
-        .input-group:focus-within {
-            border-color: #6366f1;
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
-            transform: translateY(-1px);
-        }
-
-        .btn-login {
-            background: var(--accent-gradient);
-            border: none;
-            border-radius: 16px;
-            padding: 16px;
-            font-weight: 700;
-            font-size: 1rem;
-            color: white;
-            margin-top: 12px;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 20px -10px rgba(99, 102, 241, 0.5);
-        }
-
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 25px -5px rgba(168, 85, 247, 0.5);
+        .neo-btn:hover {
+            transform: translate(-3px, -3px);
+            box-shadow: var(--neo-shadow);
+            background: #1e3a8a;
             color: white;
         }
 
-        .btn-login:active {
-            transform: translateY(0);
+        /* Custom Checkbox */
+        .form-check {
+            padding-left: 2rem;
+            display: flex;
+            align-items: center;
         }
 
         .form-check-input {
-            background-color: rgba(255,255,255,0.1);
-            border-color: var(--glass-border);
-            width: 1.2rem;
-            height: 1.2rem;
-            margin-top: 0.15rem;
+            width: 1.25rem;
+            height: 1.25rem;
+            margin-left: -2rem;
+            border: var(--neo-border);
+            border-radius: 0 !important;
+            background-color: white;
+            cursor: pointer;
         }
 
         .form-check-input:checked {
-            background-color: #6366f1;
-            border-color: #6366f1;
+            background-color: var(--neo-charcoal);
+            border-color: var(--neo-charcoal);
         }
 
         .form-check-label {
-            color: #94a3b8;
-            font-weight: 500;
-            padding-left: 8px;
-            user-select: none;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.02em;
+            padding-left: 0.5rem;
+            cursor: pointer;
         }
 
         .login-footer {
             text-align: center;
-            margin-top: 32px;
-            color: #64748b;
+            margin-top: 2rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            color: #94a3b8;
+            letter-spacing: 0.15em;
         }
 
-        .login-footer p {
-            margin-bottom: 4px;
-        }
-
-        .validation-summary-errors {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 32px;
-            color: #fca5a5;
-            font-size: 0.9rem;
-        }
-
-        .validation-summary-errors ul {
-            margin: 0;
-            padding-left: 20px;
+        .alert-danger {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 2px solid #991b1b;
+            border-radius: 0;
+            font-weight: 700;
+            font-size: 0.875rem;
+            text-transform: uppercase;
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="glass-card">
-            <div class="card-login-header">
-                <div class="logo-icon">
-                    <i class="bi bi-box-seam-fill"></i>
-                </div>
-                <h2 class="fw-extrabold mb-1" style="letter-spacing: -0.02em;">Welcome Back</h2>
-                <p class="text-muted small fw-medium text-uppercase ls-wide">Inventory Management Suite</p>
+    <div class="login-wrapper">
+        <div class="login-container">
+            <div class="brand-stripe"></div>
+            <div class="login-header">
+                <h1>SYSTEM<br>ACCESS</h1>
             </div>
-            <div class="card-body">
+            <div class="login-body">
                 <form id="account" method="post">
-                    <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="alert alert-danger mb-4">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> INVALID CREDENTIALS
+                        </div>
+                    }
 
                     <div class="mb-4">
-                        <label asp-for="Input.UserName" class="form-label text-uppercase">Username</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="bi bi-person-fill"></i></span>
-                            <input asp-for="Input.UserName" class="form-control" placeholder="username" autocomplete="username" />
-                        </div>
-                        <span asp-validation-for="Input.UserName" class="text-danger small mt-2 d-block"></span>
+                        <label asp-for="Input.UserName" class="form-label">Username</label>
+                        <input asp-for="Input.UserName" class="form-control" placeholder="ENTER USER ID" autocomplete="username" />
+                        <span asp-validation-for="Input.UserName" class="text-danger fw-bold small mt-1 d-block"></span>
                     </div>
 
                     <div class="mb-4">
-                        <label asp-for="Input.Password" class="form-label text-uppercase">Password</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="bi bi-shield-lock-fill"></i></span>
-                            <input asp-for="Input.Password" id="passwordField" type="password" class="form-control" placeholder="••••••••" autocomplete="current-password" />
-                        </div>
-                        <span asp-validation-for="Input.Password" class="text-danger small mt-2 d-block"></span>
+                        <label asp-for="Input.Password" class="form-label">Password</label>
+                        <input asp-for="Input.Password" id="passwordField" type="password" class="form-control" placeholder="••••••••" autocomplete="current-password" />
+                        <span asp-validation-for="Input.Password" class="text-danger fw-bold small mt-1 d-block"></span>
                     </div>
 
-                    <div class="mb-4">
-                        <div class="form-check d-flex align-items-center mb-2">
+                    <div class="mb-5 d-flex flex-column gap-3">
+                        <div class="form-check">
                             <input class="form-check-input" id="showPassword" type="checkbox" />
-                            <label class="form-check-label small" for="showPassword">Show Password</label>
+                            <label class="form-check-label" for="showPassword">Show password</label>
                         </div>
-                        <div class="form-check d-flex align-items-center">
+                        <div class="form-check">
                             <input class="form-check-input" asp-for="Input.RememberMe" />
-                            <label class="form-check-label small" asp-for="Input.RememberMe">Keep me signed in</label>
+                            <label class="form-check-label" asp-for="Input.RememberMe">Remember me</label>
                         </div>
                     </div>
 
-                    <button id="login-submit" type="submit" class="w-100 btn btn-login text-white">
-                        Secure Sign In <i class="bi bi-arrow-right-short ms-1 fs-5"></i>
+                    <button id="login-submit" type="submit" class="neo-btn">
+                        Login
                     </button>
                 </form>
             </div>
         </div>
         <div class="login-footer">
-            <p class="small fw-bold">Alyarmouk Trading Co.</p>
-            <p class="small opacity-50">&copy; @DateTime.Now.Year All rights reserved.</p>
+            &copy; @DateTime.Now.Year ALYARMOUK INVENTORY MANAGER
         </div>
     </div>
 
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.getElementById('showPassword').addEventListener('change', function() {
-            const passwordField = document.getElementById('passwordField');
-            passwordField.type = this.checked ? 'text' : 'password';
-        });
+        const passField = document.getElementById('passwordField');
+        const showPassCheckbox = document.getElementById('showPassword');
+
+        if (showPassCheckbox) {
+            showPassCheckbox.addEventListener('change', function() {
+                passField.type = this.checked ? 'text' : 'password';
+            });
+        }
     </script>
 </body>
 </html>
-

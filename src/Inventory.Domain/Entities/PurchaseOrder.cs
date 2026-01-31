@@ -39,6 +39,28 @@ public class PurchaseOrder
     public decimal ManufacturingTaxAmount { get; set; }
     public decimal ReceiptExpenses { get; set; } // Shipping, handling, etc.
     public decimal TotalAmount { get; set; }
+    public decimal RefundedAmount { get; set; }
+    
+    /// <summary>
+    /// Optional path or identifier to an Invoice PDF attachment stored for this order.
+    /// The web layer is responsible for saving the actual file and providing the path.
+    /// </summary>
+    public string? InvoicePath { get; set; }
+
+    /// <summary>
+    /// When the Invoice PDF attachment was last uploaded/updated.
+    /// </summary>
+    public DateTimeOffset? InvoiceUploadedUtc { get; set; }
+
+    /// <summary>
+    /// Optional path or identifier to a Receipt PDF attachment stored for this order.
+    /// </summary>
+    public string? ReceiptPath { get; set; }
+
+    /// <summary>
+    /// When the Receipt PDF attachment was last uploaded/updated.
+    /// </summary>
+    public DateTimeOffset? ReceiptUploadedUtc { get; set; }
     
     public List<PurchaseOrderLine> Lines { get; set; } = new();
 }

@@ -20,6 +20,8 @@ public sealed class Product
 
     // Optimistic concurrency
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+
+    public ICollection<Supplier> Suppliers { get; set; } = new List<Supplier>();
 }
 
 

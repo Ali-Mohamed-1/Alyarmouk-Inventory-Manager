@@ -1,31 +1,495 @@
-html {
-  font-size: 14px;
+:root {
+    /* Base Structural Colors */
+    --neo-charcoal: #1A1A1A;
+    --neo-offwhite: #F9FAFB;
+    --neo-white: #FFFFFF;
+    --neo-bg: #F3F4F6;
+
+    /* Refined Professional Palette */
+    --neo-primary: #1E40AF;
+    /* Royal Blue - Primary Actions */
+    --neo-success: #065F46;
+    /* Deep Emerald */
+    --neo-info: #0369A1;
+    /* Deep Azure */
+    --neo-danger: #991B1B;
+    /* Deep Crimson */
+    --neo-warning: #B45309;
+    /* Muted Gold / Amber */
+    --neo-accent: #475569;
+    /* Slate Gray */
+
+    /* Legend Aliases (Maintaining compatibility with existing views if they use old names) */
+    --neo-yellow: var(--neo-primary);
+    --neo-lime: var(--neo-success);
+    --neo-aqua: var(--neo-info);
+    --neo-magenta: var(--neo-danger);
+    --neo-orange: var(--neo-warning);
+    --neo-blue: var(--neo-primary);
+
+    /* UI Tokens */
+    --neo-border-width: 2px;
+    --neo-border: var(--neo-border-width) solid var(--neo-charcoal);
+    --neo-shadow: 4px 4px 0px 0px var(--neo-charcoal);
+    --neo-shadow-sm: 2px 2px 0px 0px var(--neo-charcoal);
+    --neo-shadow-lg: 8px 8px 0px 0px var(--neo-charcoal);
+
+    --neo-transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1);
 }
 
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
+html,
+body {
+    min-height: 100%;
 }
 
 body {
-  margin-bottom: 60px;
+    background-color: var(--neo-bg);
+    color: var(--neo-charcoal);
+    font-family: 'Public Sans', system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    line-height: 1.6;
+    letter-spacing: 0.01em;
+    overflow-x: hidden;
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
+/* Typography Balance */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.display-1,
+.display-2,
+.display-3,
+.display-4 {
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+    color: var(--neo-charcoal);
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
+.bg-black h1,
+.bg-black h2,
+.bg-black h3,
+.bg-black h4,
+.bg-black h5,
+.bg-black h6,
+.text-white h1,
+.text-white h2,
+.text-white h3,
+.text-white h4,
+.text-white h5,
+.text-white h6,
+.modal-header h1,
+.modal-header h2,
+.modal-header h3,
+.modal-header h4,
+.modal-header h5,
+.modal-header h6,
+[class*="bg-neo-"] h1,
+[class*="bg-neo-"] h2,
+[class*="bg-neo-"] h3,
+[class*="bg-neo-"] h4,
+[class*="bg-neo-"] h5,
+[class*="bg-neo-"] h6 {
+    color: white !important;
+}
+
+p,
+body,
+td,
+th {
+    font-weight: 400;
+}
+
+.fw-black {
+    font-weight: 900 !important;
+}
+
+/* Global Transitions - Snappy but smooth enough for professional feel */
+.neo-btn,
+.neo-card,
+.form-control,
+.form-select,
+.nav-link {
+    transition: var(--neo-transition);
+}
+
+.neo-card {
+    background: var(--neo-white);
+    border: var(--neo-border);
+    box-shadow: var(--neo-shadow);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border-radius: 0;
+}
+
+.neo-btn {
+    border: var(--neo-border);
+    box-shadow: var(--neo-shadow-sm);
+    border-radius: 0;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 0.75rem 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: var(--neo-white);
+    color: var(--neo-charcoal);
+    text-decoration: none;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    font-size: 0.875rem;
+}
+
+.neo-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: var(--neo-shadow);
+    color: var(--neo-charcoal);
+    background: var(--neo-white);
+}
+
+.neo-btn-primary {
+    background: var(--neo-primary);
+    color: white;
+}
+
+.neo-btn-primary:hover {
+    background: #1E3A8A;
+    color: white;
+}
+
+.neo-btn-success {
+    background: var(--neo-success);
+    color: white;
+}
+
+.neo-btn-success:hover {
+    background: #064E3B;
+    color: white;
+}
+
+.neo-btn-info {
+    background: var(--neo-info);
+    color: white;
+}
+
+.neo-btn-info:hover {
+    background: #035D8A;
+    color: white;
+}
+
+.neo-btn-danger {
+    background: var(--neo-danger);
+    color: white;
+}
+
+.neo-btn-danger:hover {
+    background: #7F1D1D;
+    color: white;
+}
+
+.neo-btn-warning {
+    background: var(--neo-warning);
+    color: white;
+}
+
+.neo-btn-warning:hover {
+    background: #92400E;
+    color: white;
+}
+
+/* Table Styling - Professional Brutalist */
+.table-responsive {
+    border: var(--neo-border);
+    box-shadow: var(--neo-shadow);
+}
+
+.table {
+    margin-bottom: 0;
+    background: white;
+}
+
+.table thead th {
+    border-bottom: var(--neo-border);
+    background: var(--neo-charcoal);
+    color: white;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 1rem;
+    font-size: 0.75rem;
+}
+
+.table td {
+    border-bottom: 1px solid #E5E7EB;
+    padding: 1rem;
+    font-size: 0.9375rem;
+    vertical-align: middle;
+}
+
+.table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Form Elements */
+.form-control,
+.form-select {
+    border: var(--neo-border);
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0.75rem 1rem;
+    font-weight: 400;
+    background-color: var(--neo-white);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--neo-primary);
+    box-shadow: var(--neo-shadow-sm);
+    background: var(--neo-white);
+}
+
+.form-label {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+    color: var(--neo-accent);
+}
+
+/* Custom Checkboxes & Radios */
+.form-check {
+    padding-left: 2rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.form-check-input {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-left: -2rem;
+    border: var(--neo-border);
+    border-radius: 0 !important;
+    background-color: var(--neo-white);
+    background-image: none;
+    cursor: pointer;
+    transition: var(--neo-transition);
+}
+
+.form-check-input:checked {
+    background-color: var(--neo-charcoal);
+    border-color: var(--neo-charcoal);
+}
+
+.form-check-input:focus {
+    box-shadow: var(--neo-shadow-sm);
+    border-color: var(--neo-charcoal);
+}
+
+.form-check-label {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+    padding-left: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Badges */
+.badge {
+    border-radius: 0;
+    border: 1.5px solid var(--neo-charcoal);
+    padding: 0.4em 0.8em;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.65rem;
+    letter-spacing: 0.05em;
+}
+
+/* Navbar */
+/* Navbar & Brand */
+.navbar {
+    border-bottom: var(--neo-border);
+    background: var(--neo-white) !important;
+    padding: 0;
+    margin-bottom: 2.5rem !important;
+    box-shadow: 0 4px 0 0 rgba(0, 0, 0, 0.05);
+    /* Very subtle depth */
+}
+
+.navbar-brand {
+    font-weight: 900;
+    text-transform: uppercase;
+    font-size: 1.15rem;
+    letter-spacing: -0.01em;
+    border-right: var(--neo-border);
+    padding: 1.25rem 2rem !important;
+    margin-right: 0 !important;
+    background: var(--neo-charcoal);
+    color: white !important;
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+}
+
+.navbar-brand span {
+    font-size: 0.7rem;
+    color: var(--neo-primary);
+    letter-spacing: 0.2em;
+    margin-top: 4px;
+}
+
+.nav-link {
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--neo-accent) !important;
+    padding: 1.5rem 1.75rem !important;
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    transition: all 0.2s ease;
+    border-right: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.nav-link:hover {
+    background: var(--neo-offwhite);
+    color: var(--neo-charcoal) !important;
+}
+
+.nav-link.active {
+    background: var(--neo-offwhite);
+    color: var(--neo-primary) !important;
+    position: relative;
+}
+
+.nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: var(--neo-primary);
+}
+
+/* Modals */
+.modal-content {
+    border: var(--neo-border);
+    border-radius: 0;
+    box-shadow: 12px 12px 0px 0px var(--neo-charcoal);
+}
+
+.modal-header {
+    border-bottom: var(--neo-border);
+    background: var(--neo-charcoal);
+    color: var(--neo-white);
+    padding: 1.25rem 1.5rem;
+}
+
+.modal-title {
+    font-size: 1rem;
+    letter-spacing: 0.05em;
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+.modal-footer {
+    border-top: var(--neo-border);
+    padding: 1.25rem;
+    background: var(--neo-offwhite);
+}
+
+/* Dashboard Metric Cards */
+.neo-metric {
+    border: var(--neo-border);
+    box-shadow: var(--neo-shadow);
+    padding: 2rem;
+    background: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.neo-metric-label {
+    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    color: var(--neo-accent);
+    margin-bottom: 1rem;
+}
+
+.neo-metric-value {
+    font-size: 3.5rem;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--neo-charcoal);
+}
+
+/* Layout Helper */
+.main-content {
+    flex: 1 0 auto;
+}
+
+.footer {
+    flex-shrink: 0;
+    border-top: var(--neo-border);
+}
+
+/* Color Utilities */
+.bg-neo-primary {
+    background-color: var(--neo-primary) !important;
+    color: white !important;
+}
+
+.bg-neo-success {
+    background-color: var(--neo-success) !important;
+    color: white !important;
+}
+
+.bg-neo-info {
+    background-color: var(--neo-info) !important;
+    color: white !important;
+}
+
+.bg-neo-danger {
+    background-color: var(--neo-danger) !important;
+    color: white !important;
+}
+
+.bg-neo-warning {
+    background-color: var(--neo-warning) !important;
+    color: white !important;
+}
+
+.bg-neo-charcoal {
+    background-color: var(--neo-charcoal) !important;
+    color: white !important;
+}
+
+/* Adjustments for text in colored backgrounds */
+.bg-neo-primary .neo-metric-label,
+.bg-neo-success .neo-metric-label,
+.bg-neo-info .neo-metric-label,
+.bg-neo-danger .neo-metric-label,
+.bg-neo-warning .neo-metric-label,
+.bg-neo-charcoal .neo-metric-label {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.bg-neo-primary .neo-metric-value,
+.bg-neo-success .neo-metric-value,
+.bg-neo-info .neo-metric-value,
+.bg-neo-danger .neo-metric-value,
+.bg-neo-warning .neo-metric-value,
+.bg-neo-charcoal .neo-metric-value {
+    color: white !important;
 }

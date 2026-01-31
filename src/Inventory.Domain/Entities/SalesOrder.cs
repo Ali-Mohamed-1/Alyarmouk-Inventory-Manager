@@ -110,6 +110,12 @@ public  class SalesOrder
     public decimal ManufacturingTaxAmount { get; set; }
     public decimal TotalAmount { get; set; }
     
+    /// <summary>
+    /// Total amount that has been refunded for this order.
+    /// Must never exceed TotalAmount.
+    /// </summary>
+    public decimal RefundedAmount { get; set; }
+    
     public List<SalesOrderLine> Lines { get; set; } = new();
 }
 

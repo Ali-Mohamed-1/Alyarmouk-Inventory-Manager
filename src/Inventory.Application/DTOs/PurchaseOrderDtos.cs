@@ -1,3 +1,4 @@
+using Inventory.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,7 +28,12 @@ namespace Inventory.Application.DTOs
         decimal ManufacturingTaxAmount,
         decimal ReceiptExpenses,
         decimal TotalAmount,
+        decimal RefundedAmount,
         string? Note,
+        string? InvoicePath,
+        DateTimeOffset? InvoiceUploadedUtc,
+        string? ReceiptPath,
+        DateTimeOffset? ReceiptUploadedUtc,
         List<PurchaseOrderLineResponse> Lines);
 
     public record PurchaseOrderLineResponse(

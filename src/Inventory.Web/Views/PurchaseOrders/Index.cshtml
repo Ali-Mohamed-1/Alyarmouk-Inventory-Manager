@@ -3,35 +3,43 @@
     ViewData["Title"] = "Purchase Orders";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Purchase Orders</h1>
-    <a asp-action="Create" class="btn btn-primary">Create New Purchase Order</a>
-</div>
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Procurement Log</h1>
+    </div>
 
-<div class="card shadow-sm">
-    <div class="card-body">
+    <div class="neo-card p-0 overflow-hidden">
+        <div class="p-4 bg-black text-white">
+            <h5 class="mb-0 fw-black text-uppercase">Supplier Acquisition Ledger</h5>
+        </div>
         <div class="table-responsive">
-            <table class="table table-hover">
-                <thead class="table-light">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
                     <tr>
-                        <th>Order #</th>
-                        <th>Supplier</th>
-                        <th>Date</th>
-                        <th>Total Amount</th>
-                        <th>Actions</th>
+                        <th class="ps-4">ORDER REF</th>
+                        <th>SUPPLIER</th>
+                        <th>ACQUISITION DATE</th>
+                        <th class="text-end">TOTAL OUTLAY</th>
+                        <th class="text-end pe-4">ACTION</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var item in Model)
                     {
                         <tr>
-                            <td><code>@item.OrderNumber</code></td>
-                            <td>@item.SupplierName</td>
-                            <td>@item.CreatedUtc.ToString("g")</td>
-                            <td>@item.TotalAmount.ToString("C2")</td>
-                            <td>
-                                <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-outline-info">Details</a>
+                            <td class="ps-4"><code class="fw-black fs-6 text-black">@item.OrderNumber</code></td>
+                            <td class="fw-black text-uppercase">@item.SupplierName</td>
+                            <td class="small fw-bold">@item.CreatedUtc.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
+                            <td class="text-end fw-black text-primary">@item.TotalAmount.ToString("C2")</td>
+                            <td class="text-end pe-4">
+                                <a asp-controller="Suppliers" asp-action="Index" class="neo-btn btn-sm">VIEW VIA SUPPLIER</a>
                             </td>
+                        </tr>
+                    }
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-5 fw-bold">NO PROCUREMENT HISTORY DETECTED.</td>
                         </tr>
                     }
                 </tbody>

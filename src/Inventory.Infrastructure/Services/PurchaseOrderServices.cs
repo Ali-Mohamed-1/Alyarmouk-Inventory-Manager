@@ -10,6 +10,7 @@ using Inventory.Domain.Constants;
 using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Inventory.Application.DTOs.PurchaseOrder;
 
 namespace Inventory.Infrastructure.Services
 {
@@ -405,6 +406,280 @@ namespace Inventory.Infrastructure.Services
             await _auditWriter.LogUpdateAsync<PurchaseOrder>(id, user, before, new { Status = status }, ct);
         }
 
+        public async Task UpdatePaymentStatusAsync(long id, PurchasePaymentStatus status, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            
+            var order = await _db.PurchaseOrders.FindAsync(new object[] { id }, ct);
+            if (order == null) throw new NotFoundException($"Purchase order {id} not found.");
+
+            if (order.PaymentStatus == status) return;
+
+            var before = new { order.PaymentStatus };
+            var oldStatus = order.PaymentStatus;
+
+            // Use transaction to ensure money flow stays consistent
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                order.PaymentStatus = status;
+
+                if (status == PurchasePaymentStatus.Paid)
+                {
+                    // Record payment: create an Expense transaction for the supplier
+                    decimal paymentAmount = order.TotalAmount - order.RefundedAmount;
+                    
+                    if (paymentAmount > 0)
+                    {
+                        var paymentTx = new FinancialTransaction
+                        {
+                            Type = FinancialTransactionType.Expense,
+                            Amount = paymentAmount,
+                            PurchaseOrderId = order.Id,
+                            SupplierId = order.SupplierId,
+                            TimestampUtc = DateTimeOffset.UtcNow,
+                            UserId = user.UserId,
+                            UserDisplayName = user.UserDisplayName,
+                            Note = $"Full Payment for Purchase Order {order.OrderNumber}"
+                        };
+                        _db.FinancialTransactions.Add(paymentTx);
+                    }
+                }
+                else if (status == PurchasePaymentStatus.Unpaid && oldStatus == PurchasePaymentStatus.Paid)
+                {
+                    // Reversal: Find and remove ONLY the auto-generated payment transaction for this order
+                    var existingTxs = await _db.FinancialTransactions
+                        .Where(t => t.PurchaseOrderId == order.Id && 
+                                    t.Type == FinancialTransactionType.Expense && 
+                                    t.Note != null && 
+                                    t.Note.Contains($"Payment for Purchase Order {order.OrderNumber}"))
+                        .ToListAsync(ct);
+                    
+                    if (existingTxs.Any())
+                    {
+                        _db.FinancialTransactions.RemoveRange(existingTxs);
+                    }
+                }
+
+                await _db.SaveChangesAsync(ct);
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(id, user, before, new { PaymentStatus = status }, ct);
+                
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+        }
+
+
+        public async Task RefundAsync(RefundPurchaseOrderRequest req, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            if (req is null) throw new ArgumentNullException(nameof(req));
+            if (req.Amount <= 0) throw new ValidationException("Refund amount must be positive.");
+
+            var order = await _db.PurchaseOrders
+                .Include(o => o.Lines)
+                .FirstOrDefaultAsync(o => o.Id == req.OrderId, ct);
+
+            if (order == null) throw new NotFoundException($"Purchase order {req.OrderId} not found.");
+
+            if (order.RefundedAmount + req.Amount > order.TotalAmount)
+                throw new ValidationException("Total refunded amount cannot exceed the total order amount.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var before = new { order.RefundedAmount };
+                order.RefundedAmount += req.Amount;
+
+                // If the order was Received, we need to adjust inventory
+                if (order.Status == PurchaseOrderStatus.Received)
+                {
+                    // For a global refund, we ideally need to know which items are being refunded.
+                    // If it's a simple monetary refund without item return, we just record the money.
+                    // But if it's a partial product return, we'd need more details.
+                    // Given the goal "Refund option only available for eligible completed orders",
+                    // and "inventory adjustments occur if applicable", I'll assume for now it's a monetary refund
+                    // unless otherwise specified. But usually PO refund means returning goods.
+                    
+                    // Logic for monetary refund (money back from supplier)
+                    var refundTx = new FinancialTransaction
+                    {
+                        Type = FinancialTransactionType.Revenue, // Revenue because it's money coming IN (reversal of expense)
+                        Amount = req.Amount,
+                        PurchaseOrderId = order.Id,
+                        SupplierId = order.SupplierId,
+                        TimestampUtc = DateTimeOffset.UtcNow,
+                        UserId = user.UserId,
+                        UserDisplayName = user.UserDisplayName,
+                        Note = $"Refund for Purchase Order {order.OrderNumber}. {req.Reason}"
+                    };
+                    _db.FinancialTransactions.Add(refundTx);
+                }
+
+                await _db.SaveChangesAsync(ct);
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(order.Id, user, before, new { order.RefundedAmount }, ct);
+                
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+        }
+
+        public async Task AttachInvoiceAsync(long orderId, string invoicePath, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+            if (string.IsNullOrWhiteSpace(invoicePath)) throw new ValidationException("Invoice path must be provided.");
+
+            var purchaseOrder = await _db.PurchaseOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            if (purchaseOrder is null)
+                throw new NotFoundException($"Purchase order id {orderId} was not found.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousInvoicePath = purchaseOrder.InvoicePath;
+                purchaseOrder.InvoicePath = invoicePath;
+                purchaseOrder.InvoiceUploadedUtc = DateTimeOffset.UtcNow;
+
+                await _db.SaveChangesAsync(ct);
+
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
+                    purchaseOrder.Id,
+                    user,
+                    beforeState: new { InvoicePath = previousInvoicePath },
+                    afterState: new { InvoicePath = purchaseOrder.InvoicePath, InvoiceUploadedUtc = purchaseOrder.InvoiceUploadedUtc },
+                    ct);
+
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not attach Invoice to purchase order due to a database conflict.", ex);
+            }
+        }
+
+        public async Task RemoveInvoiceAsync(long orderId, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+
+            var purchaseOrder = await _db.PurchaseOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            if (purchaseOrder is null)
+                throw new NotFoundException($"Purchase order id {orderId} was not found.");
+
+            if (purchaseOrder.InvoicePath == null)
+                return; // Already removed
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousInvoicePath = purchaseOrder.InvoicePath;
+                purchaseOrder.InvoicePath = null;
+                purchaseOrder.InvoiceUploadedUtc = null;
+
+                await _db.SaveChangesAsync(ct);
+
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
+                    purchaseOrder.Id,
+                    user,
+                    beforeState: new { InvoicePath = previousInvoicePath },
+                    afterState: new { InvoicePath = (string?)null, InvoiceUploadedUtc = (DateTimeOffset?)null },
+                    ct);
+
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not remove Invoice from purchase order due to a database conflict.", ex);
+            }
+        }
+
+        public async Task AttachReceiptAsync(long orderId, string receiptPath, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+            if (string.IsNullOrWhiteSpace(receiptPath)) throw new ValidationException("Receipt path must be provided.");
+
+            var purchaseOrder = await _db.PurchaseOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            if (purchaseOrder is null)
+                throw new NotFoundException($"Purchase order id {orderId} was not found.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousReceiptPath = purchaseOrder.ReceiptPath;
+                purchaseOrder.ReceiptPath = receiptPath;
+                purchaseOrder.ReceiptUploadedUtc = DateTimeOffset.UtcNow;
+
+                await _db.SaveChangesAsync(ct);
+
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
+                    purchaseOrder.Id,
+                    user,
+                    beforeState: new { ReceiptPath = previousReceiptPath },
+                    afterState: new { ReceiptPath = purchaseOrder.ReceiptPath, ReceiptUploadedUtc = purchaseOrder.ReceiptUploadedUtc },
+                    ct);
+
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not attach Receipt to purchase order due to a database conflict.", ex);
+            }
+        }
+
+        public async Task RemoveReceiptAsync(long orderId, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+
+            var purchaseOrder = await _db.PurchaseOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            if (purchaseOrder is null)
+                throw new NotFoundException($"Purchase order id {orderId} was not found.");
+
+            if (purchaseOrder.ReceiptPath == null)
+                return; // Already removed
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousReceiptPath = purchaseOrder.ReceiptPath;
+                purchaseOrder.ReceiptPath = null;
+                purchaseOrder.ReceiptUploadedUtc = null;
+
+                await _db.SaveChangesAsync(ct);
+
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
+                    purchaseOrder.Id,
+                    user,
+                    beforeState: new { ReceiptPath = previousReceiptPath },
+                    afterState: new { ReceiptPath = (string?)null, ReceiptUploadedUtc = (DateTimeOffset?)null },
+                    ct);
+
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (DbUpdateException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not remove Receipt from purchase order due to a database conflict.", ex);
+            }
+        }
+
         private static PurchaseOrderResponse MapToResponse(PurchaseOrder o)
         {
             return new PurchaseOrderResponse(
@@ -424,7 +699,12 @@ namespace Inventory.Infrastructure.Services
                 o.ManufacturingTaxAmount,
                 o.ReceiptExpenses,
                 o.TotalAmount,
+                o.RefundedAmount,
                 o.Note,
+                o.InvoicePath,
+                o.InvoiceUploadedUtc,
+                o.ReceiptPath,
+                o.ReceiptUploadedUtc,
                 o.Lines.Select(l => new PurchaseOrderLineResponse(
                     l.Id,
                     l.ProductId,

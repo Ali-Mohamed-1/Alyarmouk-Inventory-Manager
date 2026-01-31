@@ -4,111 +4,112 @@
     var customers = ViewBag.Customers as IEnumerable<Inventory.Application.DTOs.Customer.CustomerResponseDto> ?? new List<Inventory.Application.DTOs.Customer.CustomerResponseDto>();
 }
 
-<div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h2 mb-0">Create <span class="text-primary">Sales Order</span></h1>
-        <a asp-action="Index" class="btn btn-outline-secondary">Back to List</a>
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Issue New <span class="text-primary">Sales Order</span></h1>
+        <a asp-action="Index" class="neo-btn">BACK TO LOG</a>
     </div>
 
     <form asp-action="Create" method="post" id="createOrderForm">
         @Html.AntiForgeryToken()
-        <div class="row">
+        <div class="row g-5">
             <!-- Left Side: Basic Info & Payment -->
             <div class="col-lg-4">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-light">
-                        <h5 class="card-title mb-0">Order Information</h5>
+                <div class="neo-card p-0 overflow-hidden mb-4">
+                    <div class="p-3 bg-black text-white">
+                        <h5 class="mb-0 fw-black text-uppercase small">Order Parameters</h5>
                     </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label asp-for="CustomerId" class="form-label fw-bold">Customer</label>
-                            <select asp-for="CustomerId" class="form-select" required>
-                                <option value="">-- Select Customer --</option>
+                    <div class="p-4" style="background: white;">
+                        <div class="mb-4">
+                            <label asp-for="CustomerId" class="form-label fw-black text-uppercase small">Target Customer</label>
+                            <select asp-for="CustomerId" class="form-select fw-bold" required>
+                                <option value="">-- SELECT CUSTOMER --</option>
                                 @foreach (var c in customers)
                                 {
-                                    <option value="@c.Id">@c.Name</option>
+                                    <option value="@c.Id">@c.Name.ToUpper()</option>
                                 }
                             </select>
-                            <span asp-validation-for="CustomerId" class="text-danger small"></span>
+                            <span asp-validation-for="CustomerId" class="text-danger small fw-bold"></span>
                         </div>
 
-                        <div class="mb-3">
-                            <label asp-for="OrderDate" class="form-label fw-bold">Order Date</label>
-                            <input asp-for="OrderDate" type="date" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                        <div class="mb-4">
+                            <label asp-for="OrderDate" class="form-label fw-black text-uppercase small">Order Timestamp</label>
+                            <input asp-for="OrderDate" type="date" class="form-control fw-bold" value="@DateTime.Today.ToString("yyyy-MM-dd")" />
                         </div>
 
-                        <div class="mb-3">
-                            <label asp-for="DueDate" class="form-label fw-bold">Due Date</label>
-                            <input asp-for="DueDate" type="date" class="form-control" value="@DateTime.Today.AddDays(7).ToString("yyyy-MM-dd")" required />
-                            <span asp-validation-for="DueDate" class="text-danger small"></span>
+                        <div class="mb-4">
+                            <label asp-for="DueDate" class="form-label fw-black text-uppercase small">Deadline / Due Date</label>
+                            <input asp-for="DueDate" type="date" class="form-control fw-bold" value="@DateTime.Today.AddDays(7).ToString("yyyy-MM-dd")" required />
+                            <span asp-validation-for="DueDate" class="text-danger small fw-bold"></span>
                         </div>
 
                         <div class="mb-0">
-                            <label asp-for="Note" class="form-label fw-bold">Notes</label>
-                            <textarea asp-for="Note" class="form-control" rows="3" placeholder="Additional instructions..."></textarea>
+                            <label asp-for="Note" class="form-label fw-black text-uppercase small">Operational Notes</label>
+                            <textarea asp-for="Note" class="form-control fw-bold" rows="3" placeholder="Additional context..."></textarea>
                         </div>
                     </div>
                 </div>
 
                 <!-- Payment Details -->
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-light">
-                        <h5 class="card-title mb-0">Payment & Tax</h5>
+                <div class="neo-card p-0 overflow-hidden mb-4" style="background: var(--neo-yellow);">
+                    <div class="p-3 bg-black text-white">
+                        <h5 class="mb-0 fw-black text-uppercase small">Financial Context</h5>
                     </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label asp-for="PaymentMethod" class="form-label fw-bold">Payment Method</label>
-                            <select asp-for="PaymentMethod" class="form-select" id="paymentMethodSelect" onchange="togglePaymentFields()">
-                                <option value="1">Cash</option>
-                                <option value="2">Check</option>
-                                <option value="3">Bank Transfer</option>
+                    <div class="p-4">
+                        <div class="mb-4">
+                            <label asp-for="PaymentMethod" class="form-label fw-black text-uppercase small">Method of Settlement</label>
+                            <select asp-for="PaymentMethod" class="form-select fw-black" id="paymentMethodSelect" onchange="togglePaymentFields()">
+                                <option value="1">CASH</option>
+                                <option value="2">CHECK / CHEQUE</option>
+                                <option value="3">BANK TRANSFER</option>
                             </select>
                         </div>
 
-                        <div class="mb-3">
-                            <label asp-for="PaymentStatus" class="form-label fw-bold">Initial Status</label>
-                            <select asp-for="PaymentStatus" class="form-select">
-                                <option value="0">Pending</option>
-                                <option value="1">Paid</option>
+                        <div class="mb-4">
+                            <label asp-for="PaymentStatus" class="form-label fw-black text-uppercase small">Initial Pay Status</label>
+                            <select asp-for="PaymentStatus" class="form-select fw-black text-center">
+                                <option value="0">PENDING</option>
+                                <option value="1">PAID UPON ISSUANCE</option>
+                                <option value="2">OVERDUE</option>
                             </select>
                         </div>
 
                         <!-- Check Fields -->
-                        <div id="checkFields" style="display: none;" class="p-3 bg-light rounded border mb-3">
-                            <h6 class="small fw-bold text-uppercase text-muted mb-3">Check Details</h6>
-                            <div class="form-check form-switch mb-2">
+                        <div id="checkFields" style="display: none;" class="neo-card p-4 bg-white mb-4 border-2">
+                            <h6 class="fw-black text-uppercase small mb-4 border-bottom border-2 pb-2">Check Details</h6>
+                            <div class="form-check mb-3">
                                 <input asp-for="CheckReceived" class="form-check-input" type="checkbox" id="checkReceived">
-                                <label class="form-check-label" for="checkReceived">Received</label>
+                                <label class="form-check-label fw-bold small ms-2" for="checkReceived">RECEIVED</label>
                             </div>
-                            <div class="mb-3">
-                                <label asp-for="CheckReceivedDate" class="form-label small">Received Date</label>
-                                <input asp-for="CheckReceivedDate" type="date" class="form-control form-control-sm">
+                            <div class="mb-0">
+                                <label asp-for="CheckReceivedDate" class="form-label fw-bold small text-muted">RECEIVE DATE</label>
+                                <input asp-for="CheckReceivedDate" type="date" class="form-control fw-bold">
                             </div>
                         </div>
 
                         <!-- Bank Transfer Fields -->
-                        <div id="bankFields" style="display: none;" class="p-3 bg-light rounded border mb-3">
-                            <h6 class="small fw-bold text-uppercase text-muted mb-3">Transfer Details</h6>
+                        <div id="bankFields" style="display: none;" class="neo-card p-4 bg-white mb-4 border-2">
+                            <h6 class="fw-black text-uppercase small mb-4 border-bottom border-2 pb-2">Transfer Details</h6>
                             <div class="mb-0">
-                                <label asp-for="TransferId" class="form-label small">Transfer ID / Ref</label>
-                                <input asp-for="TransferId" class="form-control form-control-sm" placeholder="e.g. TR-123456">
-                                <span asp-validation-for="TransferId" class="text-danger small"></span>
+                                <label asp-for="TransferId" class="form-label fw-bold small text-muted">REFERENCE ID / TRACE</label>
+                                <input asp-for="TransferId" class="form-control fw-bold" placeholder="e.g. TR-999999">
+                                <span asp-validation-for="TransferId" class="text-danger small fw-bold"></span>
                             </div>
                         </div>
 
-                        <hr />
-
-                        <div class="form-check form-switch mb-2">
-                            <input asp-for="IsTaxInclusive" class="form-check-input" type="checkbox" checked>
-                            <label class="form-check-label fw-bold" asp-for="IsTaxInclusive">Price Includes Tax</label>
-                        </div>
-                        <div class="form-check form-switch mb-2">
-                            <input asp-for="ApplyVat" class="form-check-input" type="checkbox" checked>
-                            <label class="form-check-label fw-bold" asp-for="ApplyVat">Apply VAT (14%)</label>
-                        </div>
-                        <div class="form-check form-switch">
-                            <input asp-for="ApplyManufacturingTax" class="form-check-input" type="checkbox" checked>
-                            <label class="form-check-label fw-bold" asp-for="ApplyManufacturingTax">Apply Manufacturing Tax (1%)</label>
+                        <div class="neo-card p-3 bg-white mb-0 border-2">
+                            <div class="form-check mb-3">
+                                <input asp-for="IsTaxInclusive" class="form-check-input" type="checkbox" checked>
+                                <label class="form-check-label fw-black text-uppercase small ms-2" asp-for="IsTaxInclusive">Price Includes Tax</label>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input asp-for="ApplyVat" class="form-check-input" type="checkbox" checked>
+                                <label class="form-check-label fw-black text-uppercase small ms-2" asp-for="ApplyVat">Apply VAT (14%)</label>
+                            </div>
+                            <div class="form-check mb-0">
+                                <input asp-for="ApplyManufacturingTax" class="form-check-input" type="checkbox" checked>
+                                <label class="form-check-label fw-black text-uppercase small ms-2" asp-for="ApplyManufacturingTax">Apply MAN. Tax (1%)</label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -116,22 +117,23 @@
 
             <!-- Right Side: Order Items -->
             <div class="col-lg-8">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">Order Items</h5>
-                        <button type="button" class="btn btn-sm btn-success" onclick="addLineItem()">
-                            <i class="bi bi-plus-lg"></i> Add Item
+                <div class="neo-card p-0 overflow-hidden h-100 d-flex flex-column">
+                    <div class="p-3 bg-black text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-black text-uppercase small">Inventory Line Items</h5>
+                        <button type="button" class="neo-btn neo-btn-success btn-sm" onclick="addLineItem()">
+                            <i class="bi bi-plus-lg"></i> ADD ITEM
                         </button>
                     </div>
-                    <div class="card-body p-0">
+                    <div class="p-0 flex-grow-1" style="background: white;">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0" id="itemsTable">
-                                <thead class="table-light text-muted small text-uppercase">
+                                <thead class="table-dark text-white small text-uppercase fw-black">
                                     <tr>
-                                        <th style="width: 40%">Product Name</th>
-                                        <th style="width: 20%">Quantity</th>
-                                        <th style="width: 25%">Unit Price</th>
-                                        <th style="width: 15%" class="text-end">Actions</th>
+                                        <th style="width: 40%" class="ps-4">PRODUCT RECORD</th>
+                                        <th style="width: 20%">BATCH / LOT</th>
+                                        <th style="width: 15%">QUANTITY</th>
+                                        <th style="width: 20%">UNIT PRICE</th>
+                                        <th style="width: 5%" class="text-end pe-4">TRASH</th>
                                     </tr>
                                 </thead>
                                 <tbody id="lineItemsContainer">
@@ -141,24 +143,29 @@
                         </div>
                         
                         <div id="emptyState" class="text-center py-5">
-                            <i class="bi bi-cart-x text-muted" style="font-size: 3rem;"></i>
-                            <p class="text-muted mt-2">No items added yet.</p>
-                            <button type="button" class="btn btn-sm btn-outline-success" onclick="addLineItem()">Add your first item</button>
+                            <i class="bi bi-cart-x text-muted" style="font-size: 4rem; opacity: 0.2;"></i>
+                            <p class="fw-black text-muted mt-3">MANIFEST IS CURRENTLY EMPTY.</p>
+                            <button type="button" class="neo-btn" onclick="addLineItem()">COMMENCE ENTRY</button>
                         </div>
                     </div>
-                    <div class="card-footer bg-white border-top-0 p-4">
-                        <div class="row justify-content-end">
+                    <div class="p-4 border-top border-4 bg-white">
+                        <div class="row g-4 align-items-end">
+                            <div class="col-md-7">
+                                <div class="neo-card p-3 bg-light mb-0 border-2">
+                                    <p class="small text-muted mb-0 fw-bold">FINAL TOTAL WILL BE RECALCULATED ON SERVER CORE.</p>
+                                </div>
+                            </div>
                             <div class="col-md-5">
                                 <div class="d-flex justify-content-between mb-2">
-                                    <span class="text-muted">Estimated Subtotal:</span>
-                                    <span id="displaySubtotal" class="fw-bold">$0.00</span>
+                                    <span class="fw-black text-uppercase small">EST. SUBTOTAL:</span>
+                                    <span id="displaySubtotal" class="fw-black">$0.00</span>
                                 </div>
-                                <div class="d-flex justify-content-between mb-3 text-success fs-4 fw-bold border-top pt-2">
-                                    <span>Total Amount:</span>
-                                    <span id="displayTotal">$0.00</span>
+                                <div class="d-flex justify-content-between mb-4 border-top border-2 pt-2">
+                                    <span class="fw-black text-uppercase fs-5">EST. GRAND TOTAL:</span>
+                                    <span id="displayTotal" class="fw-black fs-4 text-success">$0.00</span>
                                 </div>
-                                <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold">
-                                    <i class="bi bi-check2-circle me-1"></i> Create Order
+                                <button type="submit" class="neo-btn neo-btn-primary w-100 py-3 fw-black fs-5">
+                                    <i class="bi bi-check2-circle me-2"></i> EXECUTE ORDER
                                 </button>
                             </div>
                         </div>
@@ -170,7 +177,6 @@
 </div>
 
 @section Scripts {
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <script>
         let lineCount = 0;
         let products = [];
@@ -179,7 +185,6 @@
             try {
                 const response = await fetch('/api/products/with-stock');
                 products = await response.json();
-                // Initial line after products loaded
                 if (lineCount === 0) addLineItem();
             } catch (error) {
                 console.error('Error loading products:', error);
@@ -194,33 +199,27 @@
             const productNameInput = document.getElementById(`product-name-input-${idx}`);
 
             if (!productId) {
-                batchSelect.innerHTML = '<option value="">-- Batch --</option>';
-                priceInput.value = "0.00";
-                unitInput.value = "";
-                productNameInput.value = "";
-                calculateTotals();
-                return;
+                batchSelect.innerHTML = '<option value="">-- BATCH --</option>';
+                priceInput.value = "0.00"; unitInput.value = ""; productNameInput.value = "";
+                calculateTotals(); return;
             }
 
             const product = products.find(p => p.productId == productId);
             if (product) {
                 priceInput.value = product.price;
-                unitInput.value = product.unit;
+                unitInput.value = product.unit.toUpperCase();
                 productNameInput.value = product.name;
             }
 
-            // Fetch batches
             try {
                 const response = await fetch(`/api/products/${productId}/batches`);
                 const batches = await response.json();
-                batchSelect.innerHTML = '<option value="">None (General Stock)</option>';
+                batchSelect.innerHTML = '<option value="">NONE (GENERAL)</option>';
                 batches.forEach(b => {
-                    const label = b.batchNumber + (b.onHand !== undefined ? ` (Available: ${b.onHand})` : '');
+                    const label = b.batchNumber + (b.onHand !== undefined ? ` (STOCK: ${b.onHand})` : '');
                     batchSelect.innerHTML += `<option value="${b.batchNumber}" data-batch-id="${b.id}">${label}</option>`;
                 });
-            } catch (error) {
-                console.error('Error loading batches:', error);
-            }
+            } catch (error) { console.error('Error loading batches:', error); }
             calculateTotals();
         }
 
@@ -231,43 +230,41 @@
         }
 
         function addLineItem() {
-            if (products.length === 0) return; // Wait for products to load
-
+            if (products.length === 0) return;
             const container = document.getElementById('lineItemsContainer');
             const emptyState = document.getElementById('emptyState');
             emptyState.style.display = 'none';
 
             const idx = lineCount++;
-            const row = document.createElement('tr');
-            row.id = `line-row-${idx}`;
+            const row = document.createElement('tr'); row.id = `line-row-${idx}`;
             row.innerHTML = `
-                <td>
-                    <select name="Lines[${idx}].ProductId" class="form-select form-select-sm" required onchange="onProductChange(this, ${idx})">
-                        <option value="">-- Select Product --</option>
-                        ${products.map(p => `<option value="${p.productId}">${p.name} (${p.sku})</option>`).join('')}
+                <td class="ps-4 py-3">
+                    <select name="Lines[${idx}].ProductId" class="form-select select-neo fw-black text-uppercase" required onchange="onProductChange(this, ${idx})">
+                        <option value="">-- SELECT PRODUCT --</option>
+                        ${products.map(p => `<option value="${p.productId}">${p.name.toUpperCase()} [${p.sku}]</option>`).join('')}
                     </select>
                     <input type="hidden" name="Lines[${idx}].ProductName" id="product-name-input-${idx}" />
                 </td>
                 <td>
-                    <select name="Lines[${idx}].BatchNumber" id="batch-select-${idx}" class="form-select form-select-sm" onchange="onBatchChange(this, ${idx})">
-                        <option value="">None (General Stock)</option>
+                    <select name="Lines[${idx}].BatchNumber" id="batch-select-${idx}" class="form-select fw-bold small" onchange="onBatchChange(this, ${idx})">
+                        <option value="">NONE (GENERAL)</option>
                     </select>
                     <input type="hidden" name="Lines[${idx}].ProductBatchId" id="batch-id-input-${idx}" />
                 </td>
                 <td>
-                    <div class="input-group input-group-sm">
-                        <input name="Lines[${idx}].Quantity" type="number" step="0.01" class="form-control item-qty" onchange="calculateTotals()" value="1.00" required />
-                        <input name="Lines[${idx}].Unit" id="unit-input-${idx}" class="form-control form-control-sm" style="width: 60px" readonly tabindex="-1" />
+                    <div class="input-group">
+                        <input name="Lines[${idx}].Quantity" type="number" step="0.01" class="form-control fw-black text-center item-qty" onchange="calculateTotals()" value="1.00" required />
+                        <input name="Lines[${idx}].Unit" id="unit-input-${idx}" class="form-control text-center fw-bold small bg-light" style="max-width: 60px" readonly tabindex="-1" />
                     </div>
                 </td>
                 <td>
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text">$</span>
-                        <input name="Lines[${idx}].UnitPrice" id="price-input-${idx}" type="number" step="0.01" class="form-control item-price" onchange="calculateTotals()" value="0.00" required />
+                    <div class="input-group">
+                        <span class="input-group-text bg-black text-white">$</span>
+                        <input name="Lines[${idx}].UnitPrice" id="price-input-${idx}" type="number" step="0.01" class="form-control fw-black item-price" onchange="calculateTotals()" value="0.00" required />
                     </div>
                 </td>
-                <td class="text-end">
-                    <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeLineItem(${idx})">
+                <td class="text-end pe-4">
+                    <button type="button" class="neo-btn neo-btn-danger btn-sm py-1" onclick="removeLineItem(${idx})">
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
@@ -277,9 +274,7 @@
         }
 
         function removeLineItem(idx) {
-            const row = document.getElementById(`line-row-${idx}`);
-            row.remove();
-            
+            document.getElementById(`line-row-${idx}`).remove();
             if (document.querySelectorAll('#lineItemsContainer tr').length === 0) {
                 document.getElementById('emptyState').style.display = 'block';
             }
@@ -290,22 +285,14 @@
             let subtotal = 0;
             const qtys = document.querySelectorAll('.item-qty');
             const prices = document.querySelectorAll('.item-price');
-
             for (let i = 0; i < qtys.length; i++) {
                 subtotal += (parseFloat(qtys[i].value) || 0) * (parseFloat(prices[i].value) || 0);
             }
-
             document.getElementById('displaySubtotal').textContent = formatCurrency(subtotal);
-            
             let total = subtotal;
             const applyVat = document.querySelector('[name="ApplyVat"]').checked;
-            const applyMan = document.querySelector('[name="ApplyManufacturingTax"]').checked;
             const inclusive = document.querySelector('[name="IsTaxInclusive"]').checked;
-
-            if (!inclusive) {
-                if (applyVat) total += (subtotal * 0.14);
-            }
-            // Simplified display total - server handles exact rounding and man tax deduction
+            if (!inclusive && applyVat) total += (subtotal * 0.14);
             document.getElementById('displayTotal').textContent = formatCurrency(total);
         }
 
@@ -315,17 +302,9 @@
             document.getElementById('bankFields').style.display = (method === '3') ? 'block' : 'none';
         }
 
-        function formatCurrency(amount) {
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD'
-            }).format(amount);
-        }
+        function formatCurrency(a) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(a); }
 
-        // Initialize
         loadProducts();
-
-        // Add event listeners for tax switches to recalculate
         document.querySelectorAll('[name="IsTaxInclusive"], [name="ApplyVat"], [name="ApplyManufacturingTax"]').forEach(input => {
             input.addEventListener('change', calculateTotals);
         });

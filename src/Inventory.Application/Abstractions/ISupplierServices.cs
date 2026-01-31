@@ -14,5 +14,16 @@ namespace Inventory.Application.Abstractions
         Task UpdateAsync(int id, UpdateSupplierRequest req, UserContext user, CancellationToken ct = default);
         Task SetActiveAsync(int id, bool isActive, UserContext user, CancellationToken ct = default);
         Task<IEnumerable<SupplierDropdownResponse>> GetForDropdownAsync(CancellationToken ct = default);
+        Task<IEnumerable<SupplierProductResponse>> GetSupplierProductsAsync(int supplierId, CancellationToken ct = default);
+        Task UpdateSupplierProductsAsync(int supplierId, List<int> productIds, UserContext user, CancellationToken ct = default);
     }
+
+    public record SupplierProductResponse(
+        int ProductId,
+        string Sku,
+        string Name,
+        string Unit,
+        decimal? LastUnitPrice,
+        string? LastBatchNumber,
+        DateTimeOffset? LastPurchasedUtc);
 }

@@ -102,6 +102,78 @@ namespace Inventory.Infrastructure.Services
                 .ToListAsync(ct);
         }
 
+        public async Task<IEnumerable<SupplierProductResponse>> GetSupplierProductsAsync(int supplierId, CancellationToken ct = default)
+        {
+            var supplier = await _db.Suppliers
+                .AsNoTracking()
+                .Include(s => s.Products)
+                .FirstOrDefaultAsync(s => s.Id == supplierId, ct);
+
+            if (supplier == null) return Enumerable.Empty<SupplierProductResponse>();
+
+            var productIds = supplier.Products.Select(p => p.Id).ToList();
+
+            // Get last PO entry for these products from this supplier
+            var lastPurchases = await _db.PurchaseOrderLines
+                .AsNoTracking()
+                .Include(l => l.PurchaseOrder)
+                .Where(l => l.PurchaseOrder!.SupplierId == supplierId && productIds.Contains(l.ProductId))
+                .GroupBy(l => l.ProductId)
+                .Select(g => new
+                {
+                    ProductId = g.Key,
+                    LastLine = g.OrderByDescending(l => l.PurchaseOrder!.CreatedUtc).FirstOrDefault()
+                })
+                .ToListAsync(ct); // Materialize first to simplify dictionary creation
+
+            var historyMap = lastPurchases.ToDictionary(x => x.ProductId, x => x.LastLine);
+
+            return supplier.Products.Select(p =>
+            {
+                var hasHistory = historyMap.TryGetValue(p.Id, out var last) && last != null;
+                return new SupplierProductResponse(
+                    p.Id,
+                    p.Sku,
+                    p.Name,
+                    p.Unit,
+                    hasHistory ? last!.UnitPrice : null,
+                    hasHistory ? last!.BatchNumber : null,
+                    hasHistory ? last!.PurchaseOrder!.CreatedUtc : null
+                );
+            });
+        }
+
+        public async Task UpdateSupplierProductsAsync(int supplierId, List<int> productIds, UserContext user, CancellationToken ct = default)
+        {
+            var supplier = await _db.Suppliers
+                .Include(s => s.Products)
+                .FirstOrDefaultAsync(s => s.Id == supplierId, ct);
+
+            if (supplier == null) throw new NotFoundException($"Supplier {supplierId} not found.");
+
+            // Get the products to be associated
+            var productsToAdd = await _db.Products
+                .Where(p => productIds.Contains(p.Id))
+                .ToListAsync(ct);
+
+            // Update collection
+            // We want to keep the collection instance if possible, or just clear and add
+            // For simple many-to-many in EF Core, clearing and re-adding works but deletes/inserts into join table.
+            
+            supplier.Products.Clear();
+            foreach (var p in productsToAdd)
+            {
+                supplier.Products.Add(p);
+            }
+
+            await _db.SaveChangesAsync(ct);
+            
+            // Log update? 
+            // Since it's a relation change, tracking it in generic AuditLog might be tricky without custom handling.
+            // For now, we'll skip detailed relation auditing or log a generic update.
+            await _auditWriter.LogUpdateAsync<Supplier>(supplierId, user, null, new { ProductCount = productsToAdd.Count }, ct);
+        }
+
         private static SupplierResponse MapToResponse(Supplier s)
         {
             return new SupplierResponse(

@@ -92,19 +92,13 @@ namespace Inventory.Infrastructure.Services
 
         public async Task<SupplierBalanceResponseDto> GetSupplierBalanceAsync(int supplierId, CancellationToken ct = default)
         {
-            var supplier = await _db.Suppliers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Id == supplierId, ct);
-
-            if (supplier is null)
-            {
-                throw new InvalidOperationException($"Supplier with id {supplierId} was not found.");
-            }
+            var supplier = await _db.Suppliers.AsNoTracking().FirstOrDefaultAsync(s => s.Id == supplierId, ct);
+            if (supplier is null) throw new NotFoundException($"Supplier {supplierId} not found.");
 
             var totalOrders = await _db.PurchaseOrders
                 .AsNoTracking()
                 .Where(po => po.SupplierId == supplierId && po.Status != PurchaseOrderStatus.Cancelled)
-                .SumAsync(po => (decimal?)po.TotalAmount, ct) ?? 0m;
+                .SumAsync(po => (decimal?)po.TotalAmount - (decimal?)po.RefundedAmount, ct) ?? 0m;
 
             var totalPayments = await _db.FinancialTransactions
                 .AsNoTracking()

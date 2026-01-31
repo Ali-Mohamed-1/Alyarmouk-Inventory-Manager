@@ -61,5 +61,11 @@ namespace Inventory.Application.Abstractions
         /// </summary>
         Task UpdatePaymentInfoAsync(long orderId, UpdateSalesOrderPaymentRequest req, UserContext user, CancellationToken ct = default);
 
+        /// <summary>
+        /// Processes a refund for a completed sales order.
+        /// Reverses revenue, COGS, and restores inventory.
+        /// </summary>
+        Task RefundAsync(RefundSalesOrderRequest req, UserContext user, CancellationToken ct = default);
+
     }
 }
