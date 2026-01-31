@@ -130,29 +130,6 @@ namespace Inventory.Infrastructure.Services
                 _db.InventoryTransactions.Add(inventoryTransaction);
                 await _db.SaveChangesAsync(ct); // Save to get the ID
 
-                // Create financial transaction for money flow
-                // Receive: Expense (money going out to buy stock)
-                // Issue: Expense (cost of goods sold)
-                if (req.Type == InventoryTransactionType.Receive || req.Type == InventoryTransactionType.Issue)
-                {
-                    var financialTransaction = new FinancialTransaction
-                    {
-                        Type = FinancialTransactionType.Expense, // Money going out
-                        Amount = totalCost,
-                        InventoryTransactionId = inventoryTransaction.Id,
-                        ProductId = req.ProductId,
-                        CustomerId = req.CustomerId,
-                        TimestampUtc = DateTimeOffset.UtcNow,
-                        UserId = user.UserId,
-                        UserDisplayName = user.UserDisplayName,
-                        Note = req.Type == InventoryTransactionType.Receive 
-                            ? $"Stock received: {product.Name}" 
-                            : $"Stock issued (COGS): {product.Name}"
-                    };
-
-                    _db.FinancialTransactions.Add(financialTransaction);
-                }
-
                 await _db.SaveChangesAsync(ct);
 
                 // AUDIT LOG: Record the transaction creation

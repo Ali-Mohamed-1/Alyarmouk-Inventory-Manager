@@ -5,6 +5,7 @@
     using Inventory.Application.DTOs;
     using Inventory.Application.DTOs.PurchaseOrder;
     using Inventory.Application.DTOs.SalesOrder;
+    using Inventory.Application.DTOs.StockSnapshot;
     using Inventory.Application.DTOs.Transaction;
     using Inventory.Domain.Entities;
     using Inventory.Infrastructure.Data;
@@ -34,10 +35,11 @@
 
                 // Mock Audit Writer for now since we don't need to test it
                 var auditMock = new MockAuditLogWriter();
-                var invTxMock = new MockInventoryTransactionServices();
+                var invServicesMock = new MockInventoryServices();
+                var finServicesMock = new MockFinancialServices();
 
-                _salesServices = new SalesOrderServices(_db, auditMock, invTxMock);
-                _purchaseServices = new PurchaseOrderServices(_db, auditMock);
+                _salesServices = new SalesOrderServices(_db, auditMock, invServicesMock, finServicesMock);
+                _purchaseServices = new PurchaseOrderServices(_db, auditMock, invServicesMock, finServicesMock);
 
                 _user = new UserContext("test-user", "Test User");
 
@@ -441,5 +443,30 @@
             public Task<IReadOnlyList<InventoryTransactionResponseDto>> GetRecentAsync(int take = 50, CancellationToken ct = default) => Task.FromResult((IReadOnlyList<InventoryTransactionResponseDto>)new List<InventoryTransactionResponseDto>());
             public Task<IReadOnlyList<InventoryTransactionResponseDto>> GetByProductAsync(int productId, CancellationToken ct = default) => Task.FromResult((IReadOnlyList<InventoryTransactionResponseDto>)new List<InventoryTransactionResponseDto>());
             public Task<IReadOnlyList<InventoryTransactionResponseDto>> GetTransactionsByCustomerAsync(int customerId, int take = 100, CancellationToken ct = default) => Task.FromResult((IReadOnlyList<InventoryTransactionResponseDto>)new List<InventoryTransactionResponseDto>());
+        }
+
+        public class MockInventoryServices : IInventoryServices
+        {
+            public Task<decimal> GetOnHandAsync(int productId, CancellationToken ct = default) => Task.FromResult(1000m);
+            public Task<StockSnapshotResponseDto?> GetStockAsync(int productId, CancellationToken ct = default) => Task.FromResult<StockSnapshotResponseDto?>(null);
+            public Task<IReadOnlyList<StockSnapshotResponseDto>> GetAllStockAsync(CancellationToken ct = default) => Task.FromResult((IReadOnlyList<StockSnapshotResponseDto>)new List<StockSnapshotResponseDto>());
+            public Task ReceiveAsync(StockReceiveRequest req, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task IssueAsync(StockIssueRequest req, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task UpdateStockAsync(UpdateStockRequest req, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task<long> CreateTransactionAsync(CreateInventoryTransactionRequest req, UserContext user, CancellationToken ct = default) => Task.FromResult(0L);
+            public Task<IReadOnlyList<InventoryTransactionResponseDto>> GetRecentTransactionsAsync(int take = 50, CancellationToken ct = default) => Task.FromResult((IReadOnlyList<InventoryTransactionResponseDto>)new List<InventoryTransactionResponseDto>());
+            public Task<IReadOnlyList<InventoryTransactionResponseDto>> GetProductTransactionsAsync(int productId, CancellationToken ct = default) => Task.FromResult((IReadOnlyList<InventoryTransactionResponseDto>)new List<InventoryTransactionResponseDto>());
+            public Task ProcessPurchaseOrderStockAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task ReversePurchaseOrderStockAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task ReverseSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+        }
+
+        public class MockFinancialServices : IFinancialServices
+        {
+            public Task ProcessSalesPaymentAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task ProcessPurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task ReverseSalesPaymentAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task ReversePurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
         }
     }

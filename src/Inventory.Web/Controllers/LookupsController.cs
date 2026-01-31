@@ -11,17 +11,20 @@ public sealed class LookupsController : Controller
     private readonly ICategoryServices _categories;
     private readonly IProductServices _products;
     private readonly ICustomerServices _customers;
+    private readonly ISupplierServices _suppliers;
     private readonly ISalesOrderServices _salesOrders;
 
     public LookupsController(
         ICategoryServices categories,
         IProductServices products,
         ICustomerServices customers,
+        ISupplierServices suppliers,
         ISalesOrderServices salesOrders)
     {
         _categories = categories;
         _products = products;
         _customers = customers;
+        _suppliers = suppliers;
         _salesOrders = salesOrders;
     }
 
@@ -56,6 +59,20 @@ public sealed class LookupsController : Controller
     public async Task<IActionResult> RecentSalesOrders(CancellationToken cancellationToken)
     {
         var items = await _salesOrders.GetRecentAsync(ct: cancellationToken);
+        return Json(items);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Suppliers(CancellationToken cancellationToken)
+    {
+        var items = await _suppliers.GetForDropdownAsync(cancellationToken);
+        return Json(items);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> SupplierProducts(int supplierId, CancellationToken cancellationToken)
+    {
+        var items = await _suppliers.GetSupplierProductsAsync(supplierId, cancellationToken);
         return Json(items);
     }
 }

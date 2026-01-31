@@ -20,16 +20,19 @@ namespace Inventory.Infrastructure.Services
         private const int MaxTake = 1000;
         private readonly AppDbContext _db;
         private readonly IAuditLogWriter _auditWriter;
-        private readonly IInventoryTransactionServices _inventoryTxServices;
+        private readonly IInventoryServices _inventoryServices;
+        private readonly IFinancialServices _financialServices;
 
         public SalesOrderServices(
             AppDbContext db,
             IAuditLogWriter auditWriter,
-            IInventoryTransactionServices inventoryTxServices)
+            IInventoryServices inventoryServices,
+            IFinancialServices financialServices)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
             _auditWriter = auditWriter ?? throw new ArgumentNullException(nameof(auditWriter));
-            _inventoryTxServices = inventoryTxServices ?? throw new ArgumentNullException(nameof(inventoryTxServices));
+            _inventoryServices = inventoryServices ?? throw new ArgumentNullException(nameof(inventoryServices));
+            _financialServices = financialServices ?? throw new ArgumentNullException(nameof(financialServices));
         }
 
         public async Task<long> CreateAsync(CreateSalesOrderRequest req, UserContext user, CancellationToken ct = default)
@@ -525,28 +528,20 @@ namespace Inventory.Infrastructure.Services
             try
             {
                 var previousStatus = salesOrder.Status;
-                
-                // 1. If moving FROM Done -> Restore inventory
+
+                // 1. Transitioning OUT of Done -> Reverse effects
                 if (previousStatus == SalesOrderStatus.Done)
                 {
-                    await ReverseInventoryAndFinancialsAsync(salesOrder, user, ct);
+                    await _inventoryServices.ReverseSalesOrderStockAsync(salesOrder.Id, user, ct);
                 }
 
-                // 2. Update status
+                // 2. Set new status
                 salesOrder.Status = req.Status;
 
-                // 3. If moving TO Done -> Deduct inventory
+                // 3. Transitioning INTO Done -> Apply effects
                 if (req.Status == SalesOrderStatus.Done)
                 {
-                    await ApplyInventoryAndFinancialsAsync(salesOrder, user, ct);
-                    
-                    // Also mark as Paid if suitable
-                    if (salesOrder.PaymentMethod == PaymentMethod.Cash || 
-                        salesOrder.PaymentMethod == PaymentMethod.BankTransfer || 
-                        (salesOrder.CheckCashed == true))
-                    {
-                        salesOrder.PaymentStatus = PaymentStatus.Paid;
-                    }
+                    await _inventoryServices.ProcessSalesOrderStockAsync(salesOrder.Id, user, ct);
                 }
 
                 await _db.SaveChangesAsync(ct);
@@ -570,114 +565,46 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
-        private async Task ApplyInventoryAndFinancialsAsync(SalesOrder salesOrder, UserContext user, CancellationToken ct)
+        public async Task UpdatePaymentStatusAsync(long orderId, PaymentStatus status, UserContext user, CancellationToken ct = default)
         {
-            foreach (var line in salesOrder.Lines)
+            ValidateUser(user);
+
+            var salesOrder = await _db.SalesOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            if (salesOrder is null)
+                throw new NotFoundException($"Sales order id {orderId} was not found.");
+
+            if (salesOrder.PaymentStatus == status)
+                return;
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
             {
-                // Check stock (including batch if specified)
-                if (line.ProductBatchId.HasValue)
+                var previousStatus = salesOrder.PaymentStatus;
+
+                // 1. Transitioning OUT of Paid -> Reverse Effects
+                if (previousStatus == PaymentStatus.Paid)
                 {
-                    var batch = await _db.ProductBatches.AsNoTracking().FirstOrDefaultAsync(b => b.Id == line.ProductBatchId.Value, ct);
-                    if (batch == null || batch.OnHand < line.Quantity)
-                    {
-                        throw new ValidationException($"Insufficient stock in batch {batch?.BatchNumber ?? line.BatchNumber} for product {line.ProductNameSnapshot}. Available: {batch?.OnHand ?? 0}, Requested: {line.Quantity}");
-                    }
-                }
-                else
-                {
-                    var snapshot = await _db.StockSnapshots.AsNoTracking().FirstOrDefaultAsync(s => s.ProductId == line.ProductId, ct);
-                    if (snapshot == null || snapshot.OnHand < line.Quantity)
-                    {
-                        throw new ValidationException($"Insufficient stock for product {line.ProductNameSnapshot}. Available: {snapshot?.OnHand ?? 0}, Requested: {line.Quantity}");
-                    }
+                    await _financialServices.ReverseSalesPaymentAsync(salesOrder.Id, user, ct);
                 }
 
-                // Create Inventory Transaction (Issue)
-                // This will also create the COGS financial transaction automatically
-                var txReq = new CreateInventoryTransactionRequest
-                {
-                    ProductId = line.ProductId,
-                    Quantity = line.Quantity,
-                    Type = InventoryTransactionType.Issue,
-                    BatchNumber = line.BatchNumber,
-                    ProductBatchId = line.ProductBatchId,
-                    CustomerId = salesOrder.CustomerId,
-                    Note = $"Sales Order {salesOrder.OrderNumber}"
-                };
+                // 2. Set new status
+                salesOrder.PaymentStatus = status;
 
-                await _inventoryTxServices.CreateAsync(txReq, user, ct);
-
-                // Create Revenue Financial Transaction
-                var revenueAmount = line.UnitPrice * line.Quantity;
-                var revenueTx = new FinancialTransaction
+                // 3. Transitioning INTO Paid -> Apply Effects
+                if (status == PaymentStatus.Paid)
                 {
-                    Type = FinancialTransactionType.Revenue,
-                    Amount = revenueAmount,
-                    SalesOrderId = salesOrder.Id,
-                    ProductId = line.ProductId,
-                    CustomerId = salesOrder.CustomerId,
-                    TimestampUtc = DateTimeOffset.UtcNow,
-                    UserId = user.UserId,
-                    UserDisplayName = user.UserDisplayName,
-                    Note = $"Revenue from Sales Order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
-                };
-                _db.FinancialTransactions.Add(revenueTx);
+                    await _financialServices.ProcessSalesPaymentAsync(salesOrder.Id, user, ct);
+                }
+
+                await _db.SaveChangesAsync(ct);
+                await _auditWriter.LogUpdateAsync<SalesOrder>(orderId, user, new { PaymentStatus = previousStatus }, new { PaymentStatus = status }, ct);
+
+                await transaction.CommitAsync(ct);
             }
-        }
-
-        private async Task ReverseInventoryAndFinancialsAsync(SalesOrder salesOrder, UserContext user, CancellationToken ct)
-        {
-            foreach (var line in salesOrder.Lines)
+            catch (Exception ex)
             {
-                // Create Inventory Transaction (Adjust positive) to restore stock
-                // We use Adjust to skip automatic COGS creation in InventoryTransactionServices
-                var txReq = new CreateInventoryTransactionRequest
-                {
-                    ProductId = line.ProductId,
-                    Quantity = line.Quantity, // Positive delta for Adjust
-                    Type = InventoryTransactionType.Adjust,
-                    BatchNumber = line.BatchNumber,
-                    ProductBatchId = line.ProductBatchId,
-                    CustomerId = salesOrder.CustomerId,
-                    Note = $"Reversal of Sales Order {salesOrder.OrderNumber}"
-                };
-
-                await _inventoryTxServices.CreateAsync(txReq, user, ct);
-
-                // Reverse Revenue -> Create an Expense transaction
-                var revenueAmount = line.UnitPrice * line.Quantity;
-                var revenueReversalTx = new FinancialTransaction
-                {
-                    Type = FinancialTransactionType.Expense,
-                    Amount = revenueAmount,
-                    SalesOrderId = salesOrder.Id,
-                    ProductId = line.ProductId,
-                    CustomerId = salesOrder.CustomerId,
-                    TimestampUtc = DateTimeOffset.UtcNow,
-                    UserId = user.UserId,
-                    UserDisplayName = user.UserDisplayName,
-                    Note = $"Revenue Reversal for Sales Order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
-                };
-                _db.FinancialTransactions.Add(revenueReversalTx);
-
-                // Reverse COGS -> Create a Revenue transaction
-                // Need to find product cost
-                var product = line.Product ?? await _db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == line.ProductId, ct);
-                var cogsAmount = (product?.Cost ?? 0) * line.Quantity;
-                
-                var cogsReversalTx = new FinancialTransaction
-                {
-                    Type = FinancialTransactionType.Revenue,
-                    Amount = cogsAmount,
-                    SalesOrderId = salesOrder.Id,
-                    ProductId = line.ProductId,
-                    CustomerId = salesOrder.CustomerId,
-                    TimestampUtc = DateTimeOffset.UtcNow,
-                    UserId = user.UserId,
-                    UserDisplayName = user.UserDisplayName,
-                    Note = $"COGS Reversal for Sales Order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
-                };
-                _db.FinancialTransactions.Add(cogsReversalTx);
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not update payment status.", ex);
             }
         }
 
@@ -897,65 +824,42 @@ namespace Inventory.Infrastructure.Services
 
                 var oldPaymentStatus = salesOrder.PaymentStatus;
                 var oldCheckCashed = salesOrder.CheckCashed;
-                salesOrder.PaymentStatus = req.PaymentStatus;
-                
+
                 if (salesOrder.PaymentMethod == PaymentMethod.Check)
                 {
                     salesOrder.CheckReceived = req.CheckReceived;
                     salesOrder.CheckReceivedDate = req.CheckReceivedDate;
 
-                    // If transitioning to Check Cashed, create revenue transactions
+                    // If transitioning to Check Cashed, process payment
                     if (req.CheckCashed == true && oldCheckCashed != true)
                     {
-                        foreach (var line in salesOrder.Lines)
-                        {
-                            var revenueAmount = line.UnitPrice * line.Quantity;
-                            var revenueTransaction = new FinancialTransaction
-                            {
-                                Type = FinancialTransactionType.Revenue,
-                                Amount = revenueAmount,
-                                SalesOrderId = salesOrder.Id,
-                                ProductId = line.ProductId,
-                                CustomerId = salesOrder.CustomerId,
-                                TimestampUtc = DateTimeOffset.UtcNow,
-                                UserId = user.UserId,
-                                UserDisplayName = user.UserDisplayName,
-                                Note = $"Revenue from Check Cashing - Order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
-                            };
-                            _db.FinancialTransactions.Add(revenueTransaction);
-                        }
-                        salesOrder.PaymentStatus = PaymentStatus.Paid;
+                        await _financialServices.ProcessSalesPaymentAsync(salesOrder.Id, user, ct);
                     }
 
                     salesOrder.CheckCashed = req.CheckCashed;
                     salesOrder.CheckCashedDate = req.CheckCashedDate;
                 }
-
-                if (salesOrder.PaymentMethod == PaymentMethod.BankTransfer)
+                else if (salesOrder.PaymentMethod == PaymentMethod.BankTransfer)
                 {
-                    // If transitioning to Paid via Bank Transfer, record revenue
+                    // If transitioning to Paid via Bank Transfer, process payment
                     if (req.PaymentStatus == PaymentStatus.Paid && oldPaymentStatus != PaymentStatus.Paid)
                     {
-                        foreach (var line in salesOrder.Lines)
-                        {
-                            var revenueAmount = line.UnitPrice * line.Quantity;
-                            var revenueTransaction = new FinancialTransaction
-                            {
-                                Type = FinancialTransactionType.Revenue,
-                                Amount = revenueAmount,
-                                SalesOrderId = salesOrder.Id,
-                                ProductId = line.ProductId,
-                                CustomerId = salesOrder.CustomerId,
-                                TimestampUtc = DateTimeOffset.UtcNow,
-                                UserId = user.UserId,
-                                UserDisplayName = user.UserDisplayName,
-                                Note = $"Revenue from Bank Transfer - Order {salesOrder.OrderNumber} - {line.ProductNameSnapshot}"
-                            };
-                            _db.FinancialTransactions.Add(revenueTransaction);
-                        }
+                        await _financialServices.ProcessSalesPaymentAsync(salesOrder.Id, user, ct);
                     }
                     salesOrder.TransferId = req.TransferId;
                 }
+                else if (req.PaymentStatus == PaymentStatus.Paid && oldPaymentStatus != PaymentStatus.Paid)
+                {
+                    // For Cash or other methods
+                    await _financialServices.ProcessSalesPaymentAsync(salesOrder.Id, user, ct);
+                }
+                // Handle reversal if status changed from Paid to something else
+                else if (req.PaymentStatus != PaymentStatus.Paid && oldPaymentStatus == PaymentStatus.Paid)
+                {
+                    await _financialServices.ReverseSalesPaymentAsync(salesOrder.Id, user, ct);
+                }
+
+                salesOrder.PaymentStatus = req.PaymentStatus;
 
                 if (!string.IsNullOrWhiteSpace(req.Note))
                 {
@@ -1013,6 +917,10 @@ namespace Inventory.Infrastructure.Services
             if (salesOrder.Status != SalesOrderStatus.Done)
                 throw new ValidationException("Only completed sales orders can be refunded.");
 
+            // Validate payment status
+            if (salesOrder.PaymentStatus != PaymentStatus.Paid)
+                throw new ValidationException("Only paid sales orders can be refunded.");
+
             // Validate refund amount doesn't exceed available amount
             var availableToRefund = salesOrder.TotalAmount - salesOrder.RefundedAmount;
             if (req.Amount > availableToRefund)
@@ -1023,6 +931,20 @@ namespace Inventory.Infrastructure.Services
             {
                 var beforeRefundedAmount = salesOrder.RefundedAmount;
                 salesOrder.RefundedAmount += req.Amount;
+
+                // Create RefundTransaction audit record
+                var refundTransaction = new RefundTransaction
+                {
+                    Type = RefundType.SalesOrder,
+                    SalesOrderId = salesOrder.Id,
+                    Amount = req.Amount,
+                    Reason = req.Reason,
+                    ProcessedUtc = DateTimeOffset.UtcNow,
+                    ProcessedByUserId = user.UserId,
+                    ProcessedByUserDisplayName = user.UserDisplayName,
+                    Note = $"Refund processed for Sales Order {salesOrder.OrderNumber}"
+                };
+                _db.RefundTransactions.Add(refundTransaction);
 
                 // Determine refund type
                 if (req.LineItems != null && req.LineItems.Any())
@@ -1089,7 +1011,7 @@ namespace Inventory.Infrastructure.Services
                     Note = $"Refund for Sales Order {salesOrder.OrderNumber} - {orderLine.ProductNameSnapshot}"
                 };
 
-                await _inventoryTxServices.CreateAsync(adjustReq, user, ct);
+                await _inventoryServices.CreateTransactionAsync(adjustReq, user, ct);
 
                 // Reverse Revenue (create Expense)
                 var revenueAmount = orderLine.UnitPrice * refundItem.Quantity;
@@ -1132,8 +1054,11 @@ namespace Inventory.Infrastructure.Services
         /// </summary>
         private async Task ProcessFullRefundAsync(SalesOrder salesOrder, UserContext user, CancellationToken ct)
         {
-            // Use existing reversal logic
-            await ReverseInventoryAndFinancialsAsync(salesOrder, user, ct);
+            // Reverse the entire sales order stock
+            await _inventoryServices.ReverseSalesOrderStockAsync(salesOrder.Id, user, ct);
+
+            // Reverse financial effects (revenue)
+            await _financialServices.ReverseSalesPaymentAsync(salesOrder.Id, user, ct);
         }
 
         #region Helper Methods

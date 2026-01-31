@@ -7,6 +7,7 @@ using Inventory.Application.Abstractions;
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.StockSnapshot;
 using Inventory.Application.DTOs.Transaction;
+using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -116,6 +117,163 @@ namespace Inventory.Infrastructure.Services
         public async Task<IReadOnlyList<InventoryTransactionResponseDto>> GetProductTransactionsAsync(int productId, CancellationToken ct = default)
         {
             return await _transactionServices.GetByProductAsync(productId, ct);
+        }
+
+        public async Task ProcessPurchaseOrderStockAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default)
+        {
+            var order = await _db.PurchaseOrders
+                .Include(o => o.Lines)
+                .FirstOrDefaultAsync(o => o.Id == purchaseOrderId, ct);
+            if (order == null) throw new NotFoundException($"Purchase order {purchaseOrderId} not found.");
+
+            foreach (var line in order.Lines)
+            {
+                // 1. Ensure Batch exists if batch number is provided
+                if (!string.IsNullOrEmpty(line.BatchNumber))
+                {
+                    var batch = await _db.ProductBatches
+                        .FirstOrDefaultAsync(b => b.ProductId == line.ProductId && b.BatchNumber == line.BatchNumber, ct);
+
+                    if (batch == null)
+                    {
+                        var product = await _db.Products.FindAsync(new object[] { line.ProductId }, ct);
+                        batch = new ProductBatch
+                        {
+                            ProductId = line.ProductId,
+                            BatchNumber = line.BatchNumber,
+                            UnitCost = line.UnitPrice,
+                            UnitPrice = product?.Price ?? 0,
+                            UpdatedUtc = DateTimeOffset.UtcNow
+                        };
+                        _db.ProductBatches.Add(batch);
+                    }
+                    else
+                    {
+                        batch.UnitCost = line.UnitPrice;
+                        batch.UpdatedUtc = DateTimeOffset.UtcNow;
+                    }
+                }
+
+                // 2. Weighted Average Cost calculation
+                var productToUpdate = await _db.Products.FindAsync(new object[] { line.ProductId }, ct);
+                if (productToUpdate != null)
+                {
+                    var snapshot = await _db.StockSnapshots
+                        .FirstOrDefaultAsync(s => s.ProductId == line.ProductId, ct);
+
+                    decimal oldCost = productToUpdate.Cost;
+                    decimal newCost;
+
+                    if (snapshot is null || snapshot.OnHand == 0)
+                    {
+                        newCost = line.UnitPrice;
+                    }
+                    else
+                    {
+                        decimal oldStockValue = snapshot.OnHand * productToUpdate.Cost;
+                        decimal newPurchaseValue = line.Quantity * line.UnitPrice;
+                        decimal totalValue = oldStockValue + newPurchaseValue;
+                        decimal totalQuantity = snapshot.OnHand + line.Quantity;
+
+                        newCost = Math.Round(totalValue / totalQuantity, 2, MidpointRounding.AwayFromZero);
+                    }
+
+                    productToUpdate.Cost = newCost;
+                    _db.Products.Update(productToUpdate);
+                }
+
+                // 3. Create Inventory Transaction (Receive)
+                var txReq = new CreateInventoryTransactionRequest
+                {
+                    ProductId = line.ProductId,
+                    Quantity = line.Quantity,
+                    Type = InventoryTransactionType.Receive,
+                    BatchNumber = line.BatchNumber,
+                    CustomerId = 0, // Not applicable for PO
+                    Note = $"Purchase Order {order.OrderNumber}"
+                };
+
+                await _transactionServices.CreateAsync(txReq, user, ct);
+            }
+
+            await _db.SaveChangesAsync(ct);
+        }
+
+        public async Task ReversePurchaseOrderStockAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default)
+        {
+            var order = await _db.PurchaseOrders
+                .Include(o => o.Lines)
+                .FirstOrDefaultAsync(o => o.Id == purchaseOrderId, ct);
+            if (order == null) throw new NotFoundException($"Purchase order {purchaseOrderId} not found.");
+
+            foreach (var line in order.Lines)
+            {
+                // Create Inventory Transaction (Issue) to reverse Receive
+                var txReq = new CreateInventoryTransactionRequest
+                {
+                    ProductId = line.ProductId,
+                    Quantity = line.Quantity,
+                    Type = InventoryTransactionType.Issue,
+                    BatchNumber = line.BatchNumber,
+                    Note = $"Reversal of Purchase Order {order.OrderNumber}"
+                };
+
+                await _transactionServices.CreateAsync(txReq, user, ct);
+            }
+
+            await _db.SaveChangesAsync(ct);
+        }
+
+        public async Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default)
+        {
+            var order = await _db.SalesOrders
+                .Include(o => o.Lines)
+                .FirstOrDefaultAsync(o => o.Id == salesOrderId, ct);
+            if (order == null) throw new NotFoundException($"Sales order {salesOrderId} not found.");
+
+            foreach (var line in order.Lines)
+            {
+                var txReq = new CreateInventoryTransactionRequest
+                {
+                    ProductId = line.ProductId,
+                    Quantity = line.Quantity,
+                    Type = InventoryTransactionType.Issue,
+                    BatchNumber = line.BatchNumber,
+                    ProductBatchId = line.ProductBatchId,
+                    CustomerId = order.CustomerId,
+                    Note = $"Sales Order {order.OrderNumber}"
+                };
+
+                await _transactionServices.CreateAsync(txReq, user, ct);
+            }
+
+            await _db.SaveChangesAsync(ct);
+        }
+
+        public async Task ReverseSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default)
+        {
+            var order = await _db.SalesOrders
+                .Include(o => o.Lines)
+                .FirstOrDefaultAsync(o => o.Id == salesOrderId, ct);
+            if (order == null) throw new NotFoundException($"Sales order {salesOrderId} not found.");
+
+            foreach (var line in order.Lines)
+            {
+                var txReq = new CreateInventoryTransactionRequest
+                {
+                    ProductId = line.ProductId,
+                    Quantity = line.Quantity,
+                    Type = InventoryTransactionType.Receive, // Use Receive to put stock back
+                    BatchNumber = line.BatchNumber,
+                    ProductBatchId = line.ProductBatchId,
+                    CustomerId = order.CustomerId,
+                    Note = $"Reversal of Sales Order {order.OrderNumber}"
+                };
+
+                await _transactionServices.CreateAsync(txReq, user, ct);
+            }
+
+            await _db.SaveChangesAsync(ct);
         }
     }
 }

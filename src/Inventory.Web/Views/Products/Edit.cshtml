@@ -9,7 +9,7 @@
             <div class="neo-card p-0 overflow-hidden">
                 <div class="p-4 bg-black text-white d-flex justify-content-between align-items-center">
                     <h3 class="mb-0 fw-black text-uppercase">Modify Product: <span class="text-primary">@Model.Name</span></h3>
-                    <a asp-action="Index" class="neo-btn neo-btn-danger btn-sm text-uppercase">BACK TO CATALOG</a>
+                    <a asp-controller="Dashboard" asp-action="Index" class="neo-btn neo-btn-danger btn-sm text-uppercase">BACK TO DASHBOARD</a>
                 </div>
                 <div class="p-5" style="background: white;">
                     <form asp-action="Edit" asp-route-id="@Model.Id" method="post">
@@ -71,7 +71,7 @@
                             <div class="col-12 mt-5 pt-4 border-top border-2">
                                 <div class="d-flex gap-3">
                                     <button type="submit" class="neo-btn neo-btn-primary px-5">UPDATE PERMANENT RECORD</button>
-                                    <a asp-action="Index" class="neo-btn">ABORT CHANGES</a>
+                                    <a asp-controller="Dashboard" asp-action="Index" class="neo-btn">CANCEL</a>
                                 </div>
                             </div>
                         </div>

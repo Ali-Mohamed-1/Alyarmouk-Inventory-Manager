@@ -18,13 +18,19 @@ namespace Inventory.Infrastructure.Services
     {
         private readonly AppDbContext _db;
         private readonly IAuditLogWriter _auditWriter;
+        private readonly IInventoryServices _inventoryServices;
+        private readonly IFinancialServices _financialServices;
 
         public PurchaseOrderServices(
             AppDbContext db,
-            IAuditLogWriter auditWriter)
+            IAuditLogWriter auditWriter,
+            IInventoryServices inventoryServices,
+            IFinancialServices financialServices)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
             _auditWriter = auditWriter ?? throw new ArgumentNullException(nameof(auditWriter));
+            _inventoryServices = inventoryServices ?? throw new ArgumentNullException(nameof(inventoryServices));
+            _financialServices = financialServices ?? throw new ArgumentNullException(nameof(financialServices));
         }
 
         public async Task<IEnumerable<PurchaseOrderResponse>> GetRecentAsync(int count = 10, CancellationToken ct = default)
@@ -221,116 +227,27 @@ namespace Inventory.Infrastructure.Services
                     };
 
                     _db.PurchaseOrderLines.Add(poLine);
-
-                    if (req.ConnectToReceiveStock)
-                    {
-                        // ============================================================
-                        // ENSURE PRODUCT BATCH EXISTS
-                        // ============================================================
-                        if (!string.IsNullOrEmpty(batchNumber))
-                        {
-                            var batch = await _db.ProductBatches
-                                .FirstOrDefaultAsync(b => b.ProductId == productId && b.BatchNumber == batchNumber, ct);
-
-                            if (batch == null)
-                            {
-                                batch = new ProductBatch
-                                {
-                                    ProductId = productId,
-                                    BatchNumber = batchNumber,
-                                    UnitCost = unitPrice,
-                                    UnitPrice = product.Price, // Use current product price as default
-                                    UpdatedUtc = DateTimeOffset.UtcNow
-                                };
-                                _db.ProductBatches.Add(batch);
-                            }
-                            else
-                            {
-                                // Update cost if necessary? Or just notes
-                                batch.UnitCost = unitPrice;
-                                batch.UpdatedUtc = DateTimeOffset.UtcNow;
-                            }
-                        }
-
-                        // ============================================================
-                        // UPDATE PRODUCT COST using WEIGHTED AVERAGE
-                        // ============================================================
-
-                        var snapshot = await _db.StockSnapshots
-                            .FirstOrDefaultAsync(s => s.ProductId == productId, ct);
-
-                        decimal oldCost = product.Cost;
-                        decimal newCost;
-
-                        if (snapshot is null || snapshot.OnHand == 0)
-                        {
-                            // First purchase OR zero stock - use purchase price as cost
-                            newCost = unitPrice;
-
-                            // Create snapshot if doesn't exist
-                            if (snapshot is null)
-                            {
-                                snapshot = new StockSnapshot
-                                {
-                                    ProductId = productId,
-                                    OnHand = 0,
-                                    Reserved = 0
-                                };
-                                _db.StockSnapshots.Add(snapshot);
-                            }
-                        }
-                        else
-                        {
-                            // Weighted Average Cost calculation
-                            // New Cost = (Old Stock Value + New Purchase Value) / (Old Stock + New Stock)
-                            decimal oldStockValue = snapshot.OnHand * product.Cost;
-                            decimal newPurchaseValue = quantity * unitPrice;
-                            decimal totalValue = oldStockValue + newPurchaseValue;
-                            decimal totalQuantity = snapshot.OnHand + quantity;
-
-                            newCost = Math.Round(totalValue / totalQuantity, 2, MidpointRounding.AwayFromZero);
-                        }
-
-                        // Update product cost
-                        product.Cost = newCost;
-                        _db.Products.Update(product);
-
-                        // Update stock quantity
-                        snapshot.OnHand += quantity;
-
-                        // Create Inventory Transaction (Receipt)
-                        var inventoryTransaction = new InventoryTransaction
-                        {
-                            ProductId = productId,
-                            QuantityDelta = quantity,
-                            UnitCost = newCost, // Use the newly calculated cost
-                            Type = InventoryTransactionType.Receive,
-                            TimestampUtc = DateTimeOffset.UtcNow,
-                            UserId = user.UserId,
-                            UserDisplayName = user.UserDisplayName,
-                            clientId = req.SupplierId,
-                            BatchNumber = batchNumber,
-                            Note = $"Purchase Order {orderNumber}"
-                        };
-                        _db.InventoryTransactions.Add(inventoryTransaction);
-
-                        // Log cost change in audit if cost changed
-                        if (oldCost != newCost)
-                        {
-                            await _auditWriter.LogUpdateAsync<Product>(
-                                product.Id,
-                                user,
-                                beforeState: new { Cost = oldCost },
-                                afterState: new { Cost = newCost },
-                                ct);
-                        }
-                    }
                 }
 
                 purchaseOrder.Subtotal = totalSubtotal;
                 purchaseOrder.VatAmount = totalVat;
                 purchaseOrder.ManufacturingTaxAmount = totalManTax;
                 purchaseOrder.TotalAmount = totalOrderAmount + req.ReceiptExpenses;
+
+                await _db.SaveChangesAsync(ct);
+
+                // Even if ConnectToReceiveStock is true, we should handle it via a separate call 
+                // to maintain "no effects on creation" if we want to be strict, or just call the service.
+                // The rule says "Stock must NOT be affected on: Order creation".
+                // I will set it to Draft always on creation to enforce this, or just let it stay Received but NOT trigger stock here.
+                // If I set it to Received but don't call the service, then stock won't be updated.
+                // If I want to follow "Transitioning into the triggering state applies effects", then creating it as Received SHOULD trigger it.
+                // But the rule explicitly says "Stock must NOT be affected on: Order creation".
+                // So I will force status to Draft or Pending if it was Received.
+                if (purchaseOrder.Status == PurchaseOrderStatus.Received)
+                {
+                    purchaseOrder.Status = PurchaseOrderStatus.Pending;
+                }
 
                 await _db.SaveChangesAsync(ct);
 
@@ -398,12 +315,38 @@ namespace Inventory.Infrastructure.Services
             var order = await _db.PurchaseOrders.FindAsync(new object[] { id }, ct);
             if (order == null) throw new NotFoundException($"Purchase order {id} not found.");
 
-            var before = new { order.Status };
-            order.Status = status;
+            if (order.Status == status) return; // Idempotent
 
-            await _db.SaveChangesAsync(ct);
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousStatus = order.Status;
 
-            await _auditWriter.LogUpdateAsync<PurchaseOrder>(id, user, before, new { Status = status }, ct);
+                // 1. Transitioning OUT of Received -> Reverse Effects
+                if (previousStatus == PurchaseOrderStatus.Received)
+                {
+                    await _inventoryServices.ReversePurchaseOrderStockAsync(order.Id, user, ct);
+                }
+
+                // 2. Set new status
+                order.Status = status;
+
+                // 3. Transitioning INTO Received -> Apply Effects
+                if (status == PurchaseOrderStatus.Received)
+                {
+                    await _inventoryServices.ProcessPurchaseOrderStockAsync(order.Id, user, ct);
+                }
+
+                await _db.SaveChangesAsync(ct);
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(id, user, new { Status = previousStatus }, new { Status = status }, ct);
+                
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
         }
 
         public async Task UpdatePaymentStatusAsync(long id, PurchasePaymentStatus status, UserContext user, CancellationToken ct = default)
@@ -415,54 +358,29 @@ namespace Inventory.Infrastructure.Services
 
             if (order.PaymentStatus == status) return;
 
-            var before = new { order.PaymentStatus };
             var oldStatus = order.PaymentStatus;
 
             // Use transaction to ensure money flow stays consistent
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
             {
+                // 1. Transitioning OUT of Paid -> Reverse effects
+                if (oldStatus == PurchasePaymentStatus.Paid)
+                {
+                    await _financialServices.ReversePurchasePaymentAsync(order.Id, user, ct);
+                }
+
+                // 2. Set new status (FinancialServices might have already set it, but we ensure consistency)
                 order.PaymentStatus = status;
 
+                // 3. Transitioning INTO Paid -> Apply effects
                 if (status == PurchasePaymentStatus.Paid)
                 {
-                    // Record payment: create an Expense transaction for the supplier
-                    decimal paymentAmount = order.TotalAmount - order.RefundedAmount;
-                    
-                    if (paymentAmount > 0)
-                    {
-                        var paymentTx = new FinancialTransaction
-                        {
-                            Type = FinancialTransactionType.Expense,
-                            Amount = paymentAmount,
-                            PurchaseOrderId = order.Id,
-                            SupplierId = order.SupplierId,
-                            TimestampUtc = DateTimeOffset.UtcNow,
-                            UserId = user.UserId,
-                            UserDisplayName = user.UserDisplayName,
-                            Note = $"Full Payment for Purchase Order {order.OrderNumber}"
-                        };
-                        _db.FinancialTransactions.Add(paymentTx);
-                    }
-                }
-                else if (status == PurchasePaymentStatus.Unpaid && oldStatus == PurchasePaymentStatus.Paid)
-                {
-                    // Reversal: Find and remove ONLY the auto-generated payment transaction for this order
-                    var existingTxs = await _db.FinancialTransactions
-                        .Where(t => t.PurchaseOrderId == order.Id && 
-                                    t.Type == FinancialTransactionType.Expense && 
-                                    t.Note != null && 
-                                    t.Note.Contains($"Payment for Purchase Order {order.OrderNumber}"))
-                        .ToListAsync(ct);
-                    
-                    if (existingTxs.Any())
-                    {
-                        _db.FinancialTransactions.RemoveRange(existingTxs);
-                    }
+                    await _financialServices.ProcessPurchasePaymentAsync(order.Id, user, ct);
                 }
 
                 await _db.SaveChangesAsync(ct);
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(id, user, before, new { PaymentStatus = status }, ct);
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(id, user, new { PaymentStatus = oldStatus }, new { PaymentStatus = status }, ct);
                 
                 await transaction.CommitAsync(ct);
             }
@@ -486,6 +404,14 @@ namespace Inventory.Infrastructure.Services
 
             if (order == null) throw new NotFoundException($"Purchase order {req.OrderId} not found.");
 
+            // Validate order status
+            if (order.Status != PurchaseOrderStatus.Received)
+                throw new ValidationException("Only received purchase orders can be refunded.");
+
+            // Validate payment status
+            if (order.PaymentStatus != PurchasePaymentStatus.Paid)
+                throw new ValidationException("Only paid purchase orders can be refunded.");
+
             if (order.RefundedAmount + req.Amount > order.TotalAmount)
                 throw new ValidationException("Total refunded amount cannot exceed the total order amount.");
 
@@ -495,30 +421,36 @@ namespace Inventory.Infrastructure.Services
                 var before = new { order.RefundedAmount };
                 order.RefundedAmount += req.Amount;
 
-                // If the order was Received, we need to adjust inventory
-                if (order.Status == PurchaseOrderStatus.Received)
+                // Create RefundTransaction audit record
+                var refundTransaction = new RefundTransaction
                 {
-                    // For a global refund, we ideally need to know which items are being refunded.
-                    // If it's a simple monetary refund without item return, we just record the money.
-                    // But if it's a partial product return, we'd need more details.
-                    // Given the goal "Refund option only available for eligible completed orders",
-                    // and "inventory adjustments occur if applicable", I'll assume for now it's a monetary refund
-                    // unless otherwise specified. But usually PO refund means returning goods.
-                    
-                    // Logic for monetary refund (money back from supplier)
-                    var refundTx = new FinancialTransaction
-                    {
-                        Type = FinancialTransactionType.Revenue, // Revenue because it's money coming IN (reversal of expense)
-                        Amount = req.Amount,
-                        PurchaseOrderId = order.Id,
-                        SupplierId = order.SupplierId,
-                        TimestampUtc = DateTimeOffset.UtcNow,
-                        UserId = user.UserId,
-                        UserDisplayName = user.UserDisplayName,
-                        Note = $"Refund for Purchase Order {order.OrderNumber}. {req.Reason}"
-                    };
-                    _db.FinancialTransactions.Add(refundTx);
-                }
+                    Type = RefundType.PurchaseOrder,
+                    PurchaseOrderId = order.Id,
+                    Amount = req.Amount,
+                    Reason = req.Reason,
+                    ProcessedUtc = DateTimeOffset.UtcNow,
+                    ProcessedByUserId = user.UserId,
+                    ProcessedByUserDisplayName = user.UserDisplayName,
+                    Note = $"Refund processed for Purchase Order {order.OrderNumber}"
+                };
+                _db.RefundTransactions.Add(refundTransaction);
+
+                // Reverse inventory (stock goes back to supplier)
+                await _inventoryServices.ReversePurchaseOrderStockAsync(order.Id, user, ct);
+
+                // Create financial transaction (money back from supplier)
+                var refundTx = new FinancialTransaction
+                {
+                    Type = FinancialTransactionType.Revenue, // Revenue because it's money coming IN (reversal of expense)
+                    Amount = req.Amount,
+                    PurchaseOrderId = order.Id,
+                    SupplierId = order.SupplierId,
+                    TimestampUtc = DateTimeOffset.UtcNow,
+                    UserId = user.UserId,
+                    UserDisplayName = user.UserDisplayName,
+                    Note = $"Refund for Purchase Order {order.OrderNumber}. {req.Reason}"
+                };
+                _db.FinancialTransactions.Add(refundTx);
 
                 await _db.SaveChangesAsync(ct);
                 await _auditWriter.LogUpdateAsync<PurchaseOrder>(order.Id, user, before, new { order.RefundedAmount }, ct);

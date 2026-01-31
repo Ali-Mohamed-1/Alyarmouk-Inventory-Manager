@@ -18,6 +18,19 @@ public class PurchaseOrdersApiController : ControllerBase
         _purchaseOrderServices = purchaseOrderServices;
     }
 
+    [HttpPost]
+    public async Task<ActionResult<long>> Create([FromBody] CreatePurchaseOrderRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = GetUserContext();
+        var id = await _purchaseOrderServices.CreateAsync(request, user, ct);
+        return Ok(id);
+    }
+
     [HttpGet("{id}")]
     public async Task<ActionResult<PurchaseOrderResponse>> GetById(int id, CancellationToken ct)
     {

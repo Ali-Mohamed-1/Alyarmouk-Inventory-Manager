@@ -40,17 +40,22 @@
     <div class="neo-card mb-5 bg-black text-white p-5">
         <h4 class="mb-4 fw-black text-uppercase">Stock Operations</h4>
         <div class="row g-3">
-            <div class="col-4">
+            <div class="col-3">
+                <button type="button" class="neo-btn neo-btn-primary w-100" id="btn-sales-order-shortcut">
+                    <i class="bi bi-cart-plus"></i> SALES ORDER
+                </button>
+            </div>
+            <div class="col-3">
                 <button type="button" class="neo-btn neo-btn-success w-100" id="btn-receive-stock">
                     <i class="bi bi-box-arrow-in-down"></i> RECEIVE
                 </button>
             </div>
-            <div class="col-4">
+            <div class="col-3">
                 <button type="button" class="neo-btn neo-btn-warning w-100" id="btn-issue-stock">
                     <i class="bi bi-box-arrow-up"></i> ISSUE
                 </button>
             </div>
-            <div class="col-4">
+            <div class="col-3">
                 <button type="button" class="neo-btn neo-btn-info w-100" id="btn-adjust-stock">
                     <i class="bi bi-sliders"></i> ADJUST
                 </button>
@@ -96,41 +101,121 @@
 
 <!-- MODALS - Systemic preservation of forms and IDs -->
 
-<!-- Receive Stock Modal -->
+<!-- Receive Stock Modal (Simplified Single-Page + Multi-Product) -->
 <div class="modal fade" id="receiveStockModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-neo-success">
                 <h5 class="modal-title fw-black text-uppercase">Receive Stock</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="receiveStockForm" action="/Inventory/Receive" method="post">
-                <div class="modal-body p-4">
-                    @Html.AntiForgeryToken()
-                    <div class="mb-4">
-                        <label for="receiveProductId" class="form-label fw-black text-uppercase small">Select Product</label>
-                        <select id="receiveProductId" name="ProductId" class="form-select" required>
-                            <option value="">-- LOADING --</option>
-                        </select>
+            <div class="modal-body p-4">
+                <form id="receiveStockForm">
+                    <!-- Header Info -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label for="receiveSupplierId" class="form-label fw-black text-uppercase small">Supplier</label>
+                            <select id="receiveSupplierId" name="SupplierId" class="form-select border-2 border-black" required>
+                                <option value="">-- LOADING SUPPLIERS --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label for="receiveNote" class="form-label fw-black text-uppercase small">Notes</label>
+                            <input type="text" id="receiveNote" name="Note" class="form-control border-2 border-black" placeholder="Order remarks...">
+                        </div>
                     </div>
-                    <div class="mb-4">
-                        <label for="receiveQuantity" class="form-label fw-black text-uppercase small">Quantity to Receive</label>
-                        <input type="number" id="receiveQuantity" name="Quantity" class="form-control" step="0.01" min="0.01" required />
+
+                    <!-- Line Items Table -->
+                    <div class="table-responsive mb-4">
+                        <table class="table table-bordered border-black align-middle" id="receiveLinesTable">
+                            <thead class="table-dark text-uppercase small">
+                                <tr>
+                                    <th style="width: 35%;">Product</th>
+                                    <th style="width: 15%;">Quantity</th>
+                                    <th style="width: 20%;">Unit Cost (Base)</th>
+                                    <th style="width: 20%;">Batch Number</th>
+                                    <th style="width: 10%;" class="text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Rows will be added dynamically -->
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="5">
+                                        <button type="button" class="neo-btn neo-btn-sm neo-btn-primary" id="btn-add-line">
+                                            <i class="bi bi-plus-circle me-1"></i> ADD PRODUCT
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
-                    <div class="mb-4">
-                        <label for="receiveBatchNumber" class="form-label fw-black text-uppercase small">Batch Number</label>
-                        <input type="text" id="receiveBatchNumber" name="BatchNumber" class="form-control" placeholder="e.g. BATCH-2026-001" />
+
+                    <div class="row g-4 align-items-end">
+                        <!-- Tax & Expenses Controls -->
+                        <div class="col-md-6">
+                            <div class="neo-card bg-light p-3 border-2 border-black">
+                                <h6 class="fw-black text-uppercase small mb-3">Global Configuration</h6>
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="receiveApplyVat" name="ApplyVat" checked>
+                                            <label class="form-check-label small fw-bold" for="receiveApplyVat">Apply VAT (14%)</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="receiveApplyManTax" name="ApplyManufacturingTax" checked>
+                                            <label class="form-check-label small fw-bold" for="receiveApplyManTax">Apply Man. Tax (1%)</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 mt-3">
+                                        <label for="receiveExpenses" class="form-label fw-black text-uppercase small mb-1">Total Receipt Expenses</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-black text-white">$</span>
+                                            <input type="number" id="receiveExpenses" name="ReceiptExpenses" class="form-control border-black" step="0.01" min="0" value="0" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Summary -->
+                        <div class="col-md-6">
+                            <div class="neo-card p-4 border-3 border-black bg-black text-white rounded-0">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-uppercase small opacity-75">Subtotal:</span>
+                                    <span id="summary-subtotal" class="fw-bold">$0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-uppercase small opacity-75">VAT (14%):</span>
+                                    <span id="summary-vat" class="fw-bold">$0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-uppercase small opacity-75">Man. Tax (1%):</span>
+                                    <span id="summary-mantax" class="fw-bold text-danger">-$0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-uppercase small opacity-75">Expenses:</span>
+                                    <span id="summary-expenses" class="fw-bold">$0.00</span>
+                                </div>
+                                <hr class="border-white opacity-25">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="h5 fw-black text-uppercase mb-0">Total Due:</span>
+                                    <span id="summary-total" class="h4 fw-black text-success mb-0">$0.00</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-0">
-                        <label for="receiveNote" class="form-label fw-black text-uppercase small">Notes</label>
-                        <textarea id="receiveNote" name="Note" class="form-control" rows="2"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="neo-btn" data-bs-dismiss="modal">CANCEL</button>
-                    <button type="submit" class="neo-btn neo-btn-success">COMPLETE RECEIPT</button>
-                </div>
-            </form>
+                </form>
+            </div>
+            <div class="modal-footer border-top-0">
+                <button type="button" class="neo-btn" data-bs-dismiss="modal">CANCEL</button>
+                <button type="button" class="neo-btn neo-btn-success shadow-sm" id="btn-receive-submit">
+                    <i class="bi bi-check2-circle me-1"></i> COMPLETE RECEIPT
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -324,6 +409,7 @@
                     });
                 loadProducts();
             }
+            window.refreshDashboard = refreshDashboard;
 
             let allProductsForModals = [];
 
@@ -553,4 +639,5 @@
             });
         })();
     </script>
+    <script src="~/js/dashboard-operations.js"></script>
 }

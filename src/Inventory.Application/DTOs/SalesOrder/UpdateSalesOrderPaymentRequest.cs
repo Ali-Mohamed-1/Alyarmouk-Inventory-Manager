@@ -7,9 +7,9 @@ namespace Inventory.Application.DTOs.SalesOrder
         public long OrderId { get; init; }
         public PaymentStatus PaymentStatus { get; init; }
         public PaymentMethod? PaymentMethod { get; init; } // Allow updating payment method
-        public bool? CheckReceived { get; init; }
+        public bool CheckReceived { get; init; } = false;
         public DateTimeOffset? CheckReceivedDate { get; init; }
-        public bool? CheckCashed { get; init; }
+        public bool CheckCashed { get; init; } = false;
         public DateTimeOffset? CheckCashedDate { get; init; }
         public string? TransferId { get; init; }
         public string? Note { get; init; }

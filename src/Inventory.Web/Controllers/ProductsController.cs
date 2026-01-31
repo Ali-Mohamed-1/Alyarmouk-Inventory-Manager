@@ -19,10 +19,9 @@ public sealed class ProductsController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    public IActionResult Index()
     {
-        var items = await _products.GetAllAsync(cancellationToken);
-        return View(items);
+        return RedirectToAction("Index", "Dashboard");
     }
 
     [HttpGet]

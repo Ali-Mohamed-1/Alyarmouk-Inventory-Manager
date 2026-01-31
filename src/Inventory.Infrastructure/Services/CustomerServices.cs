@@ -55,9 +55,9 @@ namespace Inventory.Infrastructure.Services
                 {
                     Id = c.Id,
                     Name = c.Name,
-                    Phone = null,           // Not needed for dropdown
-                    Email = null,            // Not needed for dropdown
-                    CreatedUtc = default    // Not needed for dropdown
+                    Phone = null,
+                    Email = null,
+                    CreatedUtc = c.CreatedUtc 
                 })
                 .ToListAsync(ct);
         }

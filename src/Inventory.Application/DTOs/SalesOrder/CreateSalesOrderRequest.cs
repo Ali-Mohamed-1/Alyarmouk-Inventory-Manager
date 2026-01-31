@@ -41,7 +41,7 @@ namespace Inventory.Application.DTOs.SalesOrder
         /// For check payments: whether we received the check.
         /// Ignored for cash payments.
         /// </summary>
-        public bool? CheckReceived { get; init; }
+        public bool CheckReceived { get; init; } = false;
 
         /// <summary>
         /// For check payments: date when the check was received.
@@ -51,7 +51,7 @@ namespace Inventory.Application.DTOs.SalesOrder
         /// <summary>
         /// For check payments: whether the check has been cashed.
         /// </summary>
-        public bool? CheckCashed { get; init; }
+        public bool CheckCashed { get; init; } = false;
 
         /// <summary>
         /// For check payments: date when the check was cashed.

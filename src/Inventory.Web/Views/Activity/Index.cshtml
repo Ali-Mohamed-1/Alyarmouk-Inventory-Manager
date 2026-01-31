@@ -1,0 +1,521 @@
+@{
+    ViewData["Title"] = "Transactions";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <h1 class="display-3 fw-black text-uppercase mb-0">Transactions</h1>
+    </div>
+
+    <!-- TABS NAVIGATION -->
+    <ul class="nav nav-tabs border-0 mb-0" id="activityTabs" role="tablist">
+        <li class="nav-item">
+            <button class="neo-btn active me-2" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales-content" type="button" role="tab">SALES ACTIVITY</button>
+        </li>
+        <li class="nav-item">
+            <button class="neo-btn me-2" id="purchases-tab" data-bs-toggle="tab" data-bs-target="#purchases-content" type="button" role="tab">PURCHASE ACTIVITY</button>
+        </li>
+        <li class="nav-item">
+            <button class="neo-btn" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory-content" type="button" role="tab">TRANSACTIONS</button>
+        </li>
+    </ul>
+
+    <!-- TABS CONTENT -->
+    <div class="tab-content neo-card mt-0 border-top-0 p-4" style="background: white; border-width: 3px;">
+        
+        <!-- SALES CONTENT -->
+        <div class="tab-pane fade show active" id="sales-content" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="fw-black text-uppercase mb-0">Sales Activity</h4>
+            </div>
+            
+            <!-- LIST VIEW -->
+            <div id="so-list-view">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="so-table">
+                        <thead>
+                            <tr>
+                                <th>ORDER #</th>
+                                <th>CUSTOMER</th>
+                                <th>DATE</th>
+                                <th>STATUS</th>
+                                <th>PAYMENT</th>
+                                <th class="text-end">TOTAL</th>
+                                <th class="text-end">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="so-table-body">
+                            <tr><td colspan="7" class="text-center py-4 fw-bold">LOADING RECENT SALES...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DETAIL VIEW -->
+            <div id="so-detail-view" style="display:none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-black text-uppercase mb-0">Sales Order: <span id="so-detail-number" class="text-primary"></span></h5>
+                    <button class="neo-btn neo-btn-info btn-sm" onclick="switchSoView('list')">
+                        <i class="bi bi-arrow-left"></i> BACK TO LIST
+                    </button>
+                </div>
+                
+                <div class="neo-card mb-4" style="background: #f8f8f8;">
+                    <div class="row g-4">
+                        <!-- Left: Info -->
+                        <div class="col-md-6 border-end border-2">
+                            <h6 class="fw-black text-uppercase small mb-3">General Details</h6>
+                            <div class="mb-2"><strong>CUSTOMER:</strong> <span id="so-detail-customer"></span></div>
+                            <div class="mb-2"><strong>DATE:</strong> <span id="so-detail-date"></span></div>
+                            <div class="mb-2"><strong>STATUS:</strong> <span id="so-detail-status"></span></div>
+                            
+                            <div class="mt-4">
+                                <h6 class="fw-black text-uppercase small mb-3">Documents</h6>
+                                <div id="so-docs-section" class="d-flex flex-column gap-2"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Right: Financials -->
+                        <div class="col-md-6 ps-md-4">
+                            <h6 class="fw-black text-uppercase small mb-3">Financial Overview</h6>
+                            <div class="mb-2"><strong>PAYMENT:</strong> <span id="so-detail-payment"></span></div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small fw-bold">SUBTOTAL:</span>
+                                <span id="so-detail-subtotal" class="fw-bold"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small fw-bold">VAT:</span>
+                                <span id="so-detail-vat"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mt-3 pt-2 border-top border-2">
+                                <span class="fw-black">TOTAL:</span>
+                                <span id="so-detail-total" class="fw-black fs-4 text-success"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="fw-black text-uppercase mb-3">Order Line Items</h6>
+                <div class="table-responsive neo-card p-0">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-dark text-white">
+                            <tr>
+                                <th>PRODUCT</th>
+                                <th>BATCH</th>
+                                <th class="text-center">QTY</th>
+                                <th class="text-end">UNIT PRICE</th>
+                                <th class="text-end">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="so-detail-lines"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PURCHASES CONTENT -->
+        <div class="tab-pane fade" id="purchases-content" role="tabpanel">
+             <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="fw-black text-uppercase mb-0">Purchase Activity</h4>
+            </div>
+
+            <!-- LIST VIEW -->
+            <div id="po-list-view">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>ORDER #</th>
+                                <th>SUPPLIER</th>
+                                <th>DATE</th>
+                                <th>STATUS</th>
+                                <th>PAYMENT</th>
+                                <th class="text-end">TOTAL</th>
+                                <th class="text-end">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="po-table-body">
+                            <tr><td colspan="7" class="text-center py-4 fw-bold">LOADING RECENT PURCHASES...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DETAIL VIEW -->
+            <div id="po-detail-view" style="display:none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-black text-uppercase mb-0">Purchase Order: <span id="po-detail-number" class="text-primary"></span></h5>
+                    <button class="neo-btn neo-btn-info btn-sm" onclick="switchPoView('list')">
+                        <i class="bi bi-arrow-left"></i> BACK TO LIST
+                    </button>
+                </div>
+
+                <div class="neo-card mb-4" style="background: #f8f8f8;">
+                    <div class="row g-4">
+                        <div class="col-md-6 border-end border-2">
+                            <h6 class="fw-black text-uppercase small mb-3">General Details</h6>
+                            <div class="mb-2"><strong>SUPPLIER:</strong> <span id="po-detail-supplier"></span></div>
+                            <div class="mb-2"><strong>DATE:</strong> <span id="po-detail-date"></span></div>
+                            <div class="mb-2"><strong>STATUS:</strong> <span id="po-detail-status"></span></div>
+                            
+                            <div class="mt-4">
+                                <h6 class="fw-black text-uppercase small mb-3">Documents</h6>
+                                <div id="po-docs-section" class="d-flex flex-column gap-2"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 ps-md-4">
+                            <h6 class="fw-black text-uppercase small mb-3">Financial Overview</h6>
+                            <div class="mb-2"><strong>PAYMENT:</strong> <span id="po-detail-payment"></span></div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small fw-bold">SUBTOTAL:</span>
+                                <span id="po-detail-subtotal" class="fw-bold"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small fw-bold">VAT:</span>
+                                <span id="po-detail-vat"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mt-3 pt-2 border-top border-2">
+                                <span class="fw-black">TOTAL:</span>
+                                <span id="po-detail-total" class="fw-black fs-4 text-success"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="fw-black text-uppercase mb-3">Ordered Products</h6>
+                <div class="table-responsive neo-card p-0">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-dark text-white">
+                            <tr>
+                                <th>PRODUCT</th>
+                                <th>BATCH</th>
+                                <th class="text-center">QTY</th>
+                                <th class="text-end">UNIT COST</th>
+                                <th class="text-end">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="po-detail-lines"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- INVENTORY CONTENT -->
+        <div class="tab-pane fade" id="inventory-content" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="fw-black text-uppercase mb-0">Issue & Adjust Transactions</h4>
+            </div>
+
+            <!-- LIST VIEW -->
+            <div id="inv-list-view">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>TX ID</th>
+                                <th>DATE</th>
+                                <th>TYPE</th>
+                                <th>PRODUCT</th>
+                                <th class="text-center">QTY</th>
+                                <th>NOTE / REF</th>
+                                <th class="text-end">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inv-table-body">
+                            <tr><td colspan="7" class="text-center py-4 fw-bold">LOADING TRANSACTIONS...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DETAIL VIEW -->
+            <div id="inv-detail-view" style="display:none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-black text-uppercase mb-0">Transaction: <span id="inv-detail-id" class="text-primary"></span></h5>
+                    <button class="neo-btn neo-btn-info btn-sm" onclick="switchInvView('list')">
+                        <i class="bi bi-arrow-left"></i> BACK TO LIST
+                    </button>
+                </div>
+
+                <div class="neo-card p-4" style="background: #f8f8f8;">
+                    <div class="row g-4">
+                        <div class="col-md-6 border-end border-2">
+                            <h6 class="fw-black text-uppercase small mb-3">Core Info</h6>
+                            <div class="mb-2"><strong>DATE:</strong> <span id="inv-detail-date"></span></div>
+                            <div class="mb-2"><strong>TYPE:</strong> <span id="inv-detail-type"></span></div>
+                            <div class="mb-2"><strong>DIRECTION:</strong> <span id="inv-detail-direction" class="fw-bold"></span></div>
+                        </div>
+                        <div class="col-md-6 ps-md-4">
+                            <h6 class="fw-black text-uppercase small mb-3">Product Context</h6>
+                            <div class="mb-2"><strong>PRODUCT:</strong> <span id="inv-detail-product" class="fw-black text-uppercase"></span></div>
+                            <div class="mb-2"><strong>QUANTITY AFFECTED:</strong> <span id="inv-detail-qty" class="fw-black fs-5"></span></div>
+                            <div class="mt-3">
+                                <label class="small fw-bold text-muted">NOTE / REASON</label>
+                                <p id="inv-detail-note" class="mb-0 bg-white p-2 border"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function() {
+            // SHARED UTILS
+            const formatCurrency = (a) => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD' }).format(a);
+            const formatDate = (i) => new Date(i).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+            const escapeHtml = (t) => { if(!t) return ''; const d=document.createElement('div'); d.textContent=t; return d.innerHTML; };
+            
+            const getSoStatusBadge = (s) => {
+                if(s===1) return '<span class="badge neo-btn-success">DONE</span>';
+                if(s===2) return '<span class="badge neo-btn-danger text-white">CANCELLED</span>';
+                return '<span class="badge neo-btn-info">PENDING</span>';
+            };
+            
+            const getPoStatusBadge = (s) => {
+                if(s===1) return '<span class="badge neo-btn-success">RECEIVED</span>';
+                if(s===2) return '<span class="badge neo-btn-danger text-white">CANCELLED</span>';
+                return '<span class="badge neo-btn-warning">PENDING</span>';
+            };
+
+            const getPaymentBadge = (s) => {
+                if(s===1) return '<span class="badge neo-btn-success">PAID</span>';
+                if(s===2) return '<span class="badge neo-btn-warning">OVERDUE</span>';
+                return '<span class="badge neo-btn-danger text-white">UNPAID</span>';
+            };
+
+            const getInvTypeBadge = (t) => {
+                if(t==='Receive') return '<span class="badge neo-btn-success">RECEIVE</span>';
+                if(t==='Issue') return '<span class="badge neo-btn-warning">ISSUE</span>';
+                if(t==='Adjust') return '<span class="badge neo-btn-info">ADJUST</span>';
+                return '<span class="badge bg-secondary">'+t+'</span>';
+            };
+
+            // INITIALIZATION
+            async function init() {
+                await Promise.all([
+                    loadSalesOrders(),
+                    loadPurchaseOrders(),
+                    loadInventoryTransactions()
+                ]);
+            }
+
+            // --- SALES ORDERS LOGIC ---
+            async function loadSalesOrders() {
+                try {
+                    const r = await fetch('/api/activity/sales-orders');
+                    if(!r.ok) throw new Error();
+                    const orders = await r.json();
+                    renderSalesOrders(orders);
+                } catch(e) { document.getElementById('so-table-body').innerHTML = '<tr><td colspan="7" class="text-center text-danger fw-bold">FAILED TO LOAD SALES ACTIVITY</td></tr>'; }
+            }
+
+            function renderSalesOrders(orders) {
+                const tbody = document.getElementById('so-table-body');
+                if(!orders.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 fw-bold">NO RECENT SALES ACTIVITY.</td></tr>'; return; }
+                
+                tbody.innerHTML = orders.map(o => `
+                    <tr>
+                        <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
+                        <td>${escapeHtml(o.customerName)}</td>
+                        <td class="small fw-bold">${formatDate(o.orderDate)}</td>
+                        <td>${getSoStatusBadge(o.status)}</td>
+                        <td>${getPaymentBadge(o.paymentStatus)}</td>
+                        <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
+                        <td class="text-end">
+                            <button class="neo-btn neo-btn-info btn-sm p-1 px-3" onclick="viewSoDetails(${o.id})">VIEW</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            window.viewSoDetails = async (id) => {
+                window.switchSoView('detail');
+                try {
+                    const r = await fetch(`/api/sales-orders/${id}`);
+                    if(!r.ok) throw new Error();
+                    const o = await r.json();
+                    
+                    document.getElementById('so-detail-number').innerText = o.orderNumber;
+                    document.getElementById('so-detail-customer').innerText = o.customerName || 'UNKNOWN';
+                    document.getElementById('so-detail-date').innerText = formatDate(o.orderDate);
+                    document.getElementById('so-detail-status').innerHTML = getSoStatusBadge(o.status);
+                    document.getElementById('so-detail-payment').innerHTML = getPaymentBadge(o.paymentStatus);
+                    
+                    document.getElementById('so-detail-subtotal').innerText = formatCurrency(o.subtotal);
+                    document.getElementById('so-detail-vat').innerText = formatCurrency(o.vatAmount);
+                    document.getElementById('so-detail-total').innerText = formatCurrency(o.totalAmount);
+                    
+                    // Docs
+                    const dSec = document.getElementById('so-docs-section');
+                    dSec.innerHTML = '';
+                    if(o.invoicePath) dSec.innerHTML += `<a href="${o.invoicePath}" target="_blank" class="neo-btn neo-btn-primary btn-sm flex-fill text-center"><i class="bi bi-file-earmark-pdf"></i> INVOICE</a>`;
+                    if(o.receiptPath) dSec.innerHTML += `<a href="${o.receiptPath}" target="_blank" class="neo-btn neo-btn-primary btn-sm flex-fill text-center"><i class="bi bi-file-earmark-pdf"></i> RECEIPT</a>`;
+                    if(!o.invoicePath && !o.receiptPath) dSec.innerHTML = '<span class="small text-muted fst-italic">NO DOCUMENTS ATTACHED</span>';
+
+                    // Lines
+                    document.getElementById('so-detail-lines').innerHTML = o.lines.map(l => `
+                        <tr>
+                            <td><span class="fw-black text-uppercase small">${escapeHtml(l.productName)}</span></td>
+                            <td>${l.batchNumber ? `<code class="fw-bold">${escapeHtml(l.batchNumber)}</code>` : '-'}</td>
+                            <td class="text-center fw-bold">${l.quantity}</td>
+                            <td class="text-end fw-bold">${formatCurrency(l.unitPrice)}</td>
+                            <td class="text-end fw-black">${formatCurrency(l.lineTotal)}</td>
+                        </tr>
+                    `).join('');
+
+                } catch(e) { alert("Details failed to load"); window.switchSoView('list'); }
+            };
+
+            window.switchSoView = (v) => {
+                document.getElementById('so-list-view').style.display = v==='list'?'block':'none';
+                document.getElementById('so-detail-view').style.display = v==='detail'?'block':'none';
+            };
+
+
+            // --- PURCHASE ORDERS LOGIC ---
+            async function loadPurchaseOrders() {
+                try {
+                    const r = await fetch('/api/activity/purchase-orders');
+                    if(!r.ok) throw new Error();
+                    const orders = await r.json();
+                    renderPurchaseOrders(orders);
+                } catch(e) { document.getElementById('po-table-body').innerHTML = '<tr><td colspan="7" class="text-center text-danger fw-bold">FAILED TO LOAD PURCHASE ACTIVITY</td></tr>'; }
+            }
+
+            function renderPurchaseOrders(orders) {
+                const tbody = document.getElementById('po-table-body');
+                if(!orders.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 fw-bold">NO RECENT PURCHASE ACTIVITY.</td></tr>'; return; }
+                
+                tbody.innerHTML = orders.map(o => `
+                    <tr>
+                        <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
+                        <td>${escapeHtml(o.supplierName)}</td>
+                        <td class="small fw-bold">${formatDate(o.createdUtc)}</td>
+                        <td>${getPoStatusBadge(o.status)}</td>
+                        <td>${getPaymentBadge(o.paymentStatus)}</td>
+                        <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
+                        <td class="text-end">
+                            <button class="neo-btn neo-btn-info btn-sm p-1 px-3" onclick="viewPoDetails(${o.id})">VIEW</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            window.viewPoDetails = async (id) => {
+                window.switchPoView('detail');
+                try {
+                    const r = await fetch(`/api/purchase-orders/${id}`);
+                    if(!r.ok) throw new Error();
+                    const o = await r.json();
+                    
+                    document.getElementById('po-detail-number').innerText = o.orderNumber;
+                    document.getElementById('po-detail-supplier').innerText = o.supplierName || 'UNKNOWN';
+                    document.getElementById('po-detail-date').innerText = formatDate(o.createdUtc);
+                    document.getElementById('po-detail-status').innerHTML = getPoStatusBadge(o.status);
+                    document.getElementById('po-detail-payment').innerHTML = getPaymentBadge(o.paymentStatus);
+                    
+                    document.getElementById('po-detail-subtotal').innerText = formatCurrency(o.subtotal);
+                    document.getElementById('po-detail-vat').innerText = formatCurrency(o.vatAmount);
+                    document.getElementById('po-detail-total').innerText = formatCurrency(o.totalAmount);
+
+                    // Docs
+                    const dSec = document.getElementById('po-docs-section');
+                    dSec.innerHTML = '';
+                    if(o.invoicePath) dSec.innerHTML += `<a href="${o.invoicePath}" target="_blank" class="neo-btn neo-btn-primary btn-sm flex-fill text-center"><i class="bi bi-file-earmark-pdf"></i> INVOICE</a>`;
+                    if(o.receiptPath) dSec.innerHTML += `<a href="${o.receiptPath}" target="_blank" class="neo-btn neo-btn-primary btn-sm flex-fill text-center"><i class="bi bi-file-earmark-pdf"></i> RECEIPT</a>`;
+                    if(!o.invoicePath && !o.receiptPath) dSec.innerHTML = '<span class="small text-muted fst-italic">NO DOCUMENTS ATTACHED</span>';
+                    
+                    // Lines
+                    document.getElementById('po-detail-lines').innerHTML = o.lines.map(l => `
+                        <tr>
+                            <td><span class="fw-black text-uppercase small">${escapeHtml(l.productName)}</span></td>
+                            <td>${l.batchNumber ? `<code class="fw-bold">${escapeHtml(l.batchNumber)}</code>` : '-'}</td>
+                            <td class="text-center fw-bold">${l.quantity}</td>
+                            <td class="text-end fw-bold">${formatCurrency(l.unitPrice)}</td>
+                            <td class="text-end fw-black">${formatCurrency(l.lineTotal)}</td>
+                        </tr>
+                    `).join('');
+
+                } catch(e) { alert("Details failed to load"); window.switchPoView('list'); }
+            };
+
+            window.switchPoView = (v) => {
+                document.getElementById('po-list-view').style.display = v==='list'?'block':'none';
+                document.getElementById('po-detail-view').style.display = v==='detail'?'block':'none';
+            };
+
+
+            // GLOBAL STATE
+            let recentTransactions = [];
+
+            // --- INVENTORY TRANSACTIONS LOGIC ---
+            async function loadInventoryTransactions() {
+                try {
+                    const r = await fetch('/api/activity/inventory-transactions');
+                    if(!r.ok) throw new Error();
+                    const txs = await r.json();
+                    
+                    // FILTER: Hide Receive transactions (view only Issue and Adjust)
+                    recentTransactions = txs.filter(t => t.type !== 'Receive');
+                    
+                    renderInventoryTransactions(recentTransactions);
+                } catch(e) { document.getElementById('inv-table-body').innerHTML = '<tr><td colspan="7" class="text-center text-danger fw-bold">FAILED TO LOAD STOCK ACTIVITY</td></tr>'; }
+            }
+
+            function renderInventoryTransactions(txs) {
+                const tbody = document.getElementById('inv-table-body');
+                if(!txs.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 fw-bold">NO RECENT ISSUE/ADJUST MOVEMENT.</td></tr>'; return; }
+                
+                tbody.innerHTML = txs.map(t => {
+                    const isIssue = t.quantityDelta < 0 || t.type === 'Issue';
+                    return `
+                    <tr>
+                        <td><code class="fw-bold small text-muted">#${t.id}</code></td>
+                        <td class="small fw-bold">${formatDate(t.transactionDate)}</td>
+                        <td>${getInvTypeBadge(t.type)}</td>
+                        <td class="fw-black text-uppercase small">${escapeHtml(t.productName)}</td>
+                        <td class="text-center fw-bold ${t.quantityDelta < 0 ? 'text-danger' : 'text-success'}">${t.quantityDelta > 0 ? '+' : ''}${t.quantityDelta}</td>
+                        <td class="small text-muted text-truncate" style="max-width: 200px;">${escapeHtml(t.note || '')}</td>
+                        <td class="text-end">
+                            <button class="neo-btn neo-btn-info btn-sm p-1 px-3" onclick="viewInvDetails(${t.id})">VIEW</button>
+                        </td>
+                    </tr>
+                `}).join('');
+            }
+
+            window.viewInvDetails = (id) => {
+                try {
+                    const t = recentTransactions.find(x => x.id === id);
+                    if(!t) return;
+
+                    window.switchInvView('detail');
+                    
+                    document.getElementById('inv-detail-id').innerText = '#' + t.id;
+                    document.getElementById('inv-detail-date').innerText = formatDate(t.transactionDate);
+                    document.getElementById('inv-detail-type').innerHTML = getInvTypeBadge(t.type);
+                    
+                    const isOut = t.quantityDelta < 0;
+                    document.getElementById('inv-detail-direction').innerHTML = isOut 
+                        ? '<span class="text-danger fw-black"><i class="bi bi-arrow-down-circle-fill me-2"></i>OUTBOUND (ISSUE)</span>'
+                        : '<span class="text-success fw-black"><i class="bi bi-arrow-up-circle-fill me-2"></i>INBOUND (RECEIVE)</span>';
+                    
+                    document.getElementById('inv-detail-product').innerText = t.productName || 'UNKNOWN PRODUCT';
+                    document.getElementById('inv-detail-qty').innerText = Math.abs(t.quantityDelta) + ' UNITS';
+                    document.getElementById('inv-detail-note').innerText = t.note || 'No additional notes provided.';
+
+                } catch(e) { console.error(e); alert("Failed to render details"); }
+            };
+
+            window.switchInvView = (v) => {
+                document.getElementById('inv-list-view').style.display = v==='list'?'block':'none';
+                document.getElementById('inv-detail-view').style.display = v==='detail'?'block':'none';
+            };
+
+            init();
+        })();
+    </script>
+}
