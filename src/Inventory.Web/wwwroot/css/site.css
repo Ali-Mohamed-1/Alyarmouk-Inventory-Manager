@@ -37,6 +37,10 @@
     --neo-transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1);
 }
 
+* {
+    border-radius: 0 !important;
+}
+
 html,
 body {
     min-height: 100%;
@@ -379,11 +383,18 @@ th {
     background: var(--neo-primary);
 }
 
-/* Modals */
+/* Modals - Perfect Square Corners & Visibility */
+.modal-content,
+.modal-header,
+.modal-footer {
+    border-radius: 0 !important;
+}
+
 .modal-content {
     border: var(--neo-border);
-    border-radius: 0;
     box-shadow: 12px 12px 0px 0px var(--neo-charcoal);
+    overflow: hidden;
+    /* Clips children corners to prevent white bleed */
 }
 
 .modal-header {
@@ -391,11 +402,30 @@ th {
     background: var(--neo-charcoal);
     color: var(--neo-white);
     padding: 1.25rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Force 'X' button to be white and on the extreme right */
+.modal-header .btn-close {
+    background-color: transparent !important;
+    filter: invert(1) grayscale(100%) brightness(200%);
+    opacity: 1 !important;
+    margin-left: auto !important;
+    padding: 1rem;
+    transition: var(--neo-transition);
+}
+
+.modal-header .btn-close:hover {
+    transform: scale(1.1) rotate(90deg);
 }
 
 .modal-title {
     font-size: 1rem;
     letter-spacing: 0.05em;
+    font-weight: 900;
+    text-transform: uppercase;
 }
 
 .modal-body {
