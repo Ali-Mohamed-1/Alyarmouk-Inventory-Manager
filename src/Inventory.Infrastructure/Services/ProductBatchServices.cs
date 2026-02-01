@@ -26,7 +26,7 @@ public sealed class ProductBatchServices : IProductBatchServices
         var product = await _db.Products
             .AsNoTracking()
             .Where(p => p.Id == productId)
-            .Select(p => new { p.Id, p.Cost, p.Price })
+            .Select(p => new { p.Id })
             .FirstOrDefaultAsync(ct);
 
         if (product is null)
@@ -107,8 +107,8 @@ public sealed class ProductBatchServices : IProductBatchServices
                 BatchNumber = "Unbatched",
                 IsUnbatched = true,
                 OnHand = unbatchedAgg?.OnHand ?? 0m,
-                UnitCost = unbatchedMeta?.UnitCost ?? unbatchedAgg?.LastUnitCost ?? product.Cost,
-                UnitPrice = unbatchedMeta?.UnitPrice ?? product.Price,
+                UnitCost = unbatchedMeta?.UnitCost ?? unbatchedAgg?.LastUnitCost ?? 0m,
+                UnitPrice = unbatchedMeta?.UnitPrice ?? 0m,
                 LastMovementUtc = unbatchedAgg?.LastMovementUtc,
                 Notes = unbatchedMeta?.Notes,
                 RowVersion = unbatchedMeta?.RowVersion is { Length: > 0 }
@@ -128,8 +128,8 @@ public sealed class ProductBatchServices : IProductBatchServices
                 BatchNumber = batchNumber,
                 IsUnbatched = false,
                 OnHand = agg?.OnHand ?? 0m,
-                UnitCost = meta?.UnitCost ?? agg?.LastUnitCost ?? product.Cost,
-                UnitPrice = meta?.UnitPrice ?? product.Price,
+                UnitCost = meta?.UnitCost ?? agg?.LastUnitCost ?? 0m,
+                UnitPrice = meta?.UnitPrice ?? 0m,
                 LastMovementUtc = agg?.LastMovementUtc,
                 Notes = meta?.Notes,
                 RowVersion = meta?.RowVersion is { Length: > 0 }
@@ -157,7 +157,7 @@ public sealed class ProductBatchServices : IProductBatchServices
         var product = await _db.Products
             .AsNoTracking()
             .Where(p => p.Id == productId)
-            .Select(p => new { p.Id, p.Cost, p.Price })
+            .Select(p => new { p.Id })
             .FirstOrDefaultAsync(ct);
         if (product is null)
             throw new InvalidOperationException($"Product id {productId} not found.");
@@ -216,8 +216,8 @@ public sealed class ProductBatchServices : IProductBatchServices
             BatchNumber = displayBatch,
             IsUnbatched = string.IsNullOrEmpty(normalized),
             OnHand = agg?.OnHand ?? 0m,
-            UnitCost = entity.UnitCost ?? agg?.LastUnitCost ?? product.Cost,
-            UnitPrice = entity.UnitPrice ?? product.Price,
+            UnitCost = entity.UnitCost ?? agg?.LastUnitCost ?? 0m,
+            UnitPrice = entity.UnitPrice ?? 0m,
             LastMovementUtc = agg?.LastMovementUtc,
             Notes = entity.Notes,
             RowVersion = entity.RowVersion is { Length: > 0 }

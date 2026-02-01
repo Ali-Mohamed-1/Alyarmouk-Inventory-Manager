@@ -74,7 +74,7 @@ public sealed class ProductsController : Controller
             Name = existing.Name,
             CategoryId = existing.CategoryId,
             Unit = existing.Unit,
-            Price = existing.Price,
+
             ReorderPoint = existing.ReorderPoint,
             IsActive = existing.IsActive,
             RowVersion = existing.RowVersion

@@ -40,22 +40,7 @@
                                 <input asp-for="Unit" class="form-control fw-bold" required placeholder="e.g. KG, PCS, BOX" />
                                 <span asp-validation-for="Unit" class="text-danger small fw-bold"></span>
                             </div>
-                            <div class="col-md-6">
-                                <label asp-for="Price" class="form-label fw-black text-uppercase small">Current Selling Price</label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-black text-white">$</span>
-                                    <input asp-for="Price" class="form-control fw-black" type="number" step="0.01" required />
-                                </div>
-                                <span asp-validation-for="Price" class="text-danger small fw-bold"></span>
-                            </div>
-                            <div class="col-md-6">
-                                <label asp-for="Cost" class="form-label fw-black text-uppercase small">Acquisition Cost</label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-black text-white">$</span>
-                                    <input asp-for="Cost" class="form-control fw-black" type="number" step="0.01" required />
-                                </div>
-                                <span asp-validation-for="Cost" class="text-danger small fw-bold"></span>
-                            </div>
+
                             <div class="col-md-6">
                                 <label asp-for="ReorderPoint" class="form-label fw-black text-uppercase small">Low stock Level Trigger</label>
                                 <input asp-for="ReorderPoint" class="form-control fw-bold" type="number" step="0.01" required />

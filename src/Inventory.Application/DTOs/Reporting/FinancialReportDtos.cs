@@ -33,7 +33,20 @@ namespace Inventory.Application.DTOs.Reporting
     /// </summary>
     public sealed class FinancialSummaryResponseDto
     {
-        public decimal TotalSales { get; set; }
+        /// <summary>
+        /// Total sales revenue from paid orders (before refunds).
+        /// </summary>
+        public decimal SalesRevenue { get; set; }
+
+        /// <summary>
+        /// Sales revenue after refunds have been subtracted.
+        /// This is the actual money retained from sales.
+        /// </summary>
+        public decimal SalesProfit { get; set; }
+
+        /// <summary>
+        /// Cost of goods sold - the cost of inventory that was sold.
+        /// </summary>
         public decimal CostOfGoods { get; set; }
 
         /// <summary>
@@ -51,8 +64,21 @@ namespace Inventory.Application.DTOs.Reporting
         /// </summary>
         public decimal InternalExpenses { get; set; }
 
+        /// <summary>
+        /// Gross Profit = Sales Profit - Cost of Goods
+        /// </summary>
         public decimal GrossProfit { get; set; }
+
+        /// <summary>
+        /// Net Profit = Gross Profit - Internal Expenses
+        /// </summary>
         public decimal NetProfit { get; set; }
+
+        /// <summary>
+        /// Profit Margin = (Net Profit / Sales Revenue) * 100
+        /// Expressed as a percentage (0-100).
+        /// </summary>
+        public decimal ProfitMargin { get; set; }
     }
 
     /// <summary>

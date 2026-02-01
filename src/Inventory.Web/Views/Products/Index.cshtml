@@ -23,7 +23,7 @@
                         <th>NAME</th>
                         <th>CATEGORY</th>
                         <th>UNIT</th>
-                        <th>MARKET PRICE</th>
+
                         <th>STATUS</th>
                         <th class="text-end pe-4">ACTIONS</th>
                     </tr>
@@ -36,7 +36,7 @@
                             <td class="fw-black text-uppercase">@item.Name</td>
                             <td><span class="text-uppercase small fw-bold">@item.CategoryName</span></td>
                             <td class="small fw-bold">@item.Unit</td>
-                            <td class="fw-black text-primary">@item.Price.ToString("C2")</td>
+
                             <td>
                                 @if (item.IsActive)
                                 {
@@ -58,7 +58,7 @@
                     @if (!Model.Any())
                     {
                         <tr>
-                            <td colspan="7" class="text-center py-5 fw-bold">NO PRODUCTS REGISTERED IN SYSTEM.</td>
+                            <td colspan="6" class="text-center py-5 fw-bold">NO PRODUCTS REGISTERED IN SYSTEM.</td>
                         </tr>
                     }
                 </tbody>

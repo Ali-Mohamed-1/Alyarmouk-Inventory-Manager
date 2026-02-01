@@ -206,7 +206,7 @@
 
             const product = products.find(p => p.productId == productId);
             if (product) {
-                priceInput.value = product.price;
+                priceInput.value = "0.00"; // No default price
                 unitInput.value = product.unit.toUpperCase();
                 productNameInput.value = product.name;
             }
@@ -214,7 +214,8 @@
             try {
                 const response = await fetch(`/api/products/${productId}/batches`);
                 const batches = await response.json();
-                batchSelect.innerHTML = '<option value="">NONE (GENERAL)</option>';
+
+                batchSelect.innerHTML = '<option value="">-- SELECT BATCH --</option>';
                 batches.forEach(b => {
                     const label = b.batchNumber + (b.onHand !== undefined ? ` (STOCK: ${b.onHand})` : '');
                     batchSelect.innerHTML += `<option value="${b.batchNumber}" data-batch-id="${b.id}">${label}</option>`;
@@ -246,8 +247,8 @@
                     <input type="hidden" name="Lines[${idx}].ProductName" id="product-name-input-${idx}" />
                 </td>
                 <td>
-                    <select name="Lines[${idx}].BatchNumber" id="batch-select-${idx}" class="form-select fw-bold small" onchange="onBatchChange(this, ${idx})">
-                        <option value="">NONE (GENERAL)</option>
+                    <select name="Lines[${idx}].BatchNumber" id="batch-select-${idx}" class="form-select fw-bold small" required onchange="onBatchChange(this, ${idx})">
+                        <option value="">-- SELECT BATCH --</option>
                     </select>
                     <input type="hidden" name="Lines[${idx}].ProductBatchId" id="batch-id-input-${idx}" />
                 </td>

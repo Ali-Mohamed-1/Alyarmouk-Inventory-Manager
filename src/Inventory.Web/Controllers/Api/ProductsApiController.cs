@@ -54,8 +54,7 @@ public sealed class ProductsApiController : ControllerBase
                 categoryId = p.CategoryId,
                 categoryName = p.CategoryName,
                 unit = p.Unit,
-                price = p.Price,
-                cost = p.Cost,
+
                 reorderPoint = p.ReorderPoint,
                 onHand,
                 reserved,

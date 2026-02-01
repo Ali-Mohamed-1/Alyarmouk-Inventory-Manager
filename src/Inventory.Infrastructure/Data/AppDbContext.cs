@@ -42,8 +42,7 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.Name).HasMaxLength(200).IsRequired();
                 b.Property(x => x.Unit).HasMaxLength(32).IsRequired();
                 b.Property(x => x.ReorderPoint).HasPrecision(18, 2);
-                b.Property(x => x.Cost).HasPrecision(18, 2);
-                b.Property(x => x.Price).HasPrecision(18, 2);
+
                 b.Property(x => x.RowVersion).IsRowVersion();
                 b.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
             });

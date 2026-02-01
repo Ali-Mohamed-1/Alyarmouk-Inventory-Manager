@@ -39,8 +39,6 @@ namespace Inventory.Infrastructure.Services
                     CategoryId = p.CategoryId,
                     CategoryName = p.Category != null ? p.Category.Name : string.Empty,
                     Unit = p.Unit,
-                    Price = p.Price,
-                    Cost = p.Cost,
                     ReorderPoint = p.ReorderPoint,
                     IsActive = p.IsActive,
                     RowVersion = Convert.ToBase64String(p.RowVersion)
@@ -64,8 +62,6 @@ namespace Inventory.Infrastructure.Services
                     CategoryId = p.CategoryId,
                     CategoryName = p.Category != null ? p.Category.Name : string.Empty,
                     Unit = p.Unit,
-                    Price = p.Price,
-                    Cost = p.Cost,
                     ReorderPoint = p.ReorderPoint,
                     IsActive = p.IsActive,
                     RowVersion = Convert.ToBase64String(p.RowVersion)
@@ -105,8 +101,6 @@ namespace Inventory.Infrastructure.Services
                 Name = normalizedName,
                 CategoryId = req.CategoryId,
                 Unit = normalizedUnit,
-                Price = req.Price,
-                Cost = req.Cost,
                 ReorderPoint = req.ReorderPoint,
                 IsActive = req.IsActive
             };
@@ -136,8 +130,6 @@ namespace Inventory.Infrastructure.Services
                         Name = entity.Name,
                         CategoryId = entity.CategoryId,
                         Unit = entity.Unit,
-                        Price = req.Price,
-                        Cost = req.Cost,
                         ReorderPoint = entity.ReorderPoint,
                         IsActive = entity.IsActive
                     },
@@ -200,8 +192,6 @@ namespace Inventory.Infrastructure.Services
                 Name = entity.Name,
                 CategoryId = entity.CategoryId,
                 Unit = entity.Unit,
-                Price = entity.Price,
-                Cost = entity.Cost,
                 ReorderPoint = entity.ReorderPoint,
                 IsActive = entity.IsActive
             };
@@ -221,8 +211,6 @@ namespace Inventory.Infrastructure.Services
             entity.Unit = normalizedUnit;
             entity.ReorderPoint = req.ReorderPoint;
             entity.IsActive = req.IsActive;
-            entity.Price = req.Price;
-            entity.Cost = req.Cost;
 
             var afterState = new
             {
@@ -230,8 +218,6 @@ namespace Inventory.Infrastructure.Services
                 Name = entity.Name,
                 CategoryId = entity.CategoryId,
                 Unit = entity.Unit,
-                Price = entity.Price,
-                Cost = entity.Cost,
                 ReorderPoint = entity.ReorderPoint,
                 IsActive = entity.IsActive
             };

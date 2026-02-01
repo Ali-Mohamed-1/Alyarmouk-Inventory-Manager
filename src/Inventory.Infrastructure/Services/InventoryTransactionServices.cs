@@ -98,8 +98,7 @@ namespace Inventory.Infrastructure.Services
                 snapshot.OnHand += quantityDelta;
 
                 // Get product cost for financial tracking
-                var unitCost = product.Cost;
-                var totalCost = unitCost * req.Quantity;
+                decimal? unitCost = null; // Cost should come from batch or manual input (future improvement)
 
                 // Create inventory transaction
                 var inventoryTransaction = new InventoryTransaction

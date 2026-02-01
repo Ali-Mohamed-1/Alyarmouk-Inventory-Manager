@@ -1,0 +1,359 @@
+@{
+    ViewData["Title"] = "Financial Analysis";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <h1 class="display-3 fw-black text-uppercase mb-0">Financial Analysis</h1>
+    </div>
+
+    <!-- Period Selection -->
+    <div class="neo-card mb-5 p-4 bg-black text-white">
+        <h5 class="fw-black text-uppercase mb-4">SELECT PERIOD</h5>
+        <div class="row g-3">
+            <div class="col-md-8">
+                <div class="btn-group" role="group" id="period-selector">
+                    <input type="radio" class="btn-check" name="periodType" id="period-today" value="0">
+                    <label class="btn btn-outline-light" for="period-today">TODAY</label>
+
+                    <input type="radio" class="btn-check" name="periodType" id="period-week" value="1">
+                    <label class="btn btn-outline-light" for="period-week">THIS WEEK</label>
+
+                    <input type="radio" class="btn-check" name="periodType" id="period-month" value="2" checked>
+                    <label class="btn btn-outline-light" for="period-month">THIS MONTH</label>
+
+                    <input type="radio" class="btn-check" name="periodType" id="period-quarter" value="3">
+                    <label class="btn btn-outline-light" for="period-quarter">THIS QUARTER</label>
+
+                    <input type="radio" class="btn-check" name="periodType" id="period-year" value="4">
+                    <label class="btn btn-outline-light" for="period-year">THIS YEAR</label>
+
+                    <input type="radio" class="btn-check" name="periodType" id="period-custom" value="5">
+                    <label class="btn btn-outline-light" for="period-custom">CUSTOM</label>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <button type="button" class="neo-btn neo-btn-success" id="btn-apply-period">
+                    <i class="bi bi-arrow-clockwise me-2"></i>APPLY
+                </button>
+            </div>
+        </div>
+
+        <!-- Custom Date Range -->
+        <div id="custom-range-picker" class="row g-3 mt-3" style="display: none;">
+            <div class="col-md-5">
+                <label class="form-label text-uppercase small">FROM DATE</label>
+                <input type="date" id="date-from" class="form-control">
+            </div>
+            <div class="col-md-5">
+                <label class="form-label text-uppercase small">TO DATE</label>
+                <input type="date" id="date-to" class="form-control">
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Summary Card -->
+    <div class="neo-card mb-5 p-5 bg-black text-white">
+        <h4 class="mb-4 fw-black text-uppercase">FINANCIAL SUMMARY</h4>
+        <div id="summary-content">
+            <div class="text-center py-5">
+                <div class="spinner-border" role="status"></div>
+                <p class="mt-3">LOADING FINANCIAL DATA...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Internal Expenses Section -->
+    <div class="row g-4 mb-5">
+        <!-- Add Expense Form -->
+        <div class="col-lg-4">
+            <div class="neo-card p-4 h-100">
+                <h5 class="fw-black text-uppercase mb-4">ADD INTERNAL EXPENSE</h5>
+                <form id="expense-form">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-uppercase small">AMOUNT</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-black text-white">$</span>
+                            <input type="number" id="expense-amount" class="form-control" step="0.01" min="0.01" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-uppercase small">DATE</label>
+                        <input type="date" id="expense-date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-uppercase small">CATEGORY</label>
+                        <select id="expense-category" class="form-select" required>
+                            <option value="1">Rental</option>
+                            <option value="2">Salaries</option>
+                            <option value="3">Labor</option>
+                            <option value="4">Commission</option>
+                            <option value="5">Zakat</option>
+                            <option value="6">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-uppercase small">DESCRIPTION</label>
+                        <textarea id="expense-description" class="form-control" rows="2" required></textarea>
+                    </div>
+                    <button type="submit" class="neo-btn neo-btn-primary w-100">
+                        <i class="bi bi-plus-circle me-2"></i>ADD EXPENSE
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Expenses History -->
+        <div class="col-lg-8">
+            <div class="neo-card p-0 h-100 overflow-hidden">
+                <div class="p-4 bg-black text-white">
+                    <h5 class="mb-0 fw-black text-uppercase">EXPENSES HISTORY</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>DATE</th>
+                                <th>CATEGORY</th>
+                                <th>DESCRIPTION</th>
+                                <th class="text-end">AMOUNT</th>
+                                <th>CREATED BY</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenses-table-body">
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="spinner-border spinner-border-sm me-2"></div>
+                                    LOADING EXPENSES...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            let currentFilter = { dateRangeType: 2 }; // Default to This Month
+
+            // Initialize dates
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('expense-date').value = today;
+
+            // Show/hide custom date picker
+            document.querySelectorAll('input[name="periodType"]').forEach(radio => {
+                radio.addEventListener('change', function () {
+                    const customPicker = document.getElementById('custom-range-picker');
+                    customPicker.style.display = this.value === '5' ? 'block' : 'none';
+                });
+            });
+
+            // Apply period
+            document.getElementById('btn-apply-period').addEventListener('click', function () {
+                const selectedPeriod = parseInt(document.querySelector('input[name="periodType"]:checked').value);
+                
+                if (selectedPeriod === 5) { // Custom
+                    const fromDate = document.getElementById('date-from').value;
+                    const toDate = document.getElementById('date-to').value;
+                    
+                    if (!fromDate || !toDate) {
+                        alert('Please select both FROM and TO dates for custom range');
+                        return;
+                    }
+                    
+                    currentFilter = {
+                        dateRangeType: 5,
+                        fromUtc: new Date(fromDate).toISOString(),
+                        toUtc: new Date(toDate + 'T23:59:59').toISOString()
+                    };
+                } else {
+                    currentFilter = { dateRangeType: selectedPeriod };
+                }
+                
+                loadFinancialSummary();
+                loadExpenses();
+            });
+
+            // Load financial summary
+            async function loadFinancialSummary() {
+                const container = document.getElementById('summary-content');
+                container.innerHTML = '<div class="text-center py-5"><div class="spinner-border"></div></div>';
+
+                try {
+                    const response = await fetch('/api/financial/summary', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(currentFilter)
+                    });
+
+                    if (!response.ok) throw new Error();
+                    const data = await response.json();
+
+                    // Color coding: positive = green, negative = red, zero = gray
+                    let profitClass = 'text-muted';
+                    if (data.netProfit > 0) profitClass = 'text-success';
+                    else if (data.netProfit < 0) profitClass = 'text-danger';
+                    
+                    container.innerHTML = `
+                        <div class="row g-4">
+                            <div class="col-md-4">
+                                <div class="p-3 bg-white bg-opacity-10 rounded">
+                                    <div class="small text-uppercase opacity-75">Sales Revenue</div>
+                                    <div class="h3 fw-black mb-0">$${formatMoney(data.salesRevenue)}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 bg-white bg-opacity-10 rounded">
+                                    <div class="small text-uppercase opacity-75">Sales Revenue (After Refunds)</div>
+                                    <div class="h3 fw-black mb-0">$${formatMoney(data.salesProfit)}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 bg-white bg-opacity-10 rounded">
+                                    <div class="small text-uppercase opacity-75">Profit Margin</div>
+                                    <div class="h3 fw-black mb-0">${data.profitMargin.toFixed(2)}%</div>
+                                </div>
+                            </div>
+                        </div>
+                        <hr class="border-white opacity-25 my-4">
+                        <div class="row g-4">
+                            <div class="col-md-3">
+                                <div class="small text-uppercase opacity-75">Cost of Goods</div>
+                                <div class="h4 fw-bold">$${formatMoney(data.costOfGoods)}</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="small text-uppercase opacity-75">Gross Profit</div>
+                                <div class="h4 fw-bold">$${formatMoney(data.grossProfit)}</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="small text-uppercase opacity-75">Internal Expenses</div>
+                                <div class="h4 fw-bold">$${formatMoney(data.internalExpenses)}</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="small text-uppercase opacity-75">Net Profit</div>
+                                <div class="h4 fw-bold ${profitClass}">$${formatMoney(data.netProfit)}</div>
+                            </div>
+                        </div>
+                        <hr class="border-white opacity-25 my-4">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <div class="small text-uppercase opacity-75">Net VAT (14%)</div>
+                                <div class="h5 fw-bold">$${formatMoney(data.totalVat)}</div>
+                                <small class="opacity-75">Sales VAT - Purchase VAT</small>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="small text-uppercase opacity-75">Net Manufacturing Tax (1%)</div>
+                                <div class="h5 fw-bold">$${formatMoney(data.totalManufacturingTax)}</div>
+                                <small class="opacity-75">Sales Tax - Purchase Tax</small>
+                            </div>
+                        </div>
+                    `;
+                } catch (error) {
+                    container.innerHTML = '<div class="alert alert-danger">Failed to load financial summary</div>';
+                }
+            }
+
+            // Load expenses
+            async function loadExpenses() {
+                const tbody = document.getElementById('expenses-table-body');
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5"><div class="spinner-border spinner-border-sm"></div></td></tr>';
+
+                try {
+                    const response = await fetch('/api/financial/expenses', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(currentFilter)
+                    });
+
+                    if (!response.ok) throw new Error();
+                    const expenses = await response.json();
+
+                    if (expenses.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">No expenses in this period</td></tr>';
+                        return;
+                    }
+
+                    const categoryNames = ['', 'Rental', 'Salaries', 'Labor', 'Commission', 'Zakat', 'Other'];
+                    tbody.innerHTML = expenses.map(e => `
+                        <tr>
+                            <td>${formatDate(e.timestampUtc)}</td>
+                            <td><span class="badge bg-secondary">${categoryNames[e.internalExpenseType] || 'Other'}</span></td>
+                            <td>${escapeHtml(e.description)}</td>
+                            <td class="text-end fw-bold">$${formatMoney(e.amount)}</td>
+                            <td>${escapeHtml(e.createdByUserDisplayName)}</td>
+                        </tr>
+                    `).join('');
+                } catch (error) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-danger">Failed to load expenses</td></tr>';
+                }
+            }
+
+            // Submit expense
+            document.getElementById('expense-form').addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+
+                const payload = {
+                    amount: parseFloat(document.getElementById('expense-amount').value),
+                    internalExpenseType: parseInt(document.getElementById('expense-category').value),
+                    description: document.getElementById('expense-description').value.trim(),
+                    timestampUtc: new Date(document.getElementById('expense-date').value).toISOString()
+                };
+
+                try {
+                    const response = await fetch('/api/financial/expenses/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) throw new Error();
+
+                    // Reset form
+                    e.target.reset();
+                    document.getElementById('expense-date').value = today;
+
+                    // Reload data
+                    loadFinancialSummary();
+                    loadExpenses();
+
+                    alert('Expense added successfully!');
+                } catch (error) {
+                    alert('Failed to add expense');
+                } finally {
+                    submitBtn.disabled = false;
+                }
+            });
+
+            // Helper functions
+            function formatMoney(num) {
+                return parseFloat(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function formatDate(iso) {
+                try {
+                    return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                } catch {
+                    return iso;
+                }
+            }
+
+            function escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            // Initial load
+            loadFinancialSummary();
+            loadExpenses();
+        })();
+    </script>
+}

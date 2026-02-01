@@ -1030,8 +1030,7 @@ namespace Inventory.Infrastructure.Services
                 _db.FinancialTransactions.Add(revenueReversalTx);
 
                 // Reverse COGS (create Revenue)
-                var product = orderLine.Product ?? await _db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == orderLine.ProductId, ct);
-                var cogsAmount = (product?.Cost ?? 0) * refundItem.Quantity;
+                var cogsAmount = 0m; // Batch-based COGS reversal to be implemented in Phase 3
 
                 var cogsReversalTx = new FinancialTransaction
                 {

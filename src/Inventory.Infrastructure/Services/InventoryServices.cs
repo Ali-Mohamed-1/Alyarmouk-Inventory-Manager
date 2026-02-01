@@ -142,7 +142,7 @@ namespace Inventory.Infrastructure.Services
                             ProductId = line.ProductId,
                             BatchNumber = line.BatchNumber,
                             UnitCost = line.UnitPrice,
-                            UnitPrice = product?.Price ?? 0,
+                            UnitPrice = 0, // Default to 0 as Product.Price is removed
                             UpdatedUtc = DateTimeOffset.UtcNow
                         };
                         _db.ProductBatches.Add(batch);
@@ -154,33 +154,8 @@ namespace Inventory.Infrastructure.Services
                     }
                 }
 
-                // 2. Weighted Average Cost calculation
-                var productToUpdate = await _db.Products.FindAsync(new object[] { line.ProductId }, ct);
-                if (productToUpdate != null)
-                {
-                    var snapshot = await _db.StockSnapshots
-                        .FirstOrDefaultAsync(s => s.ProductId == line.ProductId, ct);
-
-                    decimal oldCost = productToUpdate.Cost;
-                    decimal newCost;
-
-                    if (snapshot is null || snapshot.OnHand == 0)
-                    {
-                        newCost = line.UnitPrice;
-                    }
-                    else
-                    {
-                        decimal oldStockValue = snapshot.OnHand * productToUpdate.Cost;
-                        decimal newPurchaseValue = line.Quantity * line.UnitPrice;
-                        decimal totalValue = oldStockValue + newPurchaseValue;
-                        decimal totalQuantity = snapshot.OnHand + line.Quantity;
-
-                        newCost = Math.Round(totalValue / totalQuantity, 2, MidpointRounding.AwayFromZero);
-                    }
-
-                    productToUpdate.Cost = newCost;
-                    _db.Products.Update(productToUpdate);
-                }
+                // 2. Weighted Average Cost calculation (REMOVED: Product.Cost is deprecated)
+                // We now rely on specific batch costs.
 
                 // 3. Create Inventory Transaction (Receive)
                 var txReq = new CreateInventoryTransactionRequest
