@@ -102,7 +102,7 @@ public  class SalesOrder
     public string? Note { get; set; }
     
     // Tax System Fields
-    public bool IsTaxInclusive { get; set; } = true;
+    public bool IsTaxInclusive { get; set; } = false;
     public bool ApplyVat { get; set; } = true;
     public bool ApplyManufacturingTax { get; set; } = true;
     public decimal Subtotal { get; set; }

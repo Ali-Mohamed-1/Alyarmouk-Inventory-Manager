@@ -64,7 +64,7 @@ namespace Inventory.Application.DTOs.SalesOrder
         public string? TransferId { get; init; }
 
         // Tax Configuration
-        public bool IsTaxInclusive { get; init; } = true;
+        public bool IsTaxInclusive { get; init; } = false;
         public bool ApplyVat { get; init; } = true;
         public bool ApplyManufacturingTax { get; init; } = true;
 

@@ -56,7 +56,10 @@
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h5 class="fw-black text-uppercase mb-0">Sales Order: <span id="so-detail-number" class="text-primary"></span></h5>
                     <div class="d-flex gap-2">
-                        <div id="so-actions-container" class="d-flex gap-1"></div>
+                         <div id="so-actions-container" class="d-flex gap-1"></div>
+                         <a id="btn-print-so-activity" href="#" target="_blank" class="neo-btn neo-btn-primary btn-sm">
+                            <i class="bi bi-printer"></i> PRINT
+                         </a>
                         <button class="neo-btn neo-btn-info btn-sm" onclick="switchSoView('list')">
                             <i class="bi bi-arrow-left"></i> BACK TO LIST
                         </button>
@@ -160,6 +163,9 @@
                     <h5 class="fw-black text-uppercase mb-0">Purchase Order: <span id="po-detail-number" class="text-primary"></span></h5>
                     <div class="d-flex gap-2">
                         <div id="po-actions-container" class="d-flex gap-1"></div>
+                        <a id="btn-print-po-activity" href="#" target="_blank" class="neo-btn neo-btn-primary btn-sm">
+                            <i class="bi bi-printer"></i> PRINT
+                        </a>
                         <button class="neo-btn neo-btn-info btn-sm" onclick="switchPoView('list')">
                             <i class="bi bi-arrow-left"></i> BACK TO LIST
                         </button>
@@ -286,6 +292,10 @@
         </div>
     </div>
 </div>
+
+<!-- HIDDEN UPLOADS -->
+<input type="file" id="invoiceUploadInput" style="display:none" onchange="performUpload('invoice')">
+<input type="file" id="receiptUploadInput" style="display:none" onchange="performUpload('receipt')">
 
 <!-- MODALS AREA -->
 
@@ -541,10 +551,75 @@
 @section Scripts {
     <script>
         (function() {
+            // GLOBALS
+            let currentContextType = null; // 'so' or 'po'
+            window.currentSoId = null;
+            window.currentPoId = null;
+
             // SHARED UTILS
             const formatCurrency = (a) => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD' }).format(a);
             const formatDate = (i) => new Date(i).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
             const escapeHtml = (t) => { if(!t) return ''; const d=document.createElement('div'); d.textContent=t; return d.innerHTML; };
+            
+            // DOCS HELPERS
+            window.renderDocSection = (iPath, rPath) => {
+                const containerId = window.currentContextType === 'so' ? 'so-docs-section' : 'po-docs-section';
+                const container = document.getElementById(containerId);
+                container.innerHTML = `
+                    <div class="d-flex align-items-center justify-content-between p-2 border border-2 border-black bg-white mb-2">
+                        <span class="small fw-black text-uppercase">INVOICE PDF</span>
+                        <div class="d-flex gap-1">
+                            ${iPath ? `
+                                <a href="${iPath}" target="_blank" class="neo-btn neo-btn-primary btn-sm p-1 px-2"><i class="bi bi-download"></i></a>
+                                <button onclick="deleteDoc('invoice')" class="neo-btn neo-btn-danger btn-sm p-1 px-2"><i class="bi bi-trash"></i></button>
+                            ` : `<button onclick="triggerUpload('invoice')" class="neo-btn btn-sm p-1 px-2">UPLOAD</button>`}
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between p-2 border border-2 border-black bg-white">
+                        <span class="small fw-black text-uppercase">RECEIPT PDF</span>
+                        <div class="d-flex gap-1">
+                            ${rPath ? `
+                                <a href="${rPath}" target="_blank" class="neo-btn neo-btn-primary btn-sm p-1 px-2"><i class="bi bi-download"></i></a>
+                                <button onclick="deleteDoc('receipt')" class="neo-btn neo-btn-danger btn-sm p-1 px-2"><i class="bi bi-trash"></i></button>
+                            ` : `<button onclick="triggerUpload('receipt')" class="neo-btn btn-sm p-1 px-2">UPLOAD</button>`}
+                        </div>
+                    </div>
+                `;
+            };
+
+            window.triggerUpload = (type) => document.getElementById(type + 'UploadInput').click();
+
+            window.performUpload = async (type) => {
+                const inputId = type + 'UploadInput';
+                const file = document.getElementById(inputId).files[0];
+                if(!file) return;
+
+                const fd = new FormData(); fd.append('file', file);
+                const isSo = window.currentContextType === 'so';
+                const id = isSo ? window.currentSoId : window.currentPoId;
+                const endpointBase = isSo ? '/api/sales-orders' : '/api/purchase-orders';
+
+                try {
+                    const r = await fetch(`${endpointBase}/${id}/${type}`, { method:'POST', body:fd });
+                    if(!r.ok) throw new Error(await r.text());
+                    
+                    document.getElementById(inputId).value = ''; // Reset
+                    if(isSo) await viewSoDetails(id); else await viewPoDetails(id);
+                } catch(e) { alert("Upload error: " + e.message); }
+            };
+
+            window.deleteDoc = async (type) => {
+                if(!confirm('DELETE THIS FILE?')) return;
+                const isSo = window.currentContextType === 'so';
+                const id = isSo ? window.currentSoId : window.currentPoId;
+                const endpointBase = isSo ? '/api/sales-orders' : '/api/purchase-orders';
+
+                try {
+                    const r = await fetch(`${endpointBase}/${id}/${type}`, { method:'DELETE' });
+                    if(!r.ok) throw new Error();
+                    if(isSo) await viewSoDetails(id); else await viewPoDetails(id);
+                } catch(e) { alert("Delete failed"); }
+            };
             
             const getSoStatusBadge = (s) => {
                 if(s===1) return '<span class="badge neo-btn-success">DONE</span>';
@@ -619,6 +694,7 @@
                     window.currentSoOrder = o;
                     
                     document.getElementById('so-detail-number').innerText = o.orderNumber;
+                    document.getElementById('btn-print-so-activity').href = `/SalesOrders/Details/${o.id}`;
                     document.getElementById('so-detail-customer').innerText = o.customerName || 'UNKNOWN';
                     document.getElementById('so-detail-date').innerText = formatDate(o.orderDate);
                     document.getElementById('so-detail-status').innerHTML = getSoStatusBadge(o.status);
@@ -640,11 +716,8 @@
                     document.getElementById('so-actions-container').innerHTML = actionsHtml.join('');
                     
                     // Docs
-                    const dSec = document.getElementById('so-docs-section');
-                    dSec.innerHTML = '';
-                    if(o.invoicePath) dSec.innerHTML += `<a href="${o.invoicePath}" target="_blank" class="neo-btn neo-btn-primary btn-sm flex-fill text-center"><i class="bi bi-file-earmark-pdf"></i> INVOICE</a>`;
-                    if(o.receiptPath) dSec.innerHTML += `<a href="${o.receiptPath}" target="_blank" class="neo-btn neo-btn-primary btn-sm flex-fill text-center"><i class="bi bi-file-earmark-pdf"></i> RECEIPT</a>`;
-                    if(!o.invoicePath && !o.receiptPath) dSec.innerHTML = '<span class="small text-muted fst-italic">NO DOCUMENTS ATTACHED</span>';
+                    window.currentContextType = 'so';
+                    renderDocSection(o.invoicePath, o.receiptPath);
 
                     // Lines
                     document.getElementById('so-detail-lines').innerHTML = o.lines.map(l => `
@@ -703,6 +776,7 @@
                     const o = await r.json();
                     
                     document.getElementById('po-detail-number').innerText = o.orderNumber;
+                    document.getElementById('btn-print-po-activity').href = `/PurchaseOrders/Details/${o.id}`;
                     document.getElementById('po-detail-supplier').innerText = o.supplierName || 'UNKNOWN';
                     document.getElementById('po-detail-date').innerText = formatDate(o.createdUtc);
                     document.getElementById('po-detail-status').innerHTML = getPoStatusBadge(o.status);
@@ -721,11 +795,9 @@
                     document.getElementById('po-actions-container').innerHTML = poActionsHtml.join('');
 
                     // Docs
-                    const dSec = document.getElementById('po-docs-section');
-                    dSec.innerHTML = '';
-                    if(o.invoicePath) dSec.innerHTML += `<a href="${o.invoicePath}" target="_blank" class="neo-btn neo-btn-primary btn-sm flex-fill text-center"><i class="bi bi-file-earmark-pdf"></i> INVOICE</a>`;
-                    if(o.receiptPath) dSec.innerHTML += `<a href="${o.receiptPath}" target="_blank" class="neo-btn neo-btn-primary btn-sm flex-fill text-center"><i class="bi bi-file-earmark-pdf"></i> RECEIPT</a>`;
-                    if(!o.invoicePath && !o.receiptPath) dSec.innerHTML = '<span class="small text-muted fst-italic">NO DOCUMENTS ATTACHED</span>';
+                    window.currentContextType = 'po';
+                    window.currentPoId = id;
+                    renderDocSection(o.invoicePath, o.receiptPath);
                     
                     // Lines
                     document.getElementById('po-detail-lines').innerHTML = o.lines.map(l => `

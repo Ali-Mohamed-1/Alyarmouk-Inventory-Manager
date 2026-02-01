@@ -1,11 +1,11 @@
-@model Inventory.Application.DTOs.SalesOrder.SalesOrderResponseDto
+@model Inventory.Application.DTOs.PurchaseOrderResponse
 @{
-    ViewData["Title"] = $"Order {Model.OrderNumber}";
+    ViewData["Title"] = $"PO {Model.OrderNumber}";
 }
 
 <style>
     @@media print {
-        .no-print, .neo-btn, header, footer, .d-flex.gap-2 { 
+        .no-print, .neo-btn, header, footer, .d-flex.gap-2.align-items-center { 
             display: none !important; 
         }
         .container-fluid {
@@ -17,45 +17,33 @@
             border: 1px solid #000 !important;
             box-shadow: none !important;
         }
-        
-        /* Force background colors to print */
         body { 
             background: white !important; 
             color: black !important;
             -webkit-print-color-adjust: exact; 
-             print-color-adjust: exact;
         }
-        
-        .bg-black { background-color: black !important; color: white !important; }
-        .text-white { color: white !important; }
-
         /* Ensure table fits */
         .table-responsive {
             overflow: visible !important;
         }
-        
-        /* Layout adjustments for print */
-        .col-lg-8 { width: 66% !important; flex: 0 0 66%; max-width: 66%; }
-        .col-lg-4 { width: 33% !important; flex: 0 0 33%; max-width: 33%; }
-        .row { display: flex !important; flex-wrap: wrap !important; }
     }
 </style>
 
 <div class="container-fluid py-3">
     <div class="d-flex justify-content-between align-items-center mb-5 no-print">
         <div>
-            <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Record ID: @Model.OrderNumber</h1>
-            <p class="fw-bold text-muted mb-0">ORIGINATED: @Model.CreatedUtc.ToLocalTime().ToString("f").ToUpper()</p>
+            <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">PO ID: @Model.OrderNumber</h1>
+            <p class="fw-bold text-muted mb-0">ISSUED: @Model.CreatedUtc.ToLocalTime().ToString("f").ToUpper()</p>
         </div>
         <div class="d-flex gap-2">
-            <a asp-action="Index" class="neo-btn">BACK TO LOG</a>
+            <a asp-controller="PurchaseOrders" asp-action="Index" class="neo-btn">BACK TO LOG</a>
             <button class="neo-btn neo-btn-primary" onclick="window.print()">PRINT HARDCOPY</button>
         </div>
     </div>
 
     <!-- Print Only Header -->
     <div class="d-none d-print-block mb-4">
-        <h1 class="fw-black text-uppercase mb-0">Sales Order Invoice</h1>
+        <h1 class="fw-black text-uppercase mb-0">Purchase Order</h1>
         <div class="d-flex justify-content-between fw-bold border-bottom border-2 border-black pb-2 mt-2">
             <span>REF: @Model.OrderNumber</span>
             <span>DATE: @Model.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd")</span>
@@ -67,7 +55,7 @@
         <div class="col-lg-8">
             <div class="neo-card p-0 overflow-hidden mb-4">
                 <div class="p-3 bg-black text-white">
-                    <h5 class="mb-0 fw-black text-uppercase small">Inventory Line Items</h5>
+                    <h5 class="mb-0 fw-black text-uppercase small">Acquisition Manifest</h5>
                 </div>
                 <div class="p-0" style="background: white;">
                     <div class="table-responsive">
@@ -77,7 +65,7 @@
                                     <th class="ps-4">PRODUCT RECORD</th>
                                     <th>BATCH / LOT</th>
                                     <th class="text-center">QTY</th>
-                                    <th class="text-end">UNIT VAL</th>
+                                    <th class="text-end">UNIT COST</th>
                                     <th class="text-end pe-4">LINE TOTAL</th>
                                 </tr>
                             </thead>
@@ -123,6 +111,11 @@
                             <div class="col-9 text-end fw-black text-uppercase small">Manufacturing Tax (1%):</div>
                             <div class="col-3 text-end fw-bold text-danger">-@Model.ManufacturingTaxAmount.ToString("C2")</div>
                         }
+                         @if (Model.ReceiptExpenses > 0)
+                        {
+                            <div class="col-9 text-end fw-black text-uppercase small">Receipt / Shipping Exps:</div>
+                            <div class="col-3 text-end fw-bold">@Model.ReceiptExpenses.ToString("C2")</div>
+                        }
                         <div class="col-9 text-end fw-black text-uppercase fs-4 mt-3">Grand Total:</div>
                         <div class="col-3 text-end fw-black fs-3 text-success mt-3">@Model.TotalAmount.ToString("C2")</div>
                     </div>
@@ -144,109 +137,81 @@
 
         <!-- Sidebar Info -->
         <div class="col-lg-4">
-            <!-- Customer Info -->
+            <!-- Supplier Info -->
             <div class="neo-card p-0 overflow-hidden mb-4">
                 <div class="p-3 bg-black text-white">
-                    <h5 class="mb-0 fw-black text-uppercase small">Entity Identification</h5>
+                    <h5 class="mb-0 fw-black text-uppercase small">Supplier Identity</h5>
                 </div>
                 <div class="p-4 bg-white">
-                    <h4 class="fw-black text-uppercase mb-1">@Model.CustomerName</h4>
-                    <p class="small fw-bold text-muted mb-0">INTERNAL ID: #@Model.CustomerId</p>
+                    <h4 class="fw-black text-uppercase mb-1">@Model.SupplierName</h4>
+                    <p class="small fw-bold text-muted mb-0">SYSTEM ID: #@Model.SupplierId</p>
                 </div>
             </div>
 
-            <!-- Status Info -->
-            <div class="neo-card p-0 overflow-hidden mb-4 border-4 @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done ? "border-success" : "border-info") no-print">
-                <div class="p-3 @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done ? "bg-success text-white" : "bg-info text-black")">
-                    <h5 class="mb-0 fw-black text-uppercase small">Inherent Status</h5>
+            <!-- Status Info (No Print) -->
+            <div class="neo-card p-0 overflow-hidden mb-4 border-4 @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received ? "border-success" : "border-info") no-print">
+                <div class="p-3 @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received ? "bg-success text-white" : "bg-info text-black")">
+                    <h5 class="mb-0 fw-black text-uppercase small">Current Status</h5>
                 </div>
                 <div class="p-4 bg-white">
                     <div class="d-flex justify-content-between align-items-center mb-4">
-                        <span class="badge @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done ? "neo-btn-success" : "neo-btn-info") fs-5 p-2 px-3">
+                        <span class="badge @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received ? "neo-btn-success" : "neo-btn-info") fs-5 p-2 px-3">
                             @Model.Status.ToString().ToUpper()
                         </span>
                     </div>
 
-                    @if (Model.Status != Inventory.Domain.Entities.SalesOrderStatus.Cancelled)
+                    @if (Model.Status != Inventory.Domain.Entities.PurchaseOrderStatus.Cancelled)
                     {
                         <form asp-action="UpdateStatus" asp-route-id="@Model.Id" method="post" class="d-flex gap-2">
-                            <input type="hidden" name="OrderId" value="@Model.Id" />
-                            <select name="Status" class="form-select fw-black">
-                                @foreach (var status in Enum.GetValues<Inventory.Domain.Entities.SalesOrderStatus>())
+                            <input type="hidden" name="id" value="@Model.Id" />
+                            <select name="status" class="form-select fw-black">
+                                @foreach (var status in Enum.GetValues<Inventory.Domain.Entities.PurchaseOrderStatus>())
                                 {
                                     <option value="@status" selected="@(status == Model.Status)">@status.ToString().ToUpper()</option>
                                 }
                             </select>
                             <button type="submit" class="neo-btn neo-btn-primary">UPDATE</button>
                         </form>
-                        if (Model.Status != Inventory.Domain.Entities.SalesOrderStatus.Done)
+                        @if (Model.Status != Inventory.Domain.Entities.PurchaseOrderStatus.Received)
                         {
                             <div class="mt-3 neo-card p-2 mb-0 border-2 bg-light small fw-bold">
-                                <i class="bi bi-exclamation-triangle-fill me-1 text-warning"></i> INVENTORY DEPLETION TRIGGERED UPON "DONE".
+                                <i class="bi bi-info-circle-fill me-1 text-primary"></i> STOCK IS RECEIVED UPON "RECEIVED" STATUS.
                             </div>
                         }
                     }
                 </div>
             </div>
 
-            <!-- Print Status Placeholder -->
+            <!-- Print Status (Visible on Print) -->
             <div class="d-none d-print-block mb-4 border border-2 border-black p-3">
                  <div class="d-flex justify-content-between">
                      <span class="fw-bold">STATUS:</span>
                      <span class="fw-black">@Model.Status.ToString().ToUpper()</span>
+                 </div>
+                 <div class="d-flex justify-content-between">
+                     <span class="fw-bold">PAYMENT:</span>
+                     <span class="fw-black">@Model.PaymentStatus.ToString().ToUpper()</span>
                  </div>
             </div>
 
             <!-- Payment Info -->
             <div class="neo-card p-0 overflow-hidden mb-4" style="background: var(--neo-yellow);">
                 <div class="p-3 bg-black text-white">
-                    <h5 class="mb-0 fw-black text-uppercase small">Financial Settlement</h5>
+                    <h5 class="mb-0 fw-black text-uppercase small">Financial Status</h5>
                 </div>
                 <div class="p-4">
                     <div class="mb-4">
-                        <span class="badge @(Model.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.Paid ? "neo-btn-success" : "neo-btn-danger text-white") w-100 py-3 fs-5">
+                        <span class="badge @(Model.PaymentStatus == Inventory.Domain.Entities.PurchasePaymentStatus.Paid ? "neo-btn-success" : "neo-btn-danger text-white") w-100 py-3 fs-5">
                             @Model.PaymentStatus.ToString().ToUpper()
                         </span>
                     </div>
-                    <div class="row g-3 fw-bold">
-                        <div class="col-5 text-uppercase small">Method:</div>
-                        <div class="col-7 text-end fw-black">@Model.PaymentMethod.ToString().ToUpper()</div>
-
-                        <div class="col-5 text-uppercase small">Deadline:</div>
-                        <div class="col-7 text-end">@Model.DueDate.ToString("MMM dd, yyyy").ToUpper()</div>
-
-                        @if (Model.PaymentMethod == Inventory.Domain.Entities.PaymentMethod.Check)
-                        {
-                            <div class="col-12 mt-4 pt-3 border-top border-black no-print">
-                                <h6 class="fw-black text-uppercase small mb-3">Verification Info</h6>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span>RECEIVED:</span>
-                                    <span class="badge @(Model.CheckReceived == true ? "bg-black text-white" : "bg-white text-black border border-black")">@(Model.CheckReceived == true ? "YES" : "NO")</span>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <span>CASHED:</span>
-                                    <span class="badge @(Model.CheckCashed == true ? "bg-black text-white" : "bg-white text-black border border-black")">@(Model.CheckCashed == true ? "YES" : "NO")</span>
-                                </div>
-                            </div>
-                        }
-                        else if (Model.PaymentMethod == Inventory.Domain.Entities.PaymentMethod.BankTransfer)
-                        {
-                            <div class="col-12 mt-4 pt-3 border-top border-black">
-                                <h6 class="fw-black text-uppercase small mb-2">Transfer context</h6>
-                                <div class="d-flex justify-content-between">
-                                    <span>TRACE ID:</span>
-                                    <span class="fw-black">@(Model.TransferId ?? "N/A")</span>
-                                </div>
-                            </div>
-                        }
-                    </div>
                 </div>
             </div>
-
-            <!-- Documents -->
+            
+             <!-- Documents (No Print) -->
             <div class="neo-card p-0 overflow-hidden no-print">
                 <div class="p-3 bg-black text-white">
-                    <h5 class="mb-0 fw-black text-uppercase small">Digital Audit Trail</h5>
+                    <h5 class="mb-0 fw-black text-uppercase small">Attachments</h5>
                 </div>
                 <div class="p-0 bg-white">
                     @if (!string.IsNullOrEmpty(Model.InvoicePath))
@@ -258,9 +223,9 @@
                             <i class="bi bi-download"></i>
                         </a>
                     }
-                    @if (!string.IsNullOrEmpty(Model.ReceiptPath))
+                     @if (!string.IsNullOrEmpty(Model.ReceiptPath))
                     {
-                        <a href="@Model.ReceiptPath" target="_blank" class="d-flex justify-content-between align-items-center p-3 text-decoration-none text-black hover-bg-light">
+                        <a href="@Model.ReceiptPath" target="_blank" class="d-flex justify-content-between align-items-center p-3 text-decoration-none text-black border-bottom border-2 hover-bg-light">
                             <div class="fw-black text-uppercase small">
                                 <i class="bi bi-file-earmark-check text-success me-2"></i> RECEIPT PDF
                             </div>
@@ -269,11 +234,10 @@
                     }
                     @if (string.IsNullOrEmpty(Model.InvoicePath) && string.IsNullOrEmpty(Model.ReceiptPath))
                     {
-                        <div class="p-4 text-center text-muted fw-bold small italic">ZERO ATTACHMENTS DETECTED</div>
+                        <div class="p-4 text-center text-muted fw-bold small italic">NO FILES ATTACHED</div>
                     }
                 </div>
             </div>
         </div>
     </div>
 </div>
-

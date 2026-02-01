@@ -80,9 +80,14 @@
                     <div id="orders-details-view" style="display:none;">
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <h5 class="fw-black text-uppercase mb-0">Order: <span id="view-order-number" class="text-primary"></span></h5>
-                            <button class="neo-btn neo-btn-info btn-sm" onclick="switchView('list')">
-                                <i class="bi bi-arrow-left"></i> BACK TO LIST
-                            </button>
+                            <div class="d-flex gap-2">
+                                <a id="btn-print-po" href="#" target="_blank" class="neo-btn neo-btn-primary btn-sm">
+                                    <i class="bi bi-printer"></i> PRINT
+                                </a>
+                                <button class="neo-btn neo-btn-info btn-sm" onclick="switchView('list')">
+                                    <i class="bi bi-arrow-left"></i> BACK TO LIST
+                                </button>
+                            </div>
                         </div>
 
                         <div class="neo-card mb-4" style="background: #f8f8f8;">
@@ -500,6 +505,7 @@
                     renderDocumentActions(o.invoicePath, o.receiptPath);
 
                     document.getElementById('view-order-number').innerText = o.orderNumber;
+                    document.getElementById('btn-print-po').href = `/PurchaseOrders/Details/${o.id}`;
                     document.getElementById('view-order-date').innerText = formatDate(o.createdUtc);
                     document.getElementById('view-order-status').innerHTML = getStatusBadge(o.status);
                     document.getElementById('view-payment-status').innerHTML = getPayBadge(o.paymentStatus);

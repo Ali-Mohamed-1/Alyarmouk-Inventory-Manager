@@ -15,7 +15,7 @@ namespace Inventory.Application.DTOs.PurchaseOrder
         public bool ConnectToReceiveStock { get; set; } = true;
 
         // Tax Configuration
-        public bool IsTaxInclusive { get; set; } = true;
+        public bool IsTaxInclusive { get; set; } = false;
         public bool ApplyVat { get; set; } = true;
         public bool ApplyManufacturingTax { get; set; } = true;
 
