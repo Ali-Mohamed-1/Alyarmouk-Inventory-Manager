@@ -26,6 +26,12 @@ namespace Inventory.Application.DTOs.Reporting
         /// </summary>
         public DateTimeOffset? FromUtc { get; set; }
         public DateTimeOffset? ToUtc { get; set; }
+
+        /// <summary>
+        /// Client's timezone offset in minutes (e.g. -120 for UTC+2).
+        /// Used to resolve Today, ThisWeek, etc. correctly relative to the user.
+        /// </summary>
+        public int TimezoneOffsetMinutes { get; set; }
     }
 
     /// <summary>

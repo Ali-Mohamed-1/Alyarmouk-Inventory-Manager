@@ -11,6 +11,7 @@ using Inventory.Application.DTOs;
 using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Inventory.Domain.Constants;
 
 namespace Inventory.Infrastructure.Services
 {
@@ -151,123 +152,107 @@ namespace Inventory.Infrastructure.Services
 
             var (fromUtc, toUtc) = ResolveDateRange(filter);
 
-            // ---- Sales Revenue (Base Subtotal) ----
-            // We need to calculate revenue based on the SalesOrder.Subtotal (excluding VAT/ManTax),
-            // but only for the portion that has been paid.
+            // author:gross_sales_sub_total (before refunds)
+            // author:refund_sub_total (portion of refunds that is the base price)
             
-            // 1. Get all revenue transactions in range
-            var revenueTransactions = await _db.FinancialTransactions
-                .AsNoTracking()
-                .Where(t => t.Type == FinancialTransactionType.Revenue &&
-                            t.SalesOrderId != null &&
-                            t.TimestampUtc >= fromUtc &&
-                            t.TimestampUtc <= toUtc)
-                .Include(t => t.SalesOrder)
-                .ToListAsync(ct);
+            // 1. Sales Side (Revenue + Taxes)
+            // Join FinancialTransactions (Revenue) with SalesOrders to get accurate tax data per transaction
+            var salesTransactions = await (from t in _db.FinancialTransactions
+                                           join so in _db.SalesOrders on t.SalesOrderId equals so.Id
+                                           where t.Type == FinancialTransactionType.Revenue &&
+                                                 t.TimestampUtc >= fromUtc &&
+                                                 t.TimestampUtc <= toUtc
+                                           select new
+                                           {
+                                               TxAmount = t.Amount,
+                                               OrderTotal = so.TotalAmount,
+                                               OrderSubtotal = so.Subtotal,
+                                               OrderVat = so.VatAmount,
+                                               OrderManTax = so.ManufacturingTaxAmount,
+                                               OrderId = so.Id
+                                           }).AsNoTracking().ToListAsync(ct);
 
-            var revenueTransactionsWithOrder = revenueTransactions
-                .Where(t => t.SalesOrder != null && t.SalesOrder.TotalAmount > 0)
-                .ToList();
+            var gross_sales_subtotal = 0m;
+            var sales_vat = 0m;
+            var sales_man_tax = 0m;
+            var revenueTransactionsWithOrder = new List<(long SalesOrderId, decimal Amount, decimal TotalAmount)>();
 
-            var salesRevenue = 0m;
-            var totalSalesVat = 0m;
-            var totalSalesManTax = 0m;
-
-            foreach (var t in revenueTransactionsWithOrder)
+            foreach (var item in salesTransactions)
             {
-                var order = t.SalesOrder!;
-                
-                // Ratio of this payment to the total order amount
-                // Payment Amount = (Subtotal + VAT - ManTax) * Ratio
-                // We want to extract the components.
-                var ratio = t.Amount / order.TotalAmount;
+                if (item.OrderTotal <= 0) continue;
+                var ratio = item.TxAmount / item.OrderTotal;
 
-                salesRevenue += order.Subtotal * ratio;
-                totalSalesVat += order.VatAmount * ratio;
-                totalSalesManTax += order.ManufacturingTaxAmount * ratio;
+                gross_sales_subtotal += item.OrderSubtotal * ratio;
+                sales_vat += item.OrderVat * ratio;
+                sales_man_tax += item.OrderManTax * ratio;
+                
+                revenueTransactionsWithOrder.Add((item.OrderId, item.TxAmount, item.OrderTotal));
             }
 
-            // ---- Sales Refunds (from RefundTransactions) ----
-            // We need to verify if RefundTransaction.Amount includes tax or not. 
-            // Usually refunds are "money returned", so it's Gross. 
-            // We should theoretically split refunds into Principal, VAT, ManTax too.
-            // But current RefundTransaction only tracks total Amount.
-            // For now, we assume we deduct the Gross Refund from the "Sales Profit" bucket?
-            // Wait, User Rules: "VAT must NOT inflate revenue".
-            // If we refund, we reverse VAT.
-            // Current RefundTransaction structure is simple.
-            // Let's rely on the simple "Amount" for now, but ideally we should prorate refunds too.
-            // However, to strictly follow "Net Profit = Sales Revenue ... - SalesManTax",
-            // we should treat Refunds as reversing these components.
-            // Since we don't have broken-down refund data, we will deduct the Total Refund amount
-            // from the "Sales Profit" effectively. 
-            // Correct approach: Net Sales Revenue = Gross Sales Revenue - Revenue component of Refund.
-            // Given the complexity, let's subtract Total Refunds from the calculated "Sales Profit" 
-            // but keeps "Sales Revenue" as the Gross Generated Revenue.
-            
-            var salesRefundsQuery = _db.RefundTransactions
+            // 2. Sales Refunds (Aggregated by period)
+            var salesRefundsTotal = await _db.RefundTransactions
                 .AsNoTracking()
                 .Where(r => r.Type == RefundType.SalesOrder &&
                             r.ProcessedUtc >= fromUtc &&
-                            r.ProcessedUtc <= toUtc);
+                            r.ProcessedUtc <= toUtc)
+                .SumAsync(r => (decimal?)r.Amount, ct) ?? 0m;
 
-            var salesRefundsTotal = await salesRefundsQuery.SumAsync(r => (decimal?)r.Amount, ct) ?? 0m;
-
-            // To avoid distorting the purely calculated VAT/ManTax from Positive Sales,
-            // we should technically reduce the reported VAT/ManTax by the refunded portion.
-            // BUT, if the Refund didn't record how much VAT was returned, we can't be precise without re-querying.
-            // For this iteration, we track "Total Collected Taxes" via Revenue transactions.
-            // We will report "SalesRevenue" as the Prorated Subtotal.
-            // "SalesProfit" will be "SalesRevenue - (Refunds - RefundedVAT + RefundedManTax)"?
-            // To be safe and simple compliant:
-            // Sales Revenue = Prorated Subtotal.
-            // Refunds = Money Out.
-            // We'll treat Refunds as a generic reduction to Cash Flow for now, or just subtract from SalesProfit.
+            // Refund Base = Sum / (1 + VAT - ManTax)
+            decimal refundBaseDivisor = 1m + TaxConstants.VatRate - TaxConstants.ManufacturingTaxRate;
+            decimal refundBase = salesRefundsTotal / (refundBaseDivisor > 0 ? refundBaseDivisor : 1.13m);
             
-            // User Formula: Net Profit = Sales Revenue - COGS - Internal Expenses - Sales ManTax - Purchase ManTax
+            // Adjust Sales Metrics for Refunds
+            var net_sales_subtotal = Math.Max(0, gross_sales_subtotal - refundBase);
+            sales_vat = Math.Max(0, sales_vat - (refundBase * TaxConstants.VatRate));
+            sales_man_tax = Math.Max(0, sales_man_tax - (refundBase * TaxConstants.ManufacturingTaxRate));
 
-            // ---- Purchase Expenses (Base Subtotal) ----
-            // Similar logic for purchases
-            var expenseTransactions = await _db.FinancialTransactions
-                .AsNoTracking()
-                .Where(t => t.Type == FinancialTransactionType.Expense &&
-                            !t.IsInternalExpense &&
-                            t.PurchaseOrderId != null &&
-                            t.TimestampUtc >= fromUtc &&
-                            t.TimestampUtc <= toUtc)
-                .Include(t => t.PurchaseOrder)
-                .ToListAsync(ct);
+            // 3. Purchase Side (Taxes + Receipt Expenses)
+            var purchaseTransactions = await (from t in _db.FinancialTransactions
+                                              join po in _db.PurchaseOrders on t.PurchaseOrderId equals po.Id
+                                              where t.Type == FinancialTransactionType.Expense &&
+                                                    !t.IsInternalExpense &&
+                                                    t.TimestampUtc >= fromUtc &&
+                                                    t.TimestampUtc <= toUtc
+                                              select new
+                                              {
+                                                  TxAmount = t.Amount,
+                                                  OrderTotal = po.TotalAmount,
+                                                  OrderVat = po.VatAmount,
+                                                  OrderManTax = po.ManufacturingTaxAmount,
+                                                  OrderExpenses = po.ReceiptExpenses
+                                              }).AsNoTracking().ToListAsync(ct);
 
-            var expenseTransactionsWithOrder = expenseTransactions
-                .Where(t => t.PurchaseOrder != null && t.PurchaseOrder.TotalAmount > 0)
-                .ToList();
+            var purchase_vat = 0m;
+            var purchase_man_tax = 0m;
+            var receipt_expenses = 0m;
 
-            var purchaseVat = 0m;
-            var purchaseManTax = 0m;
-            // We don't strictly need "Purchase Subtotal" for Net Profit (we need COGS), 
-            // but we need Purchase ManTax.
-
-            foreach (var t in expenseTransactionsWithOrder)
+            foreach (var item in purchaseTransactions)
             {
-                var order = t.PurchaseOrder!;
-                var ratio = t.Amount / order.TotalAmount; // Amount paid vs Total
+                if (item.OrderTotal <= 0) continue;
+                var ratio = item.TxAmount / item.OrderTotal;
 
-                purchaseVat += order.VatAmount * ratio;
-                purchaseManTax += order.ManufacturingTaxAmount * ratio;
+                purchase_vat += item.OrderVat * ratio;
+                purchase_man_tax += item.OrderManTax * ratio;
+                receipt_expenses += item.OrderExpenses * ratio;
             }
 
-            // ---- COGS Calculation ----
-            // Breakdown COGS by Paid Sales Orders
-            // We already have 'revenueTransactionsWithOrder' which represents the Paid Sales.
-            // We need to load lines to calculate COGS.
-            
-            // Optimization: Load lines for the involved orders
-            var salesOrderIds = revenueTransactionsWithOrder.Select(x => x.SalesOrderId!.Value).Distinct().ToList();
-            
+            var purchaseRefundsTotal = await _db.RefundTransactions
+                .AsNoTracking()
+                .Where(r => r.Type == RefundType.PurchaseOrder &&
+                            r.ProcessedUtc >= fromUtc &&
+                            r.ProcessedUtc <= toUtc)
+                .SumAsync(r => (decimal?)r.Amount, ct) ?? 0m;
+
+            decimal pRefBase = purchaseRefundsTotal / refundBaseDivisor;
+            purchase_vat = Math.Max(0, purchase_vat - (pRefBase * TaxConstants.VatRate));
+            purchase_man_tax = Math.Max(0, purchase_man_tax - (pRefBase * TaxConstants.ManufacturingTaxRate));
+
+            // COGS Calculation
+            var salesOrderIds = revenueTransactionsWithOrder.Select(x => x.SalesOrderId).Distinct().ToList();
             var salesOrderLines = await _db.SalesOrderLines
                 .AsNoTracking()
                 .Where(l => salesOrderIds.Contains(l.SalesOrderId))
-                .Include(l => l.ProductBatch) // Need batch cost
+                .Include(l => l.ProductBatch)
                 .ToListAsync(ct);
 
             var salesOrderLinesMap = salesOrderLines.GroupBy(l => l.SalesOrderId).ToDictionary(g => g.Key, g => g.ToList());
@@ -275,139 +260,49 @@ namespace Inventory.Infrastructure.Services
             var calculatedCogs = 0m;
             foreach (var t in revenueTransactionsWithOrder)
             {
-                if (!salesOrderLinesMap.TryGetValue(t.SalesOrderId!.Value, out var lines)) continue;
-                var order = t.SalesOrder!;
-                
-                // Calculate total cost for the order
+                if (!salesOrderLinesMap.TryGetValue(t.SalesOrderId, out var lines)) continue;
                 var totalOrderCost = lines.Sum(l => l.Quantity * (l.ProductBatch?.UnitCost ?? 0m));
-                
-                // Prorate by payment ratio
-                var ratio = t.Amount / order.TotalAmount;
+                var ratio = t.Amount / t.TotalAmount;
                 calculatedCogs += totalOrderCost * ratio;
             }
 
-            // ---- Purchase Refunds ----
-            var purchaseRefundsQuery = _db.RefundTransactions
-                .AsNoTracking()
-                .Where(r => r.Type == RefundType.PurchaseOrder &&
-                            r.ProcessedUtc >= fromUtc &&
-                            r.ProcessedUtc <= toUtc);
+            // Purchase Refunds also reduce effective COGS of bought items if they were part of it
+            // but functionally, COGS is what was GONE. If it was returned, it didn't generate revenue.
+            // Simplified: subtract the Base of returned purchases from total inventory outflow.
+            var net_cogs = Math.Max(0, calculatedCogs - pRefBase);
 
-            var purchaseRefundsTotal = await purchaseRefundsQuery.SumAsync(r => (decimal?)r.Amount, ct) ?? 0m;
+            // CALCULATED FLOW
+            var gross_profit = net_sales_subtotal - net_cogs;
 
-            // Net COGS = Calculated COGS - Purchase Refunds (Simplified, assuming refunds return cost)
-            var costOfGoods = Math.Max(0, calculatedCogs - purchaseRefundsTotal);
-
-            // ---- Internal Expenses ----
-            var internalExpensesQuery = _db.FinancialTransactions
+            var internalExpenses = await _db.FinancialTransactions
                 .AsNoTracking()
                 .Where(t => t.Type == FinancialTransactionType.Expense &&
                             t.IsInternalExpense &&
                             t.TimestampUtc >= fromUtc &&
-                            t.TimestampUtc <= toUtc);
+                            t.TimestampUtc <= toUtc)
+                .SumAsync(t => (decimal?)t.Amount, ct) ?? 0m;
 
-            var internalExpenses = await internalExpensesQuery.SumAsync(t => (decimal?)t.Amount, ct) ?? 0m;
+            var total_internal_expenses = internalExpenses + receipt_expenses;
+            var operating_profit = gross_profit - total_internal_expenses;
 
-            // Purchase Receipt Expenses are usually part of the Cost of Asset (Inventory), 
-            // so they flow into COGS via UnitCost if allocated. 
-            // If they are separate non-inventory expenses, they should be added here.
-            // In PurchaseOrderServices, ReceiptExpenses are added to TotalAmount.
-            // We should check if they are included in UnitCost. 
-            // The current system seems to just add them to the PO Total. 
-            // For safety, let's treat them as Internal Expenses if they aren't capitalized.
-            // But since we can't easily distinguish capitalized status here without deep checking, 
-            // and the previous code treated them as internal expenses, we will continue that.
-            // We need to prorate them too.
-            var receiptExpenses = 0m;
-            foreach (var t in expenseTransactionsWithOrder)
-            {
-                var order = t.PurchaseOrder!;
-                var ratio = t.Amount / order.TotalAmount;
-                receiptExpenses += order.ReceiptExpenses * ratio;
-            }
+            var net_vat = sales_vat - purchase_vat;
+            var net_man_tax = sales_man_tax - purchase_man_tax;
 
-            var totalInternalExpenses = internalExpenses + receiptExpenses;
-
-            // ---- Net Profit Calculation ----
-            // Formula: Sales Revenue - COGS - Internal Expenses - Sales ManTax - Purchase ManTax
-            // Note on Sales Refunds: They reduce Sales Revenue.
-            // Since we calculated SalesRevenue from (TotalAmount * Ratio), and TotalAmount is the Order Total,
-            // we definitely need to subtract Refunds.
-            // However, we need to subtract the *Component* parts from the refund.
-            // Since we don't have that granularity, we will subtract the FULL Refund Amount from Revenue?
-            // No, that includes VAT reversal.
-            // We should assume Refund = Revenue + VAT - ManTax.
-            // Ideally we subtract the "Revenue" portion of the refund.
-            // Approximation: Revenue portion ~= RefundAmount * (SalesRevenue / (SalesRevenue + VAT - ManTax)).
-            // For now, to ensure "SalesProfit" (Cash Retained) is accurate, the response DTO has "SalesProfit".
-            // Let's set SalesProfit = SalesRevenue - (SalesRefunds - RefundedSalesVAT?).
-            // For strict NetProfit:
-            
-            // Let's refine the User's formula: "Net Profit = Sales Revenue - COGS ..."
-            // This Sales Revenue must be Net of Refunds.
-            // Let's subtract the full sales refund from the "SalesProfit" display, 
-            // AND subtract the estimated Revenue portion from Net Profit calculation.
-            
-            // To be strictly safe and avoid massive complexity with limited Refund data:
-            // We will subtract the Total Sales Refund from the Net Profit for now, 
-            // assuming it's a loss of revenue/cash.
-            // BUT we must add back the VAT part because that's not our loss (it's liability reversal).
-            // Estimated Refunded VAT = SalesRefundsTotal * (TotalSalesVat / (SalesRevenue + TotalSalesVat - TotalSalesManTax))?
-            // This is getting guessy.
-            
-            // Simplest interpretation that matches the User Request "VAT is Output - Input":
-            // Net Profit = (Sales Revenue derived from payments) - COGS - Expenses - ManTax.
-            // We will just treat "SalesRefundsTotal" as a direct deduction from Sales Revenue for simplicity,
-            // treating it as a contra-revenue "Return Inwards".
-            // If we want to be exact about VAT, we'd need Refund Line Items.
-            // For this task, we will calculate NetProfit using the metrics we have.
-            
-            var netSalesRevenue = Math.Max(0, salesRevenue - salesRefundsTotal);
-            
-            // Correct Formula: 
-            // NetProfit = SalesRevenue (Base) - COGS - Expenses - SalesManTax - PurchaseManTax
-            // We'll use the plain salesRevenue (from payments) but we MUST account for refunds.
-            // If we don't account for refunds, profit is inflated.
-            // Let's subtract SalesRefundsTotal from the 'SalesRevenue' term in the equation.
-            
-            // However, doing so subtracts the VAT component of the refund from Profit, which is wrong (VAT isn't profit).
-            // We should only subtract the Ex-VAT portion.
-            // Let's assume average tax rate from the processed orders.
-            decimal avgVatRate = (salesRevenue > 0) ? (totalSalesVat / salesRevenue) : 0.14m; // Fallback to 14%
-            decimal avgManTaxRate = (salesRevenue > 0) ? (totalSalesManTax / salesRevenue) : 0.01m;
-            
-            // Refund = Base * (1 + Vat - ManTax)
-            // Base = Refund / (1 + Vat - ManTax)
-            decimal estimatedRefundBase = salesRefundsTotal / (1 + avgVatRate - avgManTaxRate);
-
-            // Adjusted Revenue
-            var adjustedSalesRevenue = salesRevenue - estimatedRefundBase;
-            
-            var netProfit = adjustedSalesRevenue 
-                            - costOfGoods 
-                            - totalInternalExpenses 
-                            - totalSalesManTax 
-                            - purchaseManTax;
-
-            // ---- Final Output ----
-            var salesProfit = salesRevenue - salesRefundsTotal; // This is the "Cash" profit from sales (incl tax)
-            
-            var profitMargin = adjustedSalesRevenue > 0 
-                ? Math.Round((netProfit / adjustedSalesRevenue) * 100, 2) 
-                : 0m;
+            var net_profit = operating_profit - net_vat - net_man_tax;
 
             return new FinancialSummaryResponseDto
             {
-                SalesRevenue = Math.Round(salesRevenue, 2),
-                SalesProfit = Math.Round(salesProfit, 2),
-                CostOfGoods = Math.Round(costOfGoods, 2),
-                TotalVat = Math.Round(totalSalesVat - purchaseVat, 2),
-                TotalManufacturingTax = Math.Round(totalSalesManTax + purchaseManTax, 2), // Total ManTax Impact
-                InternalExpenses = Math.Round(totalInternalExpenses, 2),
-                GrossProfit = Math.Round(adjustedSalesRevenue - costOfGoods, 2),
-                NetProfit = Math.Round(netProfit, 2),
-                ProfitMargin = profitMargin
-            };        }
+                SalesRevenue = Math.Round(gross_sales_subtotal, 2), // Legacy "Before" label
+                SalesProfit = Math.Round(net_sales_subtotal, 2),   // Legacy "After" label, Hero metric
+                CostOfGoods = Math.Round(net_cogs, 2),
+                TotalVat = Math.Round(net_vat, 2),
+                TotalManufacturingTax = Math.Round(net_man_tax, 2),
+                InternalExpenses = Math.Round(total_internal_expenses, 2),
+                GrossProfit = Math.Round(gross_profit, 2),
+                NetProfit = Math.Round(net_profit, 2),
+                ProfitMargin = net_sales_subtotal > 0 ? Math.Round((net_profit / net_sales_subtotal) * 100, 2) : 0m
+            };
+        }
 
         public async Task<IReadOnlyList<InternalExpenseResponseDto>> GetInternalExpensesAsync(FinancialReportFilterDto filter, CancellationToken ct = default)
         {
@@ -465,8 +360,8 @@ namespace Inventory.Infrastructure.Services
 
         private static (DateTimeOffset FromUtc, DateTimeOffset ToUtc) ResolveDateRange(FinancialReportFilterDto filter)
         {
-            var now = DateTimeOffset.UtcNow;
-
+            var nowUtc = DateTimeOffset.UtcNow;
+            
             if (filter.DateRangeType == FinancialDateRangeType.Custom &&
                 filter.FromUtc.HasValue &&
                 filter.ToUtc.HasValue)
@@ -474,43 +369,48 @@ namespace Inventory.Infrastructure.Services
                 return (filter.FromUtc.Value, filter.ToUtc.Value);
             }
 
-            DateTimeOffset start;
-            DateTimeOffset end;
+            // Get local current time based on offset
+            var localNow = nowUtc.AddMinutes(-filter.TimezoneOffsetMinutes);
+            DateTimeOffset localStart;
+            DateTimeOffset localEnd;
 
             switch (filter.DateRangeType)
             {
                 case FinancialDateRangeType.Today:
-                    start = now.Date;
-                    end = start.AddDays(1).AddTicks(-1);
+                    localStart = new DateTimeOffset(localNow.Year, localNow.Month, localNow.Day, 0, 0, 0, localNow.Offset);
+                    localEnd = localStart.AddDays(1).AddTicks(-1);
                     break;
                 case FinancialDateRangeType.ThisWeek:
-                    // Assuming week starts on Monday
-                    var diff = (7 + (int)now.DayOfWeek - (int)DayOfWeek.Monday) % 7;
-                    start = now.Date.AddDays(-diff);
-                    end = start.AddDays(7).AddTicks(-1);
+                    // Week Starts on Sunday (User Preference)
+                    var diffDay = (int)localNow.DayOfWeek;
+                    localStart = new DateTimeOffset(localNow.Year, localNow.Month, localNow.Day, 0, 0, 0, localNow.Offset).AddDays(-diffDay);
+                    localEnd = localStart.AddDays(7).AddTicks(-1);
                     break;
                 case FinancialDateRangeType.ThisMonth:
-                    start = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, now.Offset);
-                    end = start.AddMonths(1).AddTicks(-1);
+                    localStart = new DateTimeOffset(localNow.Year, localNow.Month, 1, 0, 0, 0, localNow.Offset);
+                    localEnd = localStart.AddMonths(1).AddTicks(-1);
                     break;
                 case FinancialDateRangeType.ThisQuarter:
-                    var quarter = (now.Month - 1) / 3;
-                    var quarterStartMonth = quarter * 3 + 1;
-                    start = new DateTimeOffset(now.Year, quarterStartMonth, 1, 0, 0, 0, now.Offset);
-                    end = start.AddMonths(3).AddTicks(-1);
+                    var quarter = (localNow.Month - 1) / 3;
+                    var qStartMonth = quarter * 3 + 1;
+                    localStart = new DateTimeOffset(localNow.Year, qStartMonth, 1, 0, 0, 0, localNow.Offset);
+                    localEnd = localStart.AddMonths(3).AddTicks(-1);
                     break;
                 case FinancialDateRangeType.ThisYear:
-                    start = new DateTimeOffset(now.Year, 1, 1, 0, 0, 0, now.Offset);
-                    end = start.AddYears(1).AddTicks(-1);
+                    localStart = new DateTimeOffset(localNow.Year, 1, 1, 0, 0, 0, localNow.Offset);
+                    localEnd = localStart.AddYears(1).AddTicks(-1);
                     break;
                 default:
-                    // Fallback to "Today" if something unexpected happens.
-                    start = now.Date;
-                    end = start.AddDays(1).AddTicks(-1);
+                    localStart = localNow;
+                    localEnd = localNow;
                     break;
             }
 
-            return (start, end);
+            // Convert local boundaries back to UTC for DB query
+            var fromUtc = localStart.ToUniversalTime();
+            var toUtc = localEnd.ToUniversalTime();
+
+            return (fromUtc, toUtc);
         }
     }
 }

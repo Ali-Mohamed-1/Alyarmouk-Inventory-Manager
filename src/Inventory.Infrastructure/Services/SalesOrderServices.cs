@@ -280,6 +280,13 @@ namespace Inventory.Infrastructure.Services
 
                 await _db.SaveChangesAsync(ct);
 
+                // If order is created as already Paid, create the Revenue transaction
+                // This ensures the financial report can aggregate tax data for this order
+                if (salesOrder.PaymentStatus == PaymentStatus.Paid)
+                {
+                    await _financialServices.ProcessSalesPaymentAsync(salesOrder.Id, user, ct);
+                }
+
                 // AUDIT LOG: Record the order creation
                 await _auditWriter.LogCreateAsync<SalesOrder>(
                     salesOrder.Id,
