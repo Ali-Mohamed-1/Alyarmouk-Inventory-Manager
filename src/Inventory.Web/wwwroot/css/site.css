@@ -1,46 +1,43 @@
 :root {
-    /* Base Structural Colors */
-    --neo-charcoal: #1A1A1A;
-    --neo-offwhite: #F9FAFB;
+    /* Base Structural Colors - Softer Palette */
+    --neo-charcoal: #2D3748;
+    /* Slate 800 - Professional Dark Gray */
+    --neo-offwhite: #F8FAFC;
     --neo-white: #FFFFFF;
-    --neo-bg: #F3F4F6;
+    --neo-bg: #F1F5F9;
+    /* Slate 100 - Cool soft gray background */
+    --neo-border-color: #334155;
+    /* Slate 700 - Muted border color */
 
     /* Refined Professional Palette */
-    --neo-primary: #1E40AF;
-    /* Royal Blue - Primary Actions */
-    --neo-success: #065F46;
-    /* Deep Emerald */
-    --neo-info: #0369A1;
-    /* Deep Azure */
-    --neo-danger: #991B1B;
-    /* Deep Crimson */
-    --neo-warning: #B45309;
-    /* Muted Gold / Amber */
-    --neo-accent: #475569;
+    --neo-primary: #2563EB;
+    /* Bright Blue */
+    --neo-success: #059669;
+    /* Emerald */
+    --neo-info: #0284C7;
+    /* Azure */
+    --neo-danger: #DC2626;
+    /* Red */
+    --neo-warning: #D97706;
+    /* Amber */
+    --neo-accent: #64748B;
     /* Slate Gray */
 
-    /* Legend Aliases (Maintaining compatibility with existing views if they use old names) */
-    --neo-yellow: var(--neo-primary);
-    --neo-lime: var(--neo-success);
-    --neo-aqua: var(--neo-info);
-    --neo-magenta: var(--neo-danger);
-    --neo-orange: var(--neo-warning);
-    --neo-blue: var(--neo-primary);
+    /* UI Tokens - Softened */
+    --neo-border-width: 1px;
+    --neo-border-radius: 8px;
+    /* Subtle rounding */
+    --neo-border: var(--neo-border-width) solid var(--neo-border-color);
 
-    /* UI Tokens */
-    --neo-border-width: 2px;
-    --neo-border: var(--neo-border-width) solid var(--neo-charcoal);
-    --neo-shadow: 4px 4px 0px 0px var(--neo-charcoal);
-    --neo-shadow-sm: 2px 2px 0px 0px var(--neo-charcoal);
-    --neo-shadow-lg: 8px 8px 0px 0px var(--neo-charcoal);
+    /* Softened Shadows - Lower depth and using border color */
+    --neo-shadow: 3px 3px 0px 0px var(--neo-border-color);
+    --neo-shadow-sm: 2px 2px 0px 0px var(--neo-border-color);
+    --neo-shadow-lg: 6px 6px 0px 0px var(--neo-border-color);
 
-    --neo-transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1);
+    --neo-transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-* {
-    border-radius: 0 !important;
-}
-
+/* Global typography and base styles */
 html,
 body {
     min-height: 100%;
@@ -69,9 +66,10 @@ h6,
 .display-2,
 .display-3,
 .display-4 {
-    font-weight: 900;
+    font-weight: 800;
+    /* Slightly reduced weight for softer feel */
     text-transform: uppercase;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
     color: var(--neo-charcoal);
 }
 
@@ -128,13 +126,16 @@ th {
     box-shadow: var(--neo-shadow);
     padding: 2rem;
     margin-bottom: 2rem;
-    border-radius: 0;
+    border-radius: var(--neo-border-radius);
+    overflow: hidden;
+    /* Ensure headers/children are clipped to rounded corners */
+    background-clip: padding-box;
 }
 
 .neo-btn {
     border: var(--neo-border);
     box-shadow: var(--neo-shadow-sm);
-    border-radius: 0;
+    border-radius: var(--neo-border-radius);
     font-weight: 700;
     text-transform: uppercase;
     padding: 0.75rem 1.5rem;
@@ -146,7 +147,7 @@ th {
     color: var(--neo-charcoal);
     text-decoration: none;
     cursor: pointer;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     font-size: 0.875rem;
 }
 
@@ -211,16 +212,22 @@ th {
 .table-responsive {
     border: var(--neo-border);
     box-shadow: var(--neo-shadow);
+    border-radius: var(--neo-border-radius);
+    overflow: hidden;
+    background: var(--neo-charcoal);
+    /* Ensure background fills corner radius before table content */
 }
 
 .table {
     margin-bottom: 0;
-    background: white;
+    background: transparent;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .table thead th {
     border-bottom: var(--neo-border);
-    background: var(--neo-charcoal);
+    background: var(--neo-charcoal) !important;
     color: white;
     text-transform: uppercase;
     font-weight: 700;
@@ -230,6 +237,7 @@ th {
 }
 
 .table td {
+    background: var(--neo-white);
     border-bottom: 1px solid #E5E7EB;
     padding: 1rem;
     font-size: 0.9375rem;
@@ -244,7 +252,7 @@ th {
 .form-control,
 .form-select {
     border: var(--neo-border);
-    border-radius: 0;
+    border-radius: var(--neo-border-radius);
     box-shadow: none;
     padding: 0.75rem 1rem;
     font-weight: 400;
@@ -280,7 +288,8 @@ th {
     height: 1.25rem;
     margin-left: -2rem;
     border: var(--neo-border);
-    border-radius: 0 !important;
+    border-radius: 4px !important;
+    /* Milder rounding for checkboxes */
     background-color: var(--neo-white);
     background-image: none;
     cursor: pointer;
@@ -309,8 +318,8 @@ th {
 
 /* Badges */
 .badge {
-    border-radius: 0;
-    border: 1.5px solid var(--neo-charcoal);
+    border-radius: 4px;
+    border: 1px solid var(--neo-border-color);
     padding: 0.4em 0.8em;
     font-weight: 700;
     text-transform: uppercase;
@@ -330,7 +339,7 @@ th {
 }
 
 .navbar-brand {
-    font-weight: 900;
+    font-weight: 800;
     text-transform: uppercase;
     font-size: 1.15rem;
     letter-spacing: -0.01em;
@@ -341,6 +350,7 @@ th {
     color: white !important;
     display: flex;
     flex-direction: column;
+    /* Removed individual border-radius to fill corners against navbar edges */
     line-height: 1;
 }
 
@@ -387,14 +397,16 @@ th {
 .modal-content,
 .modal-header,
 .modal-footer {
-    border-radius: 0 !important;
+    border-radius: 0;
 }
 
 .modal-content {
     border: var(--neo-border);
-    box-shadow: 12px 12px 0px 0px var(--neo-charcoal);
+    box-shadow: var(--neo-shadow-lg);
+    border-radius: var(--neo-border-radius) !important;
     overflow: hidden;
-    /* Clips children corners to prevent white bleed */
+    background-clip: padding-box;
+    /* Better corner clipping */
 }
 
 .modal-header {
@@ -424,7 +436,8 @@ th {
 .modal-title {
     font-size: 1rem;
     letter-spacing: 0.05em;
-    font-weight: 900;
+    font-weight: 800;
+    /* Reduced weight */
     text-transform: uppercase;
 }
 
@@ -446,6 +459,7 @@ th {
     background: white;
     position: relative;
     overflow: hidden;
+    border-radius: var(--neo-border-radius);
 }
 
 .neo-metric-label {
@@ -459,7 +473,8 @@ th {
 
 .neo-metric-value {
     font-size: 3.5rem;
-    font-weight: 900;
+    font-weight: 800;
+    /* Reduced weight */
     line-height: 1;
     color: var(--neo-charcoal);
 }
