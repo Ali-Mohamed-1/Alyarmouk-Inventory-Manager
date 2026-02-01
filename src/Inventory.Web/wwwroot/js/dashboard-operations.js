@@ -109,6 +109,8 @@
         const rowId = `line-row-${state.lineCount}`;
         const row = document.createElement('tr');
         row.id = rowId;
+
+        // Swapped Column Order: Product -> Qty -> Batch -> Cost -> Action
         row.innerHTML = `
             <td>
                 <select class="form-select border-black product-select" required>
@@ -123,13 +125,14 @@
                 <input type="number" class="form-control border-black qty-input" step="0.01" min="0.01" required value="1" />
             </td>
             <td>
+                <input type="text" class="form-control border-black batch-input" placeholder="New or Select..." list="list-${rowId}" />
+                <datalist id="list-${rowId}"></datalist>
+            </td>
+            <td>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-light text-black border-black">$</span>
                     <input type="number" class="form-control border-black cost-input" step="0.01" min="0" required />
                 </div>
-            </td>
-            <td>
-                <input type="text" class="form-control border-black batch-input" placeholder="Optional" />
             </td>
             <td class="text-center">
                 <button type="button" class="btn btn-outline-danger btn-sm border-2 remove-line" data-row="${rowId}">
@@ -141,23 +144,65 @@
         linesTableBody.appendChild(row);
 
         const pSelect = row.querySelector('.product-select');
-        pSelect.addEventListener('change', () => {
+        const batchInput = row.querySelector('.batch-input');
+        const batchList = row.querySelector(`#list-${rowId}`);
+        const costInput = row.querySelector('.cost-input');
+
+        // Product selection handler
+        pSelect.addEventListener('change', async () => {
             const opt = pSelect.selectedOptions[0];
-            if (opt && opt.value) {
-                row.querySelector('.cost-input').value = opt.dataset.cost || '';
-                row.querySelector('.batch-input').value = opt.dataset.batch || '';
+            const pid = pSelect.value;
+
+            // Reset fields
+            batchInput.value = '';
+            costInput.value = '';
+            batchList.innerHTML = '';
+
+            if (pid) {
+                // If product provides a default last used cost, use it initially
+                if (opt && opt.dataset.cost) {
+                    costInput.value = opt.dataset.cost;
+                }
+
+                // Load Batches for Datalist
+                try {
+                    const batches = await fetchProductBatches(pid);
+                    batchList.innerHTML = batches.map(b =>
+                        `<option value="${b.batchNumber}" data-cost="${b.unitCost || ''}">Qty: ${b.onHand}</option>`
+                    ).join('');
+                } catch (e) {
+                    console.error("Failed to load batches", e);
+                }
+            }
+            calculateSummary();
+        });
+
+        // Batch selection auto-fill Cost logic
+        batchInput.addEventListener('input', () => {
+            const val = batchInput.value;
+            const options = Array.from(batchList.options);
+            const matchedOption = options.find(o => o.value === val);
+
+            if (matchedOption && matchedOption.dataset.cost) {
+                costInput.value = matchedOption.dataset.cost;
             }
             calculateSummary();
         });
 
         row.querySelector('.qty-input').addEventListener('input', calculateSummary);
-        row.querySelector('.cost-input').addEventListener('input', calculateSummary);
+        costInput.addEventListener('input', calculateSummary);
         row.querySelector('.remove-line').addEventListener('click', (e) => {
             row.remove();
             calculateSummary();
         });
 
         calculateSummary();
+    }
+
+    async function fetchProductBatches(productId) {
+        const r = await fetch(`/api/products/${productId}/batches`);
+        if (!r.ok) throw new Error();
+        return await r.json();
     }
 
     function updateAllProductDropdowns() {

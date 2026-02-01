@@ -10,7 +10,7 @@
             <p class="fw-bold text-muted mb-0">ORIGINATED: @Model.CreatedUtc.ToLocalTime().ToString("f").ToUpper()</p>
         </div>
         <div class="d-flex gap-2">
-            <a asp-action="Index" class="neo-btn">BACK TO LOG</a>
+            <a asp-controller="Home" asp-action="Index" class="neo-btn">BACK</a>
             <button class="neo-btn neo-btn-primary" onclick="window.print()">PRINT HARDCOPY</button>
         </div>
     </div>

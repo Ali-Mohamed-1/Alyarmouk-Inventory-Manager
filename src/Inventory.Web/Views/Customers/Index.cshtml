@@ -57,13 +57,14 @@
                                 <th>PAYMENT</th>
                                 <th class="text-end">SUBTOTAL</th>
                                 <th class="text-end">VAT</th>
+                                <th class="text-end">MAN. TAX</th>
                                 <th class="text-end">TOTAL</th>
                                 <th>PRODUCTS</th>
                                 <th class="text-end">ACTIONS</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr><td colspan="9" class="text-center py-5 fw-bold">LOADING ORDERS...</td></tr>
+                            <tr><td colspan="10" class="text-center py-5 fw-bold">LOADING ORDERS...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -744,6 +745,7 @@
                             <td>${getPayBadge(o.paymentStatus)}</td>
                             <td class="text-end fw-bold">${formatCurrency(o.subtotal)}</td>
                             <td class="text-end fw-bold">${formatCurrency(o.vatAmount)}</td>
+                            <td class="text-end fw-bold text-danger">${o.manufacturingTaxAmount > 0 ? '-' + formatCurrency(o.manufacturingTaxAmount) : '-'}</td>
                             <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
                             <td class="text-truncate" style="max-width: 250px;" title="${escapeHtml(ps)}">${escapeHtml(ps)}</td>
                             <td class="text-end">
