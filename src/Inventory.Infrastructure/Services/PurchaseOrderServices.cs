@@ -10,7 +10,7 @@ using Inventory.Domain.Constants;
 using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using Inventory.Application.DTOs.PurchaseOrder;
+using Inventory.Application.DTOs.Payment;
 
 namespace Inventory.Infrastructure.Services
 {
@@ -36,7 +36,7 @@ namespace Inventory.Infrastructure.Services
         public async Task<IEnumerable<PurchaseOrderResponse>> GetRecentAsync(int count = 10, CancellationToken ct = default)
         {
             return await _db.PurchaseOrders
-                .AsNoTracking()
+                .Include(o => o.Payments)
                 .OrderByDescending(o => o.CreatedUtc)
                 .Take(count)
                 .Select(o => MapToResponse(o))
@@ -48,6 +48,7 @@ namespace Inventory.Infrastructure.Services
             var order = await _db.PurchaseOrders
                 .AsNoTracking()
                 .Include(o => o.Lines)
+                .Include(o => o.Payments)
                 .FirstOrDefaultAsync(o => o.Id == id, ct);
 
             return order == null ? null : MapToResponse(order);
@@ -58,6 +59,7 @@ namespace Inventory.Infrastructure.Services
             return await _db.PurchaseOrders
                 .AsNoTracking()
                 .Include(o => o.Lines)
+                .Include(o => o.Payments)
                 .Where(o => o.SupplierId == supplierId)
                 .OrderByDescending(o => o.CreatedUtc)
                 .Select(o => MapToResponse(o))
@@ -144,7 +146,8 @@ namespace Inventory.Infrastructure.Services
                     ApplyVat = req.ApplyVat,
                     ApplyManufacturingTax = req.ApplyManufacturingTax,
                     ReceiptExpenses = req.ReceiptExpenses,
-                    Status = req.ConnectToReceiveStock ? PurchaseOrderStatus.Received : PurchaseOrderStatus.Draft
+                    Status = PurchaseOrderStatus.Draft // Hardened: Stock NOT affected on creation
+                    // PaymentStatus is derived from ledger - defaults to Unpaid
                 };
 
                 // Add to DB context to generate ID
@@ -234,21 +237,27 @@ namespace Inventory.Infrastructure.Services
                 purchaseOrder.ManufacturingTaxAmount = totalManTax;
                 purchaseOrder.TotalAmount = totalOrderAmount + req.ReceiptExpenses;
 
-                await _db.SaveChangesAsync(ct);
-
-                // Even if ConnectToReceiveStock is true, we should handle it via a separate call 
-                // to maintain "no effects on creation" if we want to be strict, or just call the service.
-                // The rule says "Stock must NOT be affected on: Order creation".
-                // I will set it to Draft always on creation to enforce this, or just let it stay Received but NOT trigger stock here.
-                // If I set it to Received but don't call the service, then stock won't be updated.
-                // If I want to follow "Transitioning into the triggering state applies effects", then creating it as Received SHOULD trigger it.
-                // But the rule explicitly says "Stock must NOT be affected on: Order creation".
-                // So I will force status to Draft or Pending if it was Received.
-                if (purchaseOrder.Status == PurchaseOrderStatus.Received)
+                // 4. Handle Initial Payment
+                if (req.PaymentStatus == PurchasePaymentStatus.Paid)
                 {
-                    purchaseOrder.Status = PurchaseOrderStatus.Pending;
+                    var payment = new PaymentRecord
+                    {
+                        PurchaseOrderId = purchaseOrder.Id,
+                        Amount = purchaseOrder.TotalAmount,
+                        PaymentDate = DateTimeOffset.UtcNow,
+                        PaymentMethod = req.PaymentMethod,
+                        PaymentType = PaymentRecordType.Payment,
+                        Reference = "INITIAL-PAYMENT",
+                        CreatedByUserId = user.UserId
+                    };
+                    
+                    purchaseOrder.Payments.Add(payment);
+                    
+                    // Also create financial transaction
+                    await _financialServices.CreateFinancialTransactionFromPaymentAsync(payment, user, ct);
                 }
 
+                purchaseOrder.RecalculatePaymentStatus();
                 await _db.SaveChangesAsync(ct);
 
                 // AUDIT LOG
@@ -349,47 +358,6 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
-        public async Task UpdatePaymentStatusAsync(long id, PurchasePaymentStatus status, UserContext user, CancellationToken ct = default)
-        {
-            ValidateUser(user);
-            
-            var order = await _db.PurchaseOrders.FindAsync(new object[] { id }, ct);
-            if (order == null) throw new NotFoundException($"Purchase order {id} not found.");
-
-            if (order.PaymentStatus == status) return;
-
-            var oldStatus = order.PaymentStatus;
-
-            // Use transaction to ensure money flow stays consistent
-            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-            try
-            {
-                // 1. Transitioning OUT of Paid -> Reverse effects
-                if (oldStatus == PurchasePaymentStatus.Paid)
-                {
-                    await _financialServices.ReversePurchasePaymentAsync(order.Id, user, ct);
-                }
-
-                // 2. Set new status (FinancialServices might have already set it, but we ensure consistency)
-                order.PaymentStatus = status;
-
-                // 3. Transitioning INTO Paid -> Apply effects
-                if (status == PurchasePaymentStatus.Paid)
-                {
-                    await _financialServices.ProcessPurchasePaymentAsync(order.Id, user, ct);
-                }
-
-                await _db.SaveChangesAsync(ct);
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(id, user, new { PaymentStatus = oldStatus }, new { PaymentStatus = status }, ct);
-                
-                await transaction.CommitAsync(ct);
-            }
-            catch (Exception)
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
-        }
 
         public async Task UpdatePaymentDeadlineAsync(long id, DateTimeOffset? newDeadline, UserContext user, CancellationToken ct = default)
         {
@@ -417,6 +385,59 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
+        public async Task AddPaymentAsync(long orderId, Inventory.Application.DTOs.Payment.CreatePaymentRequest req, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            if (req.Amount <= 0) throw new ValidationException("Payment amount must be greater than zero.");
+
+            var order = await _db.PurchaseOrders
+                .Include(o => o.Payments)
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (order == null) throw new NotFoundException($"Purchase order {orderId} not found.");
+
+            var remaining = order.GetRemainingAmount();
+            if (req.Amount > remaining)
+                throw new ValidationException($"Payment amount {req.Amount:C} exceeds remaining balance {remaining:C}.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var payment = new PaymentRecord
+                {
+                    OrderType = OrderType.PurchaseOrder,
+                    PurchaseOrderId = orderId,
+                    Amount = req.Amount,
+                    PaymentDate = req.PaymentDate,
+                    PaymentMethod = req.PaymentMethod,
+                    PaymentType = PaymentRecordType.Payment,
+                    Reference = req.Reference,
+                    Note = req.Note,
+                    CreatedByUserId = user.UserId
+                };
+
+
+                order.Payments.Add(payment);
+                
+                // Single Source of Truth: ensure derived status is updated
+                order.RecalculatePaymentStatus();
+
+                // Record in Financial Ledger - Requirement 1
+                await _financialServices.CreateFinancialTransactionFromPaymentAsync(payment, user, ct);
+
+                await _db.SaveChangesAsync(ct);
+                
+                await _auditWriter.LogCreateAsync<PaymentRecord>(payment.Id, user, afterState: payment, ct);
+
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+        }
+
 
         public async Task RefundAsync(RefundPurchaseOrderRequest req, UserContext user, CancellationToken ct = default)
         {
@@ -426,6 +447,7 @@ namespace Inventory.Infrastructure.Services
 
             var order = await _db.PurchaseOrders
                 .Include(o => o.Lines)
+                .Include(o => o.Payments)
                 .FirstOrDefaultAsync(o => o.Id == req.OrderId, ct);
 
             if (order == null) throw new NotFoundException($"Purchase order {req.OrderId} not found.");
@@ -511,14 +533,32 @@ namespace Inventory.Infrastructure.Services
 
                 _db.RefundTransactions.Add(refundTx);
 
+                // Create PaymentRecord for Refund
+                var refundPayment = new PaymentRecord
+                {
+                    OrderType = OrderType.PurchaseOrder,
+                    PurchaseOrderId = order.Id,
+                    Amount = req.Amount,
+                    PaymentDate = DateTimeOffset.UtcNow,
+                    PaymentMethod = PaymentMethod.Cash, // Default to cash for refunds
+                    PaymentType = PaymentRecordType.Refund,
+                    Note = $"Refund for Order {order.OrderNumber}. Reason: {req.Reason}",
+                    CreatedByUserId = user.UserId
+                };
+                _db.PaymentRecords.Add(refundPayment);
+                order.Payments.Add(refundPayment);
+
                 // Update Order Totals
                 order.RefundedAmount += req.Amount;
+                
+                // Recalculate status
+                order.RecalculatePaymentStatus();
 
-                // Process Financial Refund (Revenue)
-                await _financialServices.ProcessPurchaseRefundPaymentAsync(order.Id, req.Amount, user, ct);
+                // Process Financial Refund - Requirement 1
+                await _financialServices.CreateFinancialTransactionFromPaymentAsync(refundPayment, user, ct);
 
                 await _db.SaveChangesAsync(ct);
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(order.Id, user, before, new { order.RefundedAmount }, ct);
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(order.Id, user, before, new { order.RefundedAmount, order.PaymentStatus }, ct);
                 
                 await transaction.CommitAsync(ct);
             }
@@ -677,8 +717,104 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
+        public async Task UpdatePaymentInfoAsync(long id, UpdatePurchaseOrderPaymentRequest req, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+
+            if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id), "Order ID must be positive.");
+            if (req is null) throw new ArgumentNullException(nameof(req));
+            if (req.OrderId != id) throw new ValidationException("Order ID mismatch.");
+
+            var purchaseOrder = await _db.PurchaseOrders
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
+
+            if (purchaseOrder is null)
+                throw new NotFoundException($"Purchase order id {id} was not found.");
+
+            // Validate logic for checks
+            if (purchaseOrder.PaymentMethod == PaymentMethod.Check || req.PaymentMethod == PaymentMethod.Check)
+            {
+                if (req.CheckReceived == true && !req.CheckReceivedDate.HasValue)
+                    throw new ValidationException("Check issued date is required when marking check as issued.");
+                
+                if (req.CheckCashed == true && !req.CheckCashedDate.HasValue)
+                    throw new ValidationException("Check cashed date is required when marking check as cashed.");
+            }
+
+            if (purchaseOrder.PaymentMethod == PaymentMethod.BankTransfer || req.PaymentMethod == PaymentMethod.BankTransfer)
+            {
+                if (purchaseOrder.PaymentStatus == PurchasePaymentStatus.Paid && string.IsNullOrWhiteSpace(req.TransferId) && string.IsNullOrWhiteSpace(purchaseOrder.TransferId))
+                    throw new ValidationException("Transfer ID is required for bank transfer orders.");
+            }
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var beforeState = new 
+                { 
+                    purchaseOrder.PaymentMethod,
+                    purchaseOrder.CheckReceived, 
+                    purchaseOrder.CheckReceivedDate,
+                    purchaseOrder.CheckCashed,
+                    purchaseOrder.CheckCashedDate,
+                    purchaseOrder.TransferId,
+                    purchaseOrder.Note
+                };
+
+                if (req.PaymentMethod.HasValue)
+                {
+                    purchaseOrder.PaymentMethod = req.PaymentMethod.Value;
+                }
+
+                if (purchaseOrder.PaymentMethod == PaymentMethod.Check)
+                {
+                    purchaseOrder.CheckReceived = req.CheckReceived;
+                    purchaseOrder.CheckReceivedDate = req.CheckReceivedDate;
+                    purchaseOrder.CheckCashed = req.CheckCashed;
+                    purchaseOrder.CheckCashedDate = req.CheckCashedDate;
+                }
+                else if (purchaseOrder.PaymentMethod == PaymentMethod.BankTransfer)
+                {
+                    purchaseOrder.TransferId = req.TransferId;
+                }
+
+                if (!string.IsNullOrWhiteSpace(req.Note))
+                {
+                    purchaseOrder.Note = req.Note;
+                }
+
+                await _db.SaveChangesAsync(ct);
+
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
+                    purchaseOrder.Id,
+                    user,
+                    beforeState: beforeState,
+                    afterState: new 
+                    { 
+                        purchaseOrder.PaymentMethod,
+                        purchaseOrder.CheckReceived, 
+                        purchaseOrder.CheckReceivedDate,
+                        purchaseOrder.CheckCashed,
+                        purchaseOrder.CheckCashedDate,
+                        purchaseOrder.TransferId,
+                        purchaseOrder.Note
+                    },
+                    ct);
+
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+        }
+
         private static PurchaseOrderResponse MapToResponse(PurchaseOrder o)
         {
+            var paidAmount = o.GetPaidAmount();
+            var remainingAmount = o.GetRemainingAmount();
+
             return new PurchaseOrderResponse(
                 o.Id,
                 o.OrderNumber,
@@ -703,6 +839,28 @@ namespace Inventory.Infrastructure.Services
                 o.InvoiceUploadedUtc,
                 o.ReceiptPath,
                 o.ReceiptUploadedUtc,
+                o.PaymentMethod,
+                o.CheckReceived,
+                o.CheckReceivedDate,
+                o.CheckCashed,
+                o.CheckCashedDate,
+                o.TransferId,
+                paidAmount,
+                remainingAmount,
+                remainingAmount, // TotalPending
+                (o.PaymentDeadline.HasValue && o.PaymentDeadline.Value < DateTimeOffset.UtcNow && remainingAmount > 0) ? remainingAmount : 0, // DeservedAmount
+                o.PaymentDeadline.HasValue && o.PaymentDeadline.Value < DateTimeOffset.UtcNow && remainingAmount > 0, // IsOverdue
+                o.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new PaymentRecordDto
+                {
+                    Id = p.Id,
+                    Amount = p.Amount,
+                    PaymentDate = p.PaymentDate,
+                    PaymentMethod = p.PaymentMethod,
+                    PaymentType = p.PaymentType,
+                    Reference = p.Reference,
+                    Note = p.Note,
+                    CreatedByUserId = p.CreatedByUserId
+                }).ToList(),
                 o.Lines.Select(l => new PurchaseOrderLineResponse(
                     l.Id,
                     l.ProductId,

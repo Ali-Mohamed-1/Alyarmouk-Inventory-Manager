@@ -1,7 +1,6 @@
 using Inventory.Application.Abstractions;
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.PurchaseOrder;
-using Inventory.Application.DTOs.PurchaseOrder;
 using Inventory.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 
@@ -47,14 +46,6 @@ public class PurchaseOrdersApiController : ControllerBase
     {
         var user = GetUserContext();
         await _purchaseOrderServices.UpdateStatusAsync(id, status, user, ct);
-        return Ok();
-    }
-
-    [HttpPut("{id}/payment-status")]
-    public async Task<IActionResult> UpdatePaymentStatus(long id, [FromBody] PurchasePaymentStatus status, CancellationToken ct)
-    {
-        var user = GetUserContext();
-        await _purchaseOrderServices.UpdatePaymentStatusAsync(id, status, user, ct);
         return Ok();
     }
 
@@ -212,6 +203,27 @@ public class PurchaseOrdersApiController : ControllerBase
         return NoContent();
     }
 
+
+    [HttpPost("{id}/payments")]
+    public async Task<IActionResult> AddPayment(long id, [FromBody] Inventory.Application.DTOs.Payment.CreatePaymentRequest request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var user = GetUserContext();
+        await _purchaseOrderServices.AddPaymentAsync(id, request, user, ct);
+        
+        return Ok();
+    }
+
+    [HttpPut("{id}/payment-info")]
+    public async Task<IActionResult> UpdatePaymentInfo(long id, [FromBody] UpdatePurchaseOrderPaymentRequest request, CancellationToken ct)
+    {
+        if (id != request.OrderId) return BadRequest();
+        var user = GetUserContext();
+        await _purchaseOrderServices.UpdatePaymentInfoAsync(id, request, user, ct);
+        return Ok();
+    }
 
     private UserContext GetUserContext()
     {

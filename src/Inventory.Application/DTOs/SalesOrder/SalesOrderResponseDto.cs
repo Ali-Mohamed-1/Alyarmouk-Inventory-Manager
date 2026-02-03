@@ -1,4 +1,5 @@
 using Inventory.Domain.Entities;
+using Inventory.Application.DTOs.Payment;
 
 namespace Inventory.Application.DTOs.SalesOrder
 {
@@ -25,6 +26,13 @@ namespace Inventory.Application.DTOs.SalesOrder
 
         public PaymentMethod PaymentMethod { get; init; }
         public PaymentStatus PaymentStatus { get; init; }
+        
+        public decimal PaidAmount { get; init; }
+        public decimal RemainingAmount { get; init; }
+        public decimal TotalPending { get; init; }
+        public decimal DeservedAmount { get; init; }
+        public bool IsOverdue { get; init; }
+        public List<PaymentRecordDto> Payments { get; init; } = new();
 
         public bool? CheckReceived { get; init; }
         public DateTimeOffset? CheckReceivedDate { get; init; }

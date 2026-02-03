@@ -19,175 +19,70 @@ namespace Inventory.Infrastructure.Services
             _db = db ?? throw new ArgumentNullException(nameof(db));
         }
 
-        public async Task ProcessSalesPaymentAsync(long salesOrderId, UserContext user, CancellationToken ct = default)
+        public async Task CreateFinancialTransactionFromPaymentAsync(PaymentRecord payment, UserContext user, CancellationToken ct = default)
         {
-            var order = await _db.SalesOrders
-                .FirstOrDefaultAsync(o => o.Id == salesOrderId, ct);
-            if (order == null) throw new NotFoundException($"Sales order {salesOrderId} not found.");
+            if (payment == null) throw new ArgumentNullException(nameof(payment));
+            if (user == null) throw new ArgumentNullException(nameof(user));
 
-            if (order.PaymentStatus != PaymentStatus.Paid)
+            FinancialTransactionType txType;
+            string notePrefix;
+
+            if (payment.OrderType == OrderType.SalesOrder)
             {
-                order.PaymentStatus = PaymentStatus.Paid;
+                txType = payment.PaymentType == PaymentRecordType.Payment 
+                    ? FinancialTransactionType.Revenue 
+                    : FinancialTransactionType.Expense;
+                notePrefix = payment.PaymentType == PaymentRecordType.Payment ? "Payment received" : "Refund processed";
+            }
+            else // PurchaseOrder
+            {
+                txType = payment.PaymentType == PaymentRecordType.Payment 
+                    ? FinancialTransactionType.Expense 
+                    : FinancialTransactionType.Revenue;
+                notePrefix = payment.PaymentType == PaymentRecordType.Payment ? "Payment made" : "Refund received";
             }
 
-            // Create Revenue Financial Transaction
-            decimal paymentAmount = order.TotalAmount - order.RefundedAmount;
-            if (paymentAmount > 0)
+            var tx = new FinancialTransaction
             {
-                var revenueTx = new FinancialTransaction
-                {
-                    Type = FinancialTransactionType.Revenue,
-                    Amount = paymentAmount,
-                    SalesOrderId = order.Id,
-                    CustomerId = order.CustomerId,
-                    TimestampUtc = DateTimeOffset.UtcNow,
-                    UserId = user.UserId,
-                    UserDisplayName = user.UserDisplayName,
-                    Note = $"Payment received for Sales Order {order.OrderNumber}"
-                };
-                _db.FinancialTransactions.Add(revenueTx);
-            }
-
-            await _db.SaveChangesAsync(ct);
-        }
-
-        public async Task ProcessPurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default)
-        {
-            var order = await _db.PurchaseOrders
-                .FirstOrDefaultAsync(o => o.Id == purchaseOrderId, ct);
-            if (order == null) throw new NotFoundException($"Purchase order {purchaseOrderId} not found.");
-
-            if (order.PaymentStatus != PurchasePaymentStatus.Paid)
-            {
-                order.PaymentStatus = PurchasePaymentStatus.Paid;
-            }
-
-            // Create Expense Financial Transaction
-            decimal paymentAmount = order.TotalAmount - order.RefundedAmount;
-            if (paymentAmount > 0)
-            {
-                var expenseTx = new FinancialTransaction
-                {
-                    Type = FinancialTransactionType.Expense,
-                    Amount = paymentAmount,
-                    PurchaseOrderId = order.Id,
-                    SupplierId = order.SupplierId,
-                    TimestampUtc = DateTimeOffset.UtcNow,
-                    UserId = user.UserId,
-                    UserDisplayName = user.UserDisplayName,
-                    Note = $"Payment made for Purchase Order {order.OrderNumber}"
-                };
-                _db.FinancialTransactions.Add(expenseTx);
-            }
-
-            await _db.SaveChangesAsync(ct);
-        }
-
-        public async Task ReverseSalesPaymentAsync(long salesOrderId, UserContext user, CancellationToken ct = default)
-        {
-            var order = await _db.SalesOrders
-                .FirstOrDefaultAsync(o => o.Id == salesOrderId, ct);
-            if (order == null) throw new NotFoundException($"Sales order {salesOrderId} not found.");
-
-            // Instead of deleting, create reversal transactions
-            decimal paymentAmount = order.TotalAmount - order.RefundedAmount;
-            if (paymentAmount > 0)
-            {
-                // Reverse Revenue by creating Expense
-                var reversalTx = new FinancialTransaction
-                {
-                    Type = FinancialTransactionType.Expense,
-                    Amount = paymentAmount,
-                    SalesOrderId = order.Id,
-                    CustomerId = order.CustomerId,
-                    TimestampUtc = DateTimeOffset.UtcNow,
-                    UserId = user.UserId,
-                    UserDisplayName = user.UserDisplayName,
-                    Note = $"Payment Reversal for Sales Order {order.OrderNumber}"
-                };
-                _db.FinancialTransactions.Add(reversalTx);
-            }
-
-            order.PaymentStatus = PaymentStatus.Pending;
-            await _db.SaveChangesAsync(ct);
-        }
-
-        public async Task ReversePurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default)
-        {
-            var order = await _db.PurchaseOrders
-                .FirstOrDefaultAsync(o => o.Id == purchaseOrderId, ct);
-            if (order == null) throw new NotFoundException($"Purchase order {purchaseOrderId} not found.");
-
-            // Instead of deleting, create reversal transactions
-            decimal paymentAmount = order.TotalAmount - order.RefundedAmount;
-            if (paymentAmount > 0)
-            {
-                // Reverse Expense by creating Revenue
-                var reversalTx = new FinancialTransaction
-                {
-                    Type = FinancialTransactionType.Revenue,
-                    Amount = paymentAmount,
-                    PurchaseOrderId = order.Id,
-                    SupplierId = order.SupplierId,
-                    TimestampUtc = DateTimeOffset.UtcNow,
-                    UserId = user.UserId,
-                    UserDisplayName = user.UserDisplayName,
-                    Note = $"Payment Reversal for Purchase Order {order.OrderNumber}"
-                };
-                _db.FinancialTransactions.Add(reversalTx);
-            }
-
-            order.PaymentStatus = PurchasePaymentStatus.Unpaid;
-            await _db.SaveChangesAsync(ct);
-        }
-
-        public async Task ProcessSalesRefundPaymentAsync(long salesOrderId, decimal amount, UserContext user, CancellationToken ct = default)
-        {
-            var order = await _db.SalesOrders.FirstOrDefaultAsync(o => o.Id == salesOrderId, ct);
-            if (order == null) throw new NotFoundException($"Sales order {salesOrderId} not found.");
-
-            // Sales Refund = We pay money BACK to customer. This is an EXPENSE.
-            // Or 'Revenue Reversal'? Usually treated as Expense or Contra-Revenue.
-            // System uses Expense/Revenue types. Refund to customer reduces our cash, so Expense.
-            
-            var refundTx = new FinancialTransaction
-            {
-                Type = FinancialTransactionType.Expense,
-                Amount = amount,
-                SalesOrderId = order.Id,
-                CustomerId = order.CustomerId,
-                TimestampUtc = DateTimeOffset.UtcNow,
+                Type = txType,
+                Amount = payment.Amount,
+                TimestampUtc = payment.PaymentDate,
                 UserId = user.UserId,
                 UserDisplayName = user.UserDisplayName,
-                Note = $"Refund for Sales Order {order.OrderNumber}"
+                PaymentRecord = payment,
+                Note = $"{notePrefix} for {payment.OrderType} (Ref: {payment.Reference}). {payment.Note}".Trim()
             };
-            
-            _db.FinancialTransactions.Add(refundTx);
-            await _db.SaveChangesAsync(ct);
-        }
 
-        public async Task ProcessPurchaseRefundPaymentAsync(long purchaseOrderId, decimal amount, UserContext user, CancellationToken ct = default)
-        {
-            var order = await _db.PurchaseOrders.FirstOrDefaultAsync(o => o.Id == purchaseOrderId, ct);
-            if (order == null) throw new NotFoundException($"Purchase order {purchaseOrderId} not found.");
-
-            // Purchase Refund = Supplier pays money BACK to us. This is REVENUE (or Contra-Expense).
-            // Refund from supplier increases our cash, so Revenue.
-
-            var refundTx = new FinancialTransaction
+            if (payment.OrderType == OrderType.SalesOrder)
             {
-                Type = FinancialTransactionType.Revenue,
-                Amount = amount,
-                PurchaseOrderId = order.Id,
-                SupplierId = order.SupplierId,
-                TimestampUtc = DateTimeOffset.UtcNow,
-                UserId = user.UserId,
-                UserDisplayName = user.UserDisplayName,
-                Note = $"Refund for Purchase Order {order.OrderNumber}"
-            };
+                tx.SalesOrderId = payment.SalesOrderId;
+                // If CustomerId isn't on payment, we might need to fetch it from the order
+                if (payment.SalesOrder != null)
+                {
+                    tx.CustomerId = payment.SalesOrder.CustomerId;
+                }
+                else if (payment.SalesOrderId.HasValue)
+                {
+                    var order = await _db.SalesOrders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == payment.SalesOrderId, ct);
+                    tx.CustomerId = order?.CustomerId;
+                }
+            }
+            else
+            {
+                tx.PurchaseOrderId = payment.PurchaseOrderId;
+                if (payment.PurchaseOrder != null)
+                {
+                    tx.SupplierId = payment.PurchaseOrder.SupplierId;
+                }
+                else if (payment.PurchaseOrderId.HasValue)
+                {
+                    var order = await _db.PurchaseOrders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == payment.PurchaseOrderId, ct);
+                    tx.SupplierId = order?.SupplierId;
+                }
+            }
 
-            _db.FinancialTransactions.Add(refundTx);
-            await _db.SaveChangesAsync(ct);
+            _db.FinancialTransactions.Add(tx);
+            // We don't call SaveChangesAsync here because it should be called by the caller as part of the transaction.
         }
     }
 }

@@ -26,6 +26,7 @@ namespace Inventory.Infrastructure.Data
         public DbSet<ProductBatch> ProductBatches { get; set; }
         public DbSet<RefundTransaction> RefundTransactions { get; set; }
         public DbSet<RefundTransactionLine> RefundTransactionLines { get; set; }
+        public DbSet<PaymentRecord> PaymentRecords { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -240,6 +241,26 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.RowVersion).IsRowVersion();
                 b.HasIndex(x => new { x.ProductId, x.BatchNumber }).IsUnique();
                 b.HasOne<Product>().WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<PaymentRecord>(b =>
+            {
+                b.Property(x => x.Amount).HasPrecision(18, 2);
+                b.Property(x => x.Reference).HasMaxLength(100);
+                b.Property(x => x.Note).HasMaxLength(500);
+                b.Property(x => x.CreatedByUserId).HasMaxLength(450);
+                b.HasIndex(x => x.SalesOrderId);
+                b.HasIndex(x => x.PurchaseOrderId);
+                
+                b.HasOne(x => x.SalesOrder)
+                 .WithMany(o => o.Payments)
+                 .HasForeignKey(x => x.SalesOrderId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                b.HasOne(x => x.PurchaseOrder)
+                 .WithMany(o => o.Payments)
+                 .HasForeignKey(x => x.PurchaseOrderId)
+                 .OnDelete(DeleteBehavior.Cascade);
             });
         }
 

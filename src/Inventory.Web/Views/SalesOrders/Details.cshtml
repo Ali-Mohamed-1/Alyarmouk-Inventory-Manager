@@ -204,48 +204,90 @@
                 </div>
                 <div class="p-4">
                     <div class="mb-4">
-                        <span class="badge @(Model.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.Paid ? "neo-btn-success" : "neo-btn-danger text-white") w-100 py-3 fs-5">
-                            @Model.PaymentStatus.ToString().ToUpper()
+                        <span class="badge @(Model.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.Paid ? "neo-btn-success" : (Model.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.PartiallyPaid ? "neo-btn-warning" : (Model.IsOverdue ? "bg-black text-danger border border-danger shadow-lg animate__animated animate__pulse animate__infinite" : "neo-btn-danger text-white"))) w-100 py-3 fs-5">
+                            @(Model.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.PartiallyPaid ? "PARTIAL" : Model.PaymentStatus.ToString().ToUpper()) @(Model.IsOverdue ? " (OVERDUE)" : "")
                         </span>
                     </div>
                     <div class="row g-3 fw-bold">
-                        <div class="col-5 text-uppercase small">Method:</div>
-                        <div class="col-7 text-end fw-black d-flex justify-content-end align-items-center gap-2">
-                             <span>@Model.PaymentMethod.ToString().ToUpper()</span>
-                             <button class="neo-btn btn-sm py-0 no-print" style="font-size: 0.7rem;" onclick="openEditPaymentModal()">EDIT</button>
+                        <div class="col-6 text-uppercase small">Total:</div>
+                        <div class="col-6 text-end fw-black">@Model.TotalAmount.ToString("C2")</div>
+                        
+                        <div class="col-6 text-uppercase small">Paid:</div>
+                        <div class="col-6 text-end fw-black text-success">@Model.PaidAmount.ToString("C2")</div>
+                        
+                        <div class="col-6 text-uppercase small">Remaining:</div>
+                        <div class="col-6 text-end fw-black @(Model.RemainingAmount > 0 ? "text-danger" : "text-success")">@Model.RemainingAmount.ToString("C2")</div>
+
+                        <div class="col-12 mt-2">
+                             @if (Model.RemainingAmount > 0)
+                             {
+                                 <button class="neo-btn neo-btn-primary w-100 py-2 no-print" onclick="openRecordPaymentModal()">RECORD PAYMENT</button>
+                             }
+                             else
+                             {
+                                 <button class="neo-btn neo-btn-success w-100 py-2 no-print" disabled>FULLY PAID</button>
+                             }
+                        </div>
+                        
+                        <div class="col-12 mt-1">
+                             <div class="d-flex justify-content-between small opacity-75">
+                                 <a href="javascript:void(0)" class="text-black no-print" onclick="openEditDueDateModal()">EDIT</a>
+                             </div>
                         </div>
 
-                        <div class="col-5 text-uppercase small">Deadline:</div>
-                        <div class="col-7 text-end d-flex justify-content-end align-items-center gap-2">
-                            <span>@Model.DueDate.ToString("MMM dd, yyyy").ToUpper()</span>
-                            <button class="neo-btn btn-sm py-0 no-print" style="font-size: 0.7rem;" onclick="openEditDueDateModal()">EDIT</button>
+                        <div class="col-12 mt-1">
+                             <div class="d-flex justify-content-between small opacity-75">
+                                 <span>PAYMENT METADATA</span>
+                                 <a href="javascript:void(0)" class="text-black no-print" onclick="openEditPaymentInfoModal()">EDIT INFO</a>
+                             </div>
                         </div>
-
-                        @if (Model.PaymentMethod == Inventory.Domain.Entities.PaymentMethod.Check)
-                        {
-                            <div class="col-12 mt-4 pt-3 border-top border-black no-print">
-                                <h6 class="fw-black text-uppercase small mb-3">Verification Info</h6>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span>RECEIVED:</span>
-                                    <span class="badge @(Model.CheckReceived == true ? "bg-black text-white" : "bg-white text-black border border-black")">@(Model.CheckReceived == true ? "YES" : "NO")</span>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <span>CASHED:</span>
-                                    <span class="badge @(Model.CheckCashed == true ? "bg-black text-white" : "bg-white text-black border border-black")">@(Model.CheckCashed == true ? "YES" : "NO")</span>
-                                </div>
-                            </div>
-                        }
-                        else if (Model.PaymentMethod == Inventory.Domain.Entities.PaymentMethod.BankTransfer)
-                        {
-                            <div class="col-12 mt-4 pt-3 border-top border-black">
-                                <h6 class="fw-black text-uppercase small mb-2">Transfer context</h6>
-                                <div class="d-flex justify-content-between">
-                                    <span>TRACE ID:</span>
-                                    <span class="fw-black">@(Model.TransferId ?? "N/A")</span>
-                                </div>
-                            </div>
-                        }
                     </div>
+                </div>
+            </div>
+
+            <!-- Payment History -->
+            <div class="neo-card p-0 overflow-hidden mb-4 no-print">
+                <div class="p-3 bg-black text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-black text-uppercase small">Payment History</h5>
+                    <span class="badge bg-white text-black fw-black">@Model.Payments.Count</span>
+                </div>
+                <div class="p-0 bg-white">
+                    @if (Model.Payments.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0 fw-bold small">
+                                <thead class="table-dark text-white tiny fw-black">
+                                    <tr>
+                                        <th class="ps-3">DATE</th>
+                                        <th>TYPE</th>
+                                        <th class="text-end pe-3">AMOUNT</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var p in Model.Payments)
+                                    {
+                                        <tr class="@(p.PaymentType == Inventory.Domain.Entities.PaymentRecordType.Refund ? "table-danger" : "")">
+                                            <td class="ps-3">@p.PaymentDate.ToLocalTime().ToString("MMM dd")</td>
+                                            <td>
+                                                @p.PaymentType.ToString().ToUpper()
+                                                @if (!string.IsNullOrEmpty(p.Reference))
+                                                {
+                                                    <br/><span class="tiny text-muted">@p.Reference</span>
+                                                }
+                                            </td>
+                                            <td class="text-end pe-3 fw-black @(p.PaymentType == Inventory.Domain.Entities.PaymentRecordType.Refund ? "text-danger" : "text-success")">
+                                                @(p.PaymentType == Inventory.Domain.Entities.PaymentRecordType.Refund ? "-" : "")@p.Amount.ToString("N2")
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="p-4 text-center text-muted fw-bold small italic">NO PAYMENTS RECORDED</div>
+                    }
                 </div>
             </div>
 
@@ -305,73 +347,125 @@
     </div>
 </div>
 
-<!-- Edit Payment Info Modal -->
-<div class="modal fade" id="editPaymentModal" tabindex="-1">
+<!-- Record Payment Modal -->
+<div class="modal fade" id="recordPaymentModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content border-4 border-black border-radius-0">
             <div class="modal-header bg-black text-white">
-                <h5 class="modal-title fw-black text-uppercase small">Update Payment Info</h5>
+                <h5 class="modal-title fw-black text-uppercase small">Record New Payment</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4">
-                <form id="paymentForm">
-                    <!-- Status -->
+            <div class="modal-body p-4 bg-light">
+                <div class="neo-card mb-4 bg-white p-3 border-2">
+                    <div class="d-flex justify-content-between mb-2 fw-bold small">
+                        <span>REMAINING BALANCE:</span>
+                        <span class="text-danger">@Model.RemainingAmount.ToString("C2")</span>
+                    </div>
+                </div>
+
+                <form id="recordPaymentForm">
                     <div class="mb-3">
-                        <label class="form-label fw-black text-uppercase small">Payment Status</label>
-                        <select class="form-select fw-bold" id="editPaymentStatus">
-                            @foreach (var status in Enum.GetValues<Inventory.Domain.Entities.PaymentStatus>())
-                            {
-                                <option value="@status">@status.ToString()</option>
-                            }
-                        </select>
+                        <label class="form-label fw-black text-uppercase small">Amount To Pay</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-black text-white fw-black border-0">$</span>
+                            <input type="number" class="form-control fw-black fs-4" id="paymentAmount" 
+                                   step="0.01" min="0.01" max="@Model.RemainingAmount" 
+                                   value="@Model.RemainingAmount.ToString("0.00")">
+                        </div>
+                        <div class="form-text fw-bold text-muted mt-2">Maximum allowed: @Model.RemainingAmount.ToString("C2")</div>
                     </div>
 
-                    <!-- Method -->
                     <div class="mb-3">
                         <label class="form-label fw-black text-uppercase small">Payment Method</label>
-                        <select class="form-select fw-bold" id="editPaymentMethod" onchange="togglePaymentFields()">
+                        <select class="form-select fw-black" id="paymentMethod">
                             @foreach (var method in Enum.GetValues<Inventory.Domain.Entities.PaymentMethod>())
                             {
-                                <option value="@method">@method.ToString()</option>
+                                <option value="@method" selected="@(method == Model.PaymentMethod)">@method.ToString().ToUpper()</option>
                             }
                         </select>
                     </div>
 
-                    <!-- Dynamic Fields: Check -->
-                    <div id="checkFields" class="d-none border-top border-2 pt-3 mt-3">
-                        <h6 class="fw-black text-uppercase small mb-3">Check Details</h6>
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" id="editCheckReceived" onchange="toggleDateFields()">
-                            <label class="form-check-label fw-bold" for="editCheckReceived">Received</label>
-                        </div>
-                        <div class="mb-3 ps-4" id="receivedDateConfig">
-                            <label class="form-label small text-muted fw-bold">Received Date</label>
-                            <input type="date" class="form-control" id="editCheckReceivedDate">
-                        </div>
-
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" id="editCheckCashed" onchange="toggleDateFields()">
-                            <label class="form-check-label fw-bold" for="editCheckCashed">Cashed</label>
-                        </div>
-                        <div class="mb-3 ps-4" id="cashedDateConfig">
-                            <label class="form-label small text-muted fw-bold">Cashed Date</label>
-                            <input type="date" class="form-control" id="editCheckCashedDate">
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-black text-uppercase small">Reference / Check #</label>
+                        <input type="text" class="form-control fw-bold" id="paymentReference" placeholder="Optional reference">
                     </div>
 
-                    <!-- Dynamic Fields: Bank Transfer -->
-                    <div id="bankTransferFields" class="d-none border-top border-2 pt-3 mt-3">
-                        <h6 class="fw-black text-uppercase small mb-3">Transfer Details</h6>
-                        <div class="mb-3">
-                            <label class="form-label small text-muted fw-bold">Transfer / Trace ID</label>
-                            <input type="text" class="form-control fw-bold" id="editTransferId" placeholder="Enter Transaction Reference">
-                        </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-black text-uppercase small">Notes</label>
+                        <textarea class="form-control fw-bold" id="paymentNote" rows="2" placeholder="Optional memo"></textarea>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer bg-light border-0">
                 <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
-                <button class="neo-btn neo-btn-primary btn-sm" onclick="savePaymentInfo()">SAVE CHANGES</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" id="submitPaymentBtn" onclick="submitPayment()">CONFIRM PAYMENT</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Payment Info Modal -->
+<div class="modal fade" id="editPaymentInfoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Edit Payment Information</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="editPaymentInfoForm">
+                    <input type="hidden" id="editOrderId" value="@Model.Id" />
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-black text-uppercase small">Payment Method</label>
+                        <select class="form-select fw-bold" id="editPaymentMethod" onchange="toggleEditPaymentFields()">
+                            @foreach (var method in Enum.GetValues<Inventory.Domain.Entities.PaymentMethod>())
+                            {
+                                <option value="@((int)method)" selected="@(method == Model.PaymentMethod)">@method.ToString().ToUpper()</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div id="checkFields" style="display: none;">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editCheckReceived" @(Model.CheckReceived == true ? "checked" : "")>
+                                <label class="form-check-label fw-bold small">Check Received</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Received Date</label>
+                            <input type="date" class="form-control fw-bold" id="editCheckReceivedDate" value="@(Model.CheckReceivedDate?.ToString("yyyy-MM-dd") ?? "")">
+                        </div>
+                        <hr class="border-2 opacity-100">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editCheckCashed" @(Model.CheckCashed == true ? "checked" : "")>
+                                <label class="form-check-label fw-bold small">Check Cashed</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Cashed Date</label>
+                            <input type="date" class="form-control fw-bold" id="editCheckCashedDate" value="@(Model.CheckCashedDate?.ToString("yyyy-MM-dd") ?? "")">
+                        </div>
+                    </div>
+
+                    <div id="transferFields" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Transfer ID / Reference</label>
+                            <input type="text" class="form-control fw-bold" id="editTransferId" value="@Model.TransferId">
+                        </div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label fw-black text-uppercase small">Internal Note</label>
+                        <textarea class="form-control fw-bold" id="editOrderNote" rows="2">@Model.Note</textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" id="savePaymentInfoBtn" onclick="savePaymentInfo()">SAVE CHANGES</button>
             </div>
         </div>
     </div>
@@ -394,79 +488,36 @@
             new bootstrap.Modal(document.getElementById('editDueDateModal')).show();
         }
 
-        function openEditPaymentModal() {
-            document.getElementById('editPaymentStatus').value = currentData.status;
-            document.getElementById('editPaymentMethod').value = currentData.method;
-            
-            // Set fields provided they are relevant, otherwise defaults
-            document.getElementById('editCheckReceived').checked = currentData.checkReceived;
-            document.getElementById('editCheckReceivedDate').value = currentData.checkReceivedDate;
-            document.getElementById('editCheckCashed').checked = currentData.checkCashed;
-            document.getElementById('editCheckCashedDate').value = currentData.checkCashedDate;
-            document.getElementById('editTransferId').value = currentData.transferId;
-
-            togglePaymentFields();
-            new bootstrap.Modal(document.getElementById('editPaymentModal')).show();
+        function openRecordPaymentModal() {
+            new bootstrap.Modal(document.getElementById('recordPaymentModal')).show();
         }
 
-        function togglePaymentFields() {
+        function openEditPaymentInfoModal() {
+            toggleEditPaymentFields();
+            new bootstrap.Modal(document.getElementById('editPaymentInfoModal')).show();
+        }
+
+        function toggleEditPaymentFields() {
             const method = document.getElementById('editPaymentMethod').value;
-            const checkFields = document.getElementById('checkFields');
-            const bankFields = document.getElementById('bankTransferFields');
-
-            checkFields.classList.add('d-none');
-            bankFields.classList.add('d-none');
-
-            if (method === 'Check') {
-                checkFields.classList.remove('d-none');
-                toggleDateFields();
-            } else if (method === 'BankTransfer') {
-                bankFields.classList.remove('d-none');
-            }
-        }
-
-        function toggleDateFields() {
-            const isReceived = document.getElementById('editCheckReceived').checked;
-            const receivedDateInput = document.getElementById('editCheckReceivedDate');
-            receivedDateInput.disabled = !isReceived;
-            if (isReceived && !receivedDateInput.value) {
-                receivedDateInput.value = new Date().toISOString().split('T')[0];
-            }
-
-            const isCashed = document.getElementById('editCheckCashed').checked;
-            const cashedDateInput = document.getElementById('editCheckCashedDate');
-            cashedDateInput.disabled = !isCashed;
-             if (isCashed && !cashedDateInput.value) {
-                cashedDateInput.value = new Date().toISOString().split('T')[0];
-            }
+            document.getElementById('checkFields').style.display = (method === '2') ? 'block' : 'none'; // 2 = Check
+            document.getElementById('transferFields').style.display = (method === '3') ? 'block' : 'none'; // 3 = BankTransfer
         }
 
         async function savePaymentInfo() {
-            const method = document.getElementById('editPaymentMethod').value;
-            
-            const payload = {
-                orderId: @Model.Id,
-                paymentStatus: document.getElementById('editPaymentStatus').value,
-                paymentMethod: method,
-                // Check fields
-                checkReceived: document.getElementById('editCheckReceived').checked,
-                checkReceivedDate: document.getElementById('editCheckReceivedDate').value ? new Date(document.getElementById('editCheckReceivedDate').value).toISOString() : null,
-                checkCashed: document.getElementById('editCheckCashed').checked,
-                checkCashedDate: document.getElementById('editCheckCashedDate').value ? new Date(document.getElementById('editCheckCashedDate').value).toISOString() : null,
-                // Bank fields
-                transferId: document.getElementById('editTransferId').value
-            };
+            const btn = document.getElementById('savePaymentInfoBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>SAVING...';
 
-            // Sanitation based on method
-            if (method !== 'Check') {
-                payload.checkReceived = false;
-                payload.checkReceivedDate = null;
-                payload.checkCashed = false;
-                payload.checkCashedDate = null;
-            }
-            if (method !== 'BankTransfer') {
-                payload.transferId = null;
-            }
+            const payload = {
+                orderId: parseInt(document.getElementById('editOrderId').value),
+                paymentMethod: parseInt(document.getElementById('editPaymentMethod').value),
+                checkReceived: document.getElementById('editCheckReceived').checked,
+                checkReceivedDate: document.getElementById('editCheckReceivedDate').value || null,
+                checkCashed: document.getElementById('editCheckCashed').checked,
+                checkCashedDate: document.getElementById('editCheckCashedDate').value || null,
+                transferId: document.getElementById('editTransferId').value,
+                note: document.getElementById('editOrderNote').value
+            };
 
             try {
                 const response = await fetch('/api/sales-orders/@Model.Id/payment', {
@@ -482,11 +533,65 @@
                     location.reload();
                 } else {
                     const err = await response.text();
-                    alert('Failed to update payment info: ' + err);
+                    alert('Failed to update info: ' + err);
+                    btn.disabled = false;
+                    btn.innerText = 'SAVE CHANGES';
                 }
             } catch (error) {
                 console.error(error);
                 alert('An error occurred.');
+                btn.disabled = false;
+                btn.innerText = 'SAVE CHANGES';
+            }
+        }
+
+        async function submitPayment() {
+            const amount = parseFloat(document.getElementById('paymentAmount').value);
+            if (isNaN(amount) || amount <= 0) {
+                alert('Please enter a valid amount.');
+                return;
+            }
+
+            if (amount > @Model.RemainingAmount) {
+                alert('Amount exceeds remaining balance.');
+                return;
+            }
+
+            const btn = document.getElementById('submitPaymentBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>PROCESSING...';
+
+            const payload = {
+                amount: amount,
+                paymentDate: new Date().toISOString(),
+                paymentMethod: document.getElementById('paymentMethod').value,
+                reference: document.getElementById('paymentReference').value,
+                note: document.getElementById('paymentNote').value
+            };
+
+            try {
+                const response = await fetch('/api/sales-orders/@Model.Id/payments', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    const err = await response.text();
+                    alert('Failed to record payment: ' + err);
+                    btn.disabled = false;
+                    btn.innerText = 'CONFIRM PAYMENT';
+                }
+            } catch (error) {
+                console.error(error);
+                alert('An error occurred.');
+                btn.disabled = false;
+                btn.innerText = 'CONFIRM PAYMENT';
             }
         }
 
@@ -495,9 +600,7 @@
             if (!date) return;
             
             try {
-                // Ensure the date string is preserved as is or ISO
                 const d = new Date(date);
-                
                 const response = await fetch('/api/sales-orders/@Model.Id/due-date', {
                     method: 'PUT',
                     headers: {

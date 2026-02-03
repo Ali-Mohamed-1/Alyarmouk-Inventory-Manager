@@ -35,7 +35,6 @@ namespace Inventory.Application.Abstractions
         /// Updates the status of a sales order
         /// </summary>
         Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default);
-        Task UpdatePaymentStatusAsync(long orderId, PaymentStatus status, UserContext user, CancellationToken ct = default);
         Task UpdateDueDateAsync(long orderId, DateTimeOffset newDate, UserContext user, CancellationToken ct = default);
 
         /// <summary>
@@ -69,6 +68,8 @@ namespace Inventory.Application.Abstractions
         /// Reverses revenue, COGS, and restores inventory.
         /// </summary>
         Task RefundAsync(RefundSalesOrderRequest req, UserContext user, CancellationToken ct = default);
+
+        Task AddPaymentAsync(long orderId, Inventory.Application.DTOs.Payment.CreatePaymentRequest req, UserContext user, CancellationToken ct = default);
 
     }
 }

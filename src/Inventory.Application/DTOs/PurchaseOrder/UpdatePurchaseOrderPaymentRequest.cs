@@ -1,11 +1,11 @@
 using Inventory.Domain.Entities;
 
-namespace Inventory.Application.DTOs.SalesOrder
+namespace Inventory.Application.DTOs.PurchaseOrder
 {
-    public record UpdateSalesOrderPaymentRequest
+    public record UpdatePurchaseOrderPaymentRequest
     {
         public long OrderId { get; init; }
-        public PaymentMethod? PaymentMethod { get; init; } // Allow updating payment method
+        public PaymentMethod? PaymentMethod { get; init; }
         public bool CheckReceived { get; init; } = false;
         public DateTimeOffset? CheckReceivedDate { get; init; }
         public bool CheckCashed { get; init; } = false;

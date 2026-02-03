@@ -11,6 +11,7 @@ using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Inventory.Domain.Constants;
 using Inventory.Application.DTOs.Transaction;
+using Inventory.Application.DTOs.Payment;
 
 namespace Inventory.Infrastructure.Services
 {
@@ -165,7 +166,7 @@ namespace Inventory.Infrastructure.Services
                     OrderDate = req.OrderDate ?? DateTimeOffset.UtcNow,
                     DueDate = req.DueDate!.Value,
                     PaymentMethod = req.PaymentMethod,
-                    PaymentStatus = req.PaymentStatus,
+                    // PaymentStatus is derived from ledger - defaults to Pending
                     CheckReceived = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckReceived,
                     CheckReceivedDate = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckReceivedDate,
                     CheckCashed = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckCashed,
@@ -273,18 +274,33 @@ namespace Inventory.Infrastructure.Services
                     _db.SalesOrderLines.Add(orderLine);
                 }
 
+                // 3. Update Order Totals
                 salesOrder.Subtotal = totalSubtotal;
                 salesOrder.VatAmount = totalVat;
                 salesOrder.ManufacturingTaxAmount = totalManTax;
                 salesOrder.TotalAmount = totalOrderAmount;
 
-                await _db.SaveChangesAsync(ct);
-
-                // If order is created as already Paid, create the Revenue transaction
-                // This ensures the financial report can aggregate tax data for this order
-                if (salesOrder.PaymentStatus == PaymentStatus.Paid)
+                // 4. Handle Initial Payment (if requested as Paid)
+                if (req.PaymentStatus == PaymentStatus.Paid)
                 {
-                    await _financialServices.ProcessSalesPaymentAsync(salesOrder.Id, user, ct);
+                    var payment = new PaymentRecord
+                    {
+                        OrderType = OrderType.SalesOrder,
+                        SalesOrderId = salesOrder.Id,
+                        Amount = salesOrder.TotalAmount,
+                        PaymentDate = DateTimeOffset.UtcNow,
+                        PaymentMethod = salesOrder.PaymentMethod,
+                        PaymentType = PaymentRecordType.Payment,
+                        Note = "Full payment recorded at order creation.",
+                        CreatedByUserId = user.UserId
+                    };
+
+                    salesOrder.Payments.Add(payment);
+
+                    // Ensure status is correctly set/derived
+                    salesOrder.RecalculatePaymentStatus();
+
+                    await _financialServices.CreateFinancialTransactionFromPaymentAsync(payment, user, ct);
                 }
 
                 // AUDIT LOG: Record the order creation
@@ -318,6 +334,59 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
+        public async Task AddPaymentAsync(long orderId, Inventory.Application.DTOs.Payment.CreatePaymentRequest req, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            if (req.Amount <= 0) throw new ValidationException("Payment amount must be greater than zero.");
+
+            var order = await _db.SalesOrders
+                .Include(o => o.Payments)
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (order == null) throw new NotFoundException($"Sales order {orderId} not found.");
+
+            var remaining = order.GetRemainingAmount();
+            if (req.Amount > remaining)
+                throw new ValidationException($"Payment amount {req.Amount:C} exceeds remaining balance {remaining:C}.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var payment = new PaymentRecord
+                {
+                    OrderType = OrderType.SalesOrder,
+                    SalesOrderId = orderId,
+                    Amount = req.Amount,
+                    PaymentDate = req.PaymentDate,
+                    PaymentMethod = req.PaymentMethod,
+                    PaymentType = PaymentRecordType.Payment,
+                    Reference = req.Reference,
+                    Note = req.Note,
+                    CreatedByUserId = user.UserId
+                };
+
+
+                order.Payments.Add(payment);
+                
+                // Single Source of Truth: ensure derived status is updated
+                order.RecalculatePaymentStatus();
+
+                // Record in Financial Ledger - Requirement 1
+                await _financialServices.CreateFinancialTransactionFromPaymentAsync(payment, user, ct);
+
+                await _db.SaveChangesAsync(ct);
+                
+                await _auditWriter.LogCreateAsync<PaymentRecord>(payment.Id, user, afterState: payment, ct);
+
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+        }
+
         public async Task<SalesOrderResponseDto?> GetByIdAsync(long id, CancellationToken ct = default)
         {
             if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id), "Id must be positive.");
@@ -325,6 +394,7 @@ namespace Inventory.Infrastructure.Services
             return await _db.SalesOrders
                 .AsNoTracking()
                 .Include(o => o.Lines)
+                .Include(o => o.Payments)
                 .Where(o => o.Id == id)
                 .Select(o => new SalesOrderResponseDto
                 {
@@ -338,6 +408,22 @@ namespace Inventory.Infrastructure.Services
                     Status = o.Status,
                     PaymentMethod = o.PaymentMethod,
                     PaymentStatus = o.PaymentStatus,
+                    PaidAmount = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
+                    RemainingAmount = o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)),
+                    TotalPending = o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)),
+                    DeservedAmount = (o.DueDate < DateTimeOffset.UtcNow && o.PaymentStatus != PaymentStatus.Paid) ? (o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount))) : 0,
+                    IsOverdue = o.DueDate < DateTimeOffset.UtcNow && o.PaymentStatus != PaymentStatus.Paid,
+                    Payments = o.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new PaymentRecordDto
+                    {
+                        Id = p.Id,
+                        Amount = p.Amount,
+                        PaymentDate = p.PaymentDate,
+                        PaymentMethod = p.PaymentMethod,
+                        PaymentType = p.PaymentType,
+                        Reference = p.Reference,
+                        Note = p.Note,
+                        CreatedByUserId = p.CreatedByUserId
+                    }).ToList(),
                     CheckReceived = o.CheckReceived,
                     CheckReceivedDate = o.CheckReceivedDate,
                     CheckCashed = o.CheckCashed,
@@ -385,6 +471,7 @@ namespace Inventory.Infrastructure.Services
             return await _db.SalesOrders
                 .AsNoTracking()
                 .Include(o => o.Lines)
+                .Include(o => o.Payments)
                 .Where(o => o.CustomerId == customerId)
                 .OrderByDescending(o => o.CreatedUtc)
                 .Take(take)
@@ -400,6 +487,22 @@ namespace Inventory.Infrastructure.Services
                     Status = o.Status,
                     PaymentMethod = o.PaymentMethod,
                     PaymentStatus = o.PaymentStatus,
+                    PaidAmount = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
+                    RemainingAmount = o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)),
+                    TotalPending = o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)),
+                    DeservedAmount = (o.DueDate < DateTimeOffset.UtcNow && o.PaymentStatus != PaymentStatus.Paid) ? (o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount))) : 0,
+                    IsOverdue = o.DueDate < DateTimeOffset.UtcNow && o.PaymentStatus != PaymentStatus.Paid,
+                    Payments = o.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new PaymentRecordDto
+                    {
+                        Id = p.Id,
+                        Amount = p.Amount,
+                        PaymentDate = p.PaymentDate,
+                        PaymentMethod = p.PaymentMethod,
+                        PaymentType = p.PaymentType,
+                        Reference = p.Reference,
+                        Note = p.Note,
+                        CreatedByUserId = p.CreatedByUserId
+                    }).ToList(),
                     CheckReceived = o.CheckReceived,
                     CheckReceivedDate = o.CheckReceivedDate,
                     CheckCashed = o.CheckCashed,
@@ -446,6 +549,7 @@ namespace Inventory.Infrastructure.Services
             return await _db.SalesOrders
                 .AsNoTracking()
                 .Include(o => o.Lines)
+                .Include(o => o.Payments)
                 .OrderByDescending(o => o.CreatedUtc)
                 .Take(take)
                 .Select(o => new SalesOrderResponseDto
@@ -460,6 +564,22 @@ namespace Inventory.Infrastructure.Services
                     Status = o.Status,
                     PaymentMethod = o.PaymentMethod,
                     PaymentStatus = o.PaymentStatus,
+                    PaidAmount = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
+                    RemainingAmount = o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)),
+                    TotalPending = o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)),
+                    DeservedAmount = (o.DueDate < DateTimeOffset.UtcNow && (o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount))) > 0) ? (o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount))) : 0,
+                    IsOverdue = o.DueDate < DateTimeOffset.UtcNow && o.PaymentStatus != PaymentStatus.Paid,
+                    Payments = o.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new PaymentRecordDto
+                    {
+                        Id = p.Id,
+                        Amount = p.Amount,
+                        PaymentDate = p.PaymentDate,
+                        PaymentMethod = p.PaymentMethod,
+                        PaymentType = p.PaymentType,
+                        Reference = p.Reference,
+                        Note = p.Note,
+                        CreatedByUserId = p.CreatedByUserId
+                    }).ToList(),
                     CheckReceived = o.CheckReceived,
                     CheckReceivedDate = o.CheckReceivedDate,
                     CheckCashed = o.CheckCashed,
@@ -575,48 +695,6 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
-        public async Task UpdatePaymentStatusAsync(long orderId, PaymentStatus status, UserContext user, CancellationToken ct = default)
-        {
-            ValidateUser(user);
-
-            var salesOrder = await _db.SalesOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
-            if (salesOrder is null)
-                throw new NotFoundException($"Sales order id {orderId} was not found.");
-
-            if (salesOrder.PaymentStatus == status)
-                return;
-
-            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-            try
-            {
-                var previousStatus = salesOrder.PaymentStatus;
-
-                // 1. Transitioning OUT of Paid -> Reverse Effects
-                if (previousStatus == PaymentStatus.Paid)
-                {
-                    await _financialServices.ReverseSalesPaymentAsync(salesOrder.Id, user, ct);
-                }
-
-                // 2. Set new status
-                salesOrder.PaymentStatus = status;
-
-                // 3. Transitioning INTO Paid -> Apply Effects
-                if (status == PaymentStatus.Paid)
-                {
-                    await _financialServices.ProcessSalesPaymentAsync(salesOrder.Id, user, ct);
-                }
-
-                await _db.SaveChangesAsync(ct);
-                await _auditWriter.LogUpdateAsync<SalesOrder>(orderId, user, new { PaymentStatus = previousStatus }, new { PaymentStatus = status }, ct);
-
-                await transaction.CommitAsync(ct);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(ct);
-                throw new ConflictException("Could not update payment status.", ex);
-            }
-        }
         
         public async Task UpdateDueDateAsync(long orderId, DateTimeOffset newDate, UserContext user, CancellationToken ct = default)
         {
@@ -817,9 +895,10 @@ namespace Inventory.Infrastructure.Services
             if (req is null) throw new ArgumentNullException(nameof(req));
 
 
-            // 1. Load Order
+            // 1. Load Order with Payments for accurate status recalculation
             var order = await _db.SalesOrders
                 .Include(o => o.Lines)
+                .Include(o => o.Payments)
                 .FirstOrDefaultAsync(o => o.Id == req.OrderId, ct);
             
             if (order == null) throw new NotFoundException($"Sales order {req.OrderId} not found.");
@@ -908,14 +987,32 @@ namespace Inventory.Infrastructure.Services
 
                 _db.RefundTransactions.Add(refundTx);
 
+                // Create PaymentRecord for Refund
+                var refundPayment = new PaymentRecord
+                {
+                    OrderType = OrderType.SalesOrder,
+                    SalesOrderId = order.Id,
+                    Amount = req.Amount,
+                    PaymentDate = DateTimeOffset.UtcNow,
+                    PaymentMethod = order.PaymentMethod, // Use original payment method or specific one? Cash is safest default for refunds.
+                    PaymentType = PaymentRecordType.Refund,
+                    Note = $"Refund for Order {order.OrderNumber}. Reason: {req.Reason}",
+                    CreatedByUserId = user.UserId
+                };
+                _db.PaymentRecords.Add(refundPayment);
+                order.Payments.Add(refundPayment);
+
                 // 6. Update Order Totals
                 order.RefundedAmount += req.Amount;
+                
+                // Recalculate status (it might downgrade from Paid to partiallyPaid)
+                order.RecalculatePaymentStatus();
 
-                // 7. Process Financial Refund (Expense)
-                await _financialServices.ProcessSalesRefundPaymentAsync(order.Id, req.Amount, user, ct);
+                // 7. Process Financial Refund - Requirement 1
+                await _financialServices.CreateFinancialTransactionFromPaymentAsync(refundPayment, user, ct);
 
                 await _db.SaveChangesAsync(ct);
-                await _auditWriter.LogUpdateAsync<SalesOrder>(order.Id, user, before, new { order.RefundedAmount }, ct);
+                await _auditWriter.LogUpdateAsync<SalesOrder>(order.Id, user, before, new { order.RefundedAmount, order.PaymentStatus }, ct);
 
                 await transaction.CommitAsync(ct);
             }
@@ -953,8 +1050,10 @@ namespace Inventory.Infrastructure.Services
 
             if (salesOrder.PaymentMethod == PaymentMethod.BankTransfer || req.PaymentMethod == PaymentMethod.BankTransfer)
             {
-                if (req.PaymentStatus == PaymentStatus.Paid && string.IsNullOrWhiteSpace(req.TransferId))
-                    throw new ValidationException("Transfer ID is required for bank transfer when marking as Paid.");
+                // If it's already paid or becoming paid, we might want to ensure TransferId exists,
+                // but since we are just updating metadata, we only check if they are trying to clear it while it's paid.
+                if (salesOrder.PaymentStatus == PaymentStatus.Paid && string.IsNullOrWhiteSpace(req.TransferId) && string.IsNullOrWhiteSpace(salesOrder.TransferId))
+                    throw new ValidationException("Transfer ID is required for bank transfer orders.");
             }
 
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
@@ -976,44 +1075,17 @@ namespace Inventory.Infrastructure.Services
                     salesOrder.PaymentMethod = req.PaymentMethod.Value;
                 }
 
-                var oldPaymentStatus = salesOrder.PaymentStatus;
-                var oldCheckCashed = salesOrder.CheckCashed;
-
                 if (salesOrder.PaymentMethod == PaymentMethod.Check)
                 {
                     salesOrder.CheckReceived = req.CheckReceived;
                     salesOrder.CheckReceivedDate = req.CheckReceivedDate;
-
-                    // If transitioning to Check Cashed, process payment
-                    if (req.CheckCashed == true && oldCheckCashed != true)
-                    {
-                        await _financialServices.ProcessSalesPaymentAsync(salesOrder.Id, user, ct);
-                    }
-
                     salesOrder.CheckCashed = req.CheckCashed;
                     salesOrder.CheckCashedDate = req.CheckCashedDate;
                 }
                 else if (salesOrder.PaymentMethod == PaymentMethod.BankTransfer)
                 {
-                    // If transitioning to Paid via Bank Transfer, process payment
-                    if (req.PaymentStatus == PaymentStatus.Paid && oldPaymentStatus != PaymentStatus.Paid)
-                    {
-                        await _financialServices.ProcessSalesPaymentAsync(salesOrder.Id, user, ct);
-                    }
                     salesOrder.TransferId = req.TransferId;
                 }
-                else if (req.PaymentStatus == PaymentStatus.Paid && oldPaymentStatus != PaymentStatus.Paid)
-                {
-                    // For Cash or other methods
-                    await _financialServices.ProcessSalesPaymentAsync(salesOrder.Id, user, ct);
-                }
-                // Handle reversal if status changed from Paid to something else
-                else if (req.PaymentStatus != PaymentStatus.Paid && oldPaymentStatus == PaymentStatus.Paid)
-                {
-                    await _financialServices.ReverseSalesPaymentAsync(salesOrder.Id, user, ct);
-                }
-
-                salesOrder.PaymentStatus = req.PaymentStatus;
 
                 if (!string.IsNullOrWhiteSpace(req.Note))
                 {

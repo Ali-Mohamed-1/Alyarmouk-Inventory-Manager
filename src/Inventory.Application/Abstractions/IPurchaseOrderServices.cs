@@ -14,9 +14,9 @@ namespace Inventory.Application.Abstractions
         Task<IEnumerable<PurchaseOrderResponse>> GetBySupplierAsync(int supplierId, CancellationToken ct = default);
         Task<long> CreateAsync(CreatePurchaseOrderRequest req, UserContext user, CancellationToken ct = default);
         Task UpdateStatusAsync(long id, PurchaseOrderStatus status, UserContext user, CancellationToken ct = default);
-        Task UpdatePaymentStatusAsync(long id, PurchasePaymentStatus status, UserContext user, CancellationToken ct = default);
         Task UpdatePaymentDeadlineAsync(long id, DateTimeOffset? newDeadline, UserContext user, CancellationToken ct = default);
         Task RefundAsync(RefundPurchaseOrderRequest req, UserContext user, CancellationToken ct = default);
+        Task AddPaymentAsync(long orderId, Inventory.Application.DTOs.Payment.CreatePaymentRequest req, UserContext user, CancellationToken ct = default);
         
         /// <summary>
         /// Attaches or updates an Invoice PDF file reference for an existing purchase order.
@@ -37,6 +37,10 @@ namespace Inventory.Application.Abstractions
         /// Removes the Receipt PDF file reference from a purchase order.
         /// </summary>
         Task RemoveReceiptAsync(long orderId, UserContext user, CancellationToken ct = default);
+        /// <summary>
+        /// Updates payment metadata for an existing purchase order.
+        /// </summary>
+        Task UpdatePaymentInfoAsync(long id, UpdatePurchaseOrderPaymentRequest req, UserContext user, CancellationToken ct = default);
     }
 }
 

@@ -1,0 +1,20 @@
+﻿  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Inventory.Domain -> H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Domain\bin\Debug\net9.0\Inventory.Domain.dll
+  Inventory.Application -> H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Application\bin\Debug\net9.0\Inventory.Application.dll
+H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Services\PurchaseOrderServices.cs(13,7): warning CS0105: The using directive for 'Inventory.Application.DTOs.PurchaseOrder' appeared previously in this namespace [H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Inventory.Infrastructure.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Services\StockSnapshotServices.cs(115,46): warning CS8602: Dereference of a possibly null reference. [H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Inventory.Infrastructure.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Services\NotificationService.cs(86,39): warning CS8629: Nullable value type may be null. [H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Inventory.Infrastructure.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Services\SalesOrderServices.cs(302,46): error CS1061: 'IFinancialServices' does not contain a definition for 'RecordSalesPaymentAsync' and no accessible extension method 'RecordSalesPaymentAsync' accepting a first argument of type 'IFinancialServices' could be found (are you missing a using directive or an assembly reference?) [H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Inventory.Infrastructure.csproj]
+
+Build FAILED.
+
+H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Services\PurchaseOrderServices.cs(13,7): warning CS0105: The using directive for 'Inventory.Application.DTOs.PurchaseOrder' appeared previously in this namespace [H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Inventory.Infrastructure.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Services\StockSnapshotServices.cs(115,46): warning CS8602: Dereference of a possibly null reference. [H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Inventory.Infrastructure.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Services\NotificationService.cs(86,39): warning CS8629: Nullable value type may be null. [H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Inventory.Infrastructure.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Services\SalesOrderServices.cs(302,46): error CS1061: 'IFinancialServices' does not contain a definition for 'RecordSalesPaymentAsync' and no accessible extension method 'RecordSalesPaymentAsync' accepting a first argument of type 'IFinancialServices' could be found (are you missing a using directive or an assembly reference?) [H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\Inventory.Infrastructure.csproj]
+    3 Warning(s)
+    1 Error(s)
+
+Time Elapsed 00:00:01.73
+

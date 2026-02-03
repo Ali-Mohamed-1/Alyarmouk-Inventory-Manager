@@ -8,28 +8,15 @@ namespace Inventory.Application.Abstractions
     public interface IFinancialServices
     {
         /// <summary>
-        /// Processes payment for a Sales Order when PaymentStatus becomes Paid.
-        /// Increases revenue/cash, updates customer balance, and logs transaction.
+        /// Creates a matching FinancialTransaction for a given PaymentRecord.
+        /// This is the MANDATORY way to record money movement in the financial log.
+        /// Must be called within the same database transaction as the PaymentRecord creation.
         /// </summary>
-        Task ProcessSalesPaymentAsync(long salesOrderId, UserContext user, CancellationToken ct = default);
+        Task CreateFinancialTransactionFromPaymentAsync(PaymentRecord payment, UserContext user, CancellationToken ct = default);
 
-        /// <summary>
-        /// Processes payment for a Purchase Order when PaymentStatus becomes Paid.
-        /// Increases accounts payable settlement, reduces cash/bank, updates supplier balance, and logs transaction.
-        /// </summary>
-        Task ProcessPurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default);
-
-        /// <summary>
-        /// Reverses a payment for a Sales Order (e.g., Refund or status reversal).
-        /// </summary>
-        Task ReverseSalesPaymentAsync(long salesOrderId, UserContext user, CancellationToken ct = default);
-
-        /// <summary>
-        /// Reverses a payment for a Purchase Order.
-        /// </summary>
-        Task ReversePurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default);
-
-        Task ProcessSalesRefundPaymentAsync(long salesOrderId, decimal amount, UserContext user, CancellationToken ct = default);
-        Task ProcessPurchaseRefundPaymentAsync(long purchaseOrderId, decimal amount, UserContext user, CancellationToken ct = default);
+        // Legacy methods for status-based automation - these should be refactored to use PaymentRecord internally if kept,
+        // but for now I will mark them or remove if not needed.
+        // Actually, the new rules say NO money movement without PaymentRecord.
+        // So these MUST be removed or updated to take a PaymentRecord.
     }
 }

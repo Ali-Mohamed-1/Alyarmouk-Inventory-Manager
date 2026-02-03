@@ -73,20 +73,19 @@ namespace Inventory.UnitTests
             {
                 OrderId = orderId,
                 Amount = 100 // Full refund of 1 item @ 100
-                // No lines specified -> Money only? Or impl checks?
-                // Logic: Logic allows Money Only.
             };
 
             // Act
             await _salesServices.RefundAsync(req, _user);
 
             // Assert
-            var order = await _db.SalesOrders.FindAsync(orderId);
+            var order = await _db.SalesOrders.Include(o => o.Payments).FirstOrDefaultAsync(o => o.Id == orderId);
             Assert.Equal(100, order.RefundedAmount);
+            Assert.Contains(order.Payments, p => p.PaymentType == PaymentRecordType.Refund && p.Amount == 100);
             
             // Verify Financial Service was called
-            Assert.True(_financialServices.SalesRefundCalled);
-            Assert.Equal(100, _financialServices.LastSalesRefundAmount);
+            Assert.True(_financialServices.CreationCalled);
+            Assert.Contains(_financialServices.CreatedPayments, p => p.PaymentType == PaymentRecordType.Refund && p.Amount == 100);
         }
 
         [Fact]
@@ -110,11 +109,12 @@ namespace Inventory.UnitTests
             await _salesServices.RefundAsync(req, _user);
 
             // Assert
-            var order = await _db.SalesOrders.Include(o => o.Lines).FirstAsync(o => o.Id == orderId);
+            var order = await _db.SalesOrders.Include(o => o.Lines).Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
             var line = order.Lines.First();
             
             Assert.Equal(0.5m, line.RefundedQuantity);
             Assert.Equal(50, order.RefundedAmount);
+            Assert.Contains(order.Payments, p => p.PaymentType == PaymentRecordType.Refund && p.Amount == 50);
 
             // Verify Stock Refund
             Assert.True(_inventoryServices.RefundSalesStockCalled);
@@ -143,11 +143,12 @@ namespace Inventory.UnitTests
             await _purchaseServices.RefundAsync(req, _user);
 
             // Assert
-            var order = await _db.PurchaseOrders.Include(o => o.Lines).FirstAsync(o => o.Id == orderId);
+            var order = await _db.PurchaseOrders.Include(o => o.Lines).Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
             var line = order.Lines.First();
 
             Assert.Equal(1m, line.RefundedQuantity);
             Assert.Equal(100, order.RefundedAmount);
+            Assert.Contains(order.Payments, p => p.PaymentType == PaymentRecordType.Refund && p.Amount == 100);
             
              // Verify Stock Refund (Issue)
             Assert.True(_inventoryServices.RefundPurchaseStockCalled);
@@ -183,6 +184,177 @@ namespace Inventory.UnitTests
             await Assert.ThrowsAsync<ValidationException>(() => _salesServices.RefundAsync(req, _user));
         }
 
+        // =============================================
+        // PARTIAL PAYMENT TESTS
+        // =============================================
+
+        [Fact]
+        public async Task AddPayment_PartialPayment_SetsStatusToPartiallyPaid()
+        {
+            // Arrange: Create order with total $1000
+            var orderId = await CreateSalesOrderWithTotalAsync(1000m);
+
+            // Act: Pay 30% ($300)
+            await _salesServices.AddPaymentAsync(orderId, new Inventory.Application.DTOs.Payment.CreatePaymentRequest
+            {
+                Amount = 300,
+                PaymentDate = DateTimeOffset.UtcNow,
+                PaymentMethod = PaymentMethod.Cash
+            }, _user);
+
+            // Assert
+            _db.ChangeTracker.Clear();
+            var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
+            Assert.Equal(PaymentStatus.PartiallyPaid, order.PaymentStatus);
+            Assert.Equal(300, order.GetPaidAmount());
+            Assert.Equal(700, order.GetRemainingAmount());
+        }
+
+        [Fact]
+        public async Task AddPayment_MultiplePartialPayments_SumsCorrectly()
+        {
+            // Arrange
+            var orderId = await CreateSalesOrderWithTotalAsync(1000m);
+            _db.ChangeTracker.Clear(); // Clear tracking to ensure fresh loads
+
+            // Act: Pay $300, then $200, then $500
+            await _salesServices.AddPaymentAsync(orderId, new Inventory.Application.DTOs.Payment.CreatePaymentRequest
+            {
+                Amount = 300,
+                PaymentDate = DateTimeOffset.UtcNow,
+                PaymentMethod = PaymentMethod.Cash
+            }, _user);
+            _db.ChangeTracker.Clear();
+
+            await _salesServices.AddPaymentAsync(orderId, new Inventory.Application.DTOs.Payment.CreatePaymentRequest
+            {
+                Amount = 200,
+                PaymentDate = DateTimeOffset.UtcNow,
+                PaymentMethod = PaymentMethod.Cash
+            }, _user);
+            _db.ChangeTracker.Clear();
+
+            await _salesServices.AddPaymentAsync(orderId, new Inventory.Application.DTOs.Payment.CreatePaymentRequest
+            {
+                Amount = 500,
+                PaymentDate = DateTimeOffset.UtcNow,
+                PaymentMethod = PaymentMethod.Cash
+            }, _user);
+
+            // Assert
+            _db.ChangeTracker.Clear();
+            var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
+            Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
+            Assert.Equal(1000, order.GetPaidAmount());
+            Assert.Equal(0, order.GetRemainingAmount());
+            Assert.Equal(3, order.Payments.Count(p => p.PaymentType == PaymentRecordType.Payment));
+        }
+
+        [Fact]
+        public async Task AddPayment_FullPaymentAfterPartial_SetsStatusToPaid()
+        {
+            // Arrange
+            var orderId = await CreateSalesOrderWithTotalAsync(1000m);
+            _db.ChangeTracker.Clear();
+
+            // Act: Pay 30% then remaining 70%
+            await _salesServices.AddPaymentAsync(orderId, new Inventory.Application.DTOs.Payment.CreatePaymentRequest
+            {
+                Amount = 300,
+                PaymentDate = DateTimeOffset.UtcNow,
+                PaymentMethod = PaymentMethod.Cash
+            }, _user);
+            _db.ChangeTracker.Clear();
+
+            // Verify it's partially paid first
+            var orderPartial = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
+            Assert.Equal(PaymentStatus.PartiallyPaid, orderPartial.PaymentStatus);
+            _db.ChangeTracker.Clear();
+
+            // Pay remaining
+            await _salesServices.AddPaymentAsync(orderId, new Inventory.Application.DTOs.Payment.CreatePaymentRequest
+            {
+                Amount = 700,
+                PaymentDate = DateTimeOffset.UtcNow,
+                PaymentMethod = PaymentMethod.Cash
+            }, _user);
+            _db.ChangeTracker.Clear();
+
+            // Assert full payment
+            var orderFull = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
+            Assert.Equal(PaymentStatus.Paid, orderFull.PaymentStatus);
+            Assert.Equal(1000, orderFull.GetPaidAmount());
+            Assert.Equal(0, orderFull.GetRemainingAmount());
+        }
+
+        [Fact]
+        public async Task GetByIdAsync_ReturnsCorrectDtoAfterPartialPayment()
+        {
+            // Arrange
+            var orderId = await CreateSalesOrderWithTotalAsync(1000m);
+
+            // Pay $400
+            await _salesServices.AddPaymentAsync(orderId, new Inventory.Application.DTOs.Payment.CreatePaymentRequest
+            {
+                Amount = 400,
+                PaymentDate = DateTimeOffset.UtcNow,
+                PaymentMethod = PaymentMethod.Cash
+            }, _user);
+
+            // Act: Get DTO
+            var dto = await _salesServices.GetByIdAsync(orderId);
+
+            // Assert: DTO fields are derived correctly
+            Assert.NotNull(dto);
+            Assert.Equal(1000, dto.TotalAmount);
+            Assert.Equal(400, dto.PaidAmount);
+            Assert.Equal(600, dto.RemainingAmount);
+            Assert.Equal(PaymentStatus.PartiallyPaid, dto.PaymentStatus);
+        }
+
+        [Fact]
+        public async Task Refund_AfterFullPayment_DowngradesStatus()
+        {
+            // Arrange: Create paid order
+            var orderId = await CreateAndCompleteSalesOrderAsync();
+            _db.ChangeTracker.Clear();
+            
+            // Act: Partial refund
+            await _salesServices.RefundAsync(new RefundSalesOrderRequest
+            {
+                OrderId = orderId,
+                Amount = 30  // Refund $30 of $100 total
+            }, _user);
+            _db.ChangeTracker.Clear();
+
+            // Assert: Status should downgrade
+            var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
+            Assert.Equal(PaymentStatus.PartiallyPaid, order.PaymentStatus);
+            Assert.Equal(70, order.GetPaidAmount());  // 100 paid - 30 refunded
+            Assert.Equal(30, order.GetRemainingAmount());
+        }
+
+        private async Task<long> CreateSalesOrderWithTotalAsync(decimal total)
+        {
+            // Calculate unit price to get desired total (1 item)
+            var createReq = new CreateSalesOrderRequest
+            {
+                CustomerId = 1,
+                DueDate = DateTimeOffset.UtcNow.AddDays(30),
+                PaymentMethod = PaymentMethod.Cash,
+                PaymentStatus = PaymentStatus.Pending,
+                IsTaxInclusive = false,
+                ApplyVat = false,
+                ApplyManufacturingTax = false,
+                Lines = new List<CreateSalesOrderLineRequest>
+                {
+                    new() { ProductId = 1, Quantity = 10, UnitPrice = total / 10 }  // 10 items @ total/10 = total
+                }
+            };
+
+            return await _salesServices.CreateAsync(createReq, _user);
+        }
+
         private async Task<long> CreateAndCompleteSalesOrderAsync()
         {
             var createReq = new CreateSalesOrderRequest
@@ -190,7 +362,7 @@ namespace Inventory.UnitTests
                 CustomerId = 1,
                 DueDate = DateTimeOffset.UtcNow.AddDays(1),
                 PaymentMethod = PaymentMethod.Cash,
-                PaymentStatus = PaymentStatus.Paid,
+                PaymentStatus = PaymentStatus.Paid, // CreateAsync refactored to handle this via ledger
                 IsTaxInclusive = false,
                 ApplyVat = false,
                 ApplyManufacturingTax = false,
@@ -222,8 +394,14 @@ namespace Inventory.UnitTests
             var id = await _purchaseServices.CreateAsync(createReq, _user);
             // Receive
             await _purchaseServices.UpdateStatusAsync(id, PurchaseOrderStatus.Received, _user);
-            // Pay
-            await _purchaseServices.UpdatePaymentStatusAsync(id, PurchasePaymentStatus.Paid, _user);
+            // Pay via AddPayment
+            await _purchaseServices.AddPaymentAsync(id, new Inventory.Application.DTOs.Payment.CreatePaymentRequest
+            {
+                Amount = 100,
+                PaymentDate = DateTimeOffset.UtcNow,
+                PaymentMethod = PaymentMethod.Cash,
+                Reference = "INIT-PAY"
+            }, _user);
             return id;
         }
 
@@ -251,7 +429,6 @@ namespace Inventory.UnitTests
             return Task.CompletedTask;
         }
 
-        // --- Other Interface Methods (No-Op) ---
         public Task<decimal> GetOnHandAsync(int productId, CancellationToken ct = default) => Task.FromResult(100m);
         public Task<StockSnapshotResponseDto?> GetStockAsync(int productId, CancellationToken ct = default) => Task.FromResult<StockSnapshotResponseDto?>(null);
         public Task<IReadOnlyList<StockSnapshotResponseDto>> GetAllStockAsync(CancellationToken ct = default) => Task.FromResult((IReadOnlyList<StockSnapshotResponseDto>)new List<StockSnapshotResponseDto>());
@@ -269,31 +446,15 @@ namespace Inventory.UnitTests
 
     public class CapturingFinancialServices : IFinancialServices
     {
-        public bool SalesRefundCalled { get; private set; }
-        public decimal LastSalesRefundAmount { get; private set; }
-        
-        public bool PurchaseRefundCalled { get; private set; }
-        public decimal LastPurchaseRefundAmount { get; private set; }
+        public bool CreationCalled { get; private set; }
+        public List<PaymentRecord> CreatedPayments { get; private set; } = new();
 
-        public Task ProcessSalesRefundPaymentAsync(long salesOrderId, decimal amount, UserContext user, CancellationToken ct = default)
+        public Task CreateFinancialTransactionFromPaymentAsync(PaymentRecord payment, UserContext user, CancellationToken ct = default)
         {
-            SalesRefundCalled = true;
-            LastSalesRefundAmount = amount;
+            CreationCalled = true;
+            CreatedPayments.Add(payment);
             return Task.CompletedTask;
         }
-
-        public Task ProcessPurchaseRefundPaymentAsync(long purchaseOrderId, decimal amount, UserContext user, CancellationToken ct = default)
-        {
-            PurchaseRefundCalled = true;
-            LastPurchaseRefundAmount = amount;
-            return Task.CompletedTask;
-        }
-
-        // --- Other Interface Methods (No-Op) ---
-        public Task ProcessSalesPaymentAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
-        public Task ProcessPurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
-        public Task ReverseSalesPaymentAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
-        public Task ReversePurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     public class MockAuditLogWriter : IAuditLogWriter

@@ -47,9 +47,82 @@ public  class SalesOrder
     public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.Cash;
 
     /// <summary>
-    /// Overall payment status for this order.
+    /// Overall payment status for this order. 
+    /// Managed by RecalculatePaymentStatus(), do not set manually.
     /// </summary>
-    public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Pending;
+    public PaymentStatus PaymentStatus { get; private set; } = PaymentStatus.Pending;
+
+    public List<PaymentRecord> Payments { get; set; } = new();
+
+    public void RecalculatePaymentStatus()
+    {
+        // GUARD: Ensure Payments collection is loaded before recalculation
+        if (Payments == null)
+            throw new InvalidOperationException(
+                $"Cannot recalculate payment status for SalesOrder {Id}: Payments collection is not loaded. " +
+                "Ensure .Include(o => o.Payments) is used when loading the order.");
+
+        // PaymentType.Payment increases paid amount
+        // PaymentType.Refund decreases paid amount
+        var paid = Payments
+            .Where(p => p.PaymentType == PaymentRecordType.Payment)
+            .Sum(p => p.Amount);
+            
+        var refunded = Payments
+            .Where(p => p.PaymentType == PaymentRecordType.Refund)
+            .Sum(p => p.Amount);
+
+        var netPaid = paid - refunded;
+        var remaining = TotalAmount - netPaid;
+
+        // CRITICAL INVARIANT: Overpayment is illegal
+        if (remaining < 0)
+            throw new InvalidOperationException(
+                $"Invalid payment state for SalesOrder {Id}: RemainingAmount ({remaining:C}) is negative. Total: {TotalAmount:C}, Paid: {netPaid:C}");
+
+        // STRICT STATUS DERIVATION
+        if (remaining == 0 && TotalAmount > 0)
+        {
+            PaymentStatus = PaymentStatus.Paid;
+        }
+        else if (netPaid > 0)
+        {
+            PaymentStatus = PaymentStatus.PartiallyPaid;
+        }
+        else
+        {
+            PaymentStatus = PaymentStatus.Pending;
+        }
+
+        // Final Invariant Check
+        if (PaymentStatus == PaymentStatus.Paid && remaining > 0)
+            throw new InvalidOperationException($"Domain Logic Failure: Order {Id} is marked PAID but has remaining balance {remaining:C}.");
+    }
+    
+    public decimal GetPaidAmount()
+    {
+        if (Payments == null) return 0;
+        var paid = Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount);
+        var refunded = Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount);
+        return paid - refunded;
+    }
+
+    public decimal GetRemainingAmount()
+    {
+        return TotalAmount - GetPaidAmount();
+    }
+
+    public bool IsOverdue() => DueDate < DateTimeOffset.UtcNow && PaymentStatus != PaymentStatus.Paid;
+
+    public decimal GetDeservedAmount()
+    {
+        return IsOverdue() ? GetRemainingAmount() : 0;
+    }
+
+    public decimal GetTotalPending()
+    {
+        return GetRemainingAmount();
+    }
 
     /// <summary>
     /// For check payments: whether we received the check.

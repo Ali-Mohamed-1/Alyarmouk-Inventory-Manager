@@ -116,13 +116,13 @@ namespace Inventory.Infrastructure.Services
                             po.Status != PurchaseOrderStatus.Cancelled &&
                             (po.PaymentStatus == PurchasePaymentStatus.Unpaid || po.PaymentStatus == PurchasePaymentStatus.PartiallyPaid));
 
-            // Total Pending: sum of all unpaid/partially-paid orders
-            var totalPending = await pendingQuery.SumAsync(po => (decimal?)po.TotalAmount - (decimal?)po.RefundedAmount, ct) ?? 0m;
+            // Total Pending: sum of all unpaid/partially-paid orders remaining balances
+            var totalPending = await pendingQuery.SumAsync(po => po.TotalAmount - (po.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - po.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)), ct);
 
             // Deserved: subset where payment deadline has passed (overdue)
             var deserved = await pendingQuery
                 .Where(po => po.PaymentDeadline.HasValue && po.PaymentDeadline.Value < asOf)
-                .SumAsync(po => (decimal?)po.TotalAmount - (decimal?)po.RefundedAmount, ct) ?? 0m;
+                .SumAsync(po => po.TotalAmount - (po.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - po.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)), ct);
 
             return new SupplierBalanceResponseDto
             {
@@ -148,13 +148,13 @@ namespace Inventory.Infrastructure.Services
                 .Where(o => o.CustomerId == customerId && 
                            (o.PaymentStatus == PaymentStatus.Pending || o.PaymentStatus == PaymentStatus.PartiallyPaid));
 
-            // Total Pending: sum of all unpaid/partially-paid orders
-            var totalPending = await query.SumAsync(o => o.TotalAmount - o.RefundedAmount, ct);
+            // Total Pending: sum of all unpaid/partially-paid orders remaining balances
+            var totalPending = await query.SumAsync(o => o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)), ct);
 
             // Deserved: subset where due date has passed (overdue)
             var deserved = await query
                 .Where(o => o.DueDate < asOf)
-                .SumAsync(o => o.TotalAmount - o.RefundedAmount, ct);
+                .SumAsync(o => o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)), ct);
 
             return new CustomerBalanceResponseDto
             {

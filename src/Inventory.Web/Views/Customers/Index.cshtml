@@ -119,9 +119,17 @@
                                     <span class="small fw-bold">TAX (1%):</span>
                                     <span id="detail-man-tax"></span>
                                 </div>
-                                <div class="d-flex justify-content-between mt-3 pt-2 border-top border-2">
+                                <div class="d-flex justify-content-between mt-2 pt-2 border-top border-2">
                                     <span class="fw-black">TOTAL:</span>
                                     <span id="detail-total" class="fw-black fs-4 text-success"></span>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <span class="small fw-bold">PAID:</span>
+                                    <span id="detail-paid" class="fw-bold text-success"></span>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <span class="small fw-bold">REMAINING:</span>
+                                    <span id="detail-remaining" class="fw-bold"></span>
                                 </div>
                                 <div id="detail-refunded-row" class="d-flex justify-content-between mt-2 pt-2 border-top border-2 text-danger" style="display:none !important;">
                                     <span class="fw-black">REFUNDED:</span>
@@ -134,14 +142,19 @@
                         <div class="col-md-6 ps-md-4">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="fw-black text-uppercase small mb-0">Payment Context</h6>
-                                <button class="neo-btn btn-sm py-0" style="font-size: 0.7rem;" onclick="openEditPaymentModal()">EDIT PAYMENT</button>
                             </div>
-                            
-                            <div class="neo-card p-3 bg-white mb-3 bg-neo-warning">
-                                <div class="mb-2"><strong>STATUS:</strong> <span id="detail-payment-status"></span></div>
-                                <div class="mb-2"><strong>METHOD:</strong> <span id="detail-payment-method" class="fw-black text-uppercase"></span></div>
-                                <div class="mb-0"><strong>DUE DATE:</strong> <span id="detail-due-date" class="fw-black text-uppercase"></span></div>
-                            </div>
+                                    <div class="neo-card p-3 bg-white mb-3 bg-neo-warning">
+                                        <div class="mb-2"><strong>STATUS:</strong> <span id="detail-payment-status"></span></div>
+                                        <div class="mb-2"><strong>METHOD:</strong> <span id="detail-payment-method" class="fw-black text-uppercase"></span></div>
+                                        <div class="mb-2"><strong>DUE DATE:</strong> <span id="detail-due-date" class="fw-black text-uppercase"></span></div>
+                                        <div class="mt-3">
+                                            <button class="neo-btn neo-btn-primary btn-sm w-100 mb-2" id="btn-record-payment" onclick="openRecordPaymentModal()">RECORD PAYMENT</button>
+                                            <div class="d-flex gap-2">
+                                                <button class="neo-btn btn-sm flex-grow-1 py-0" style="font-size: 0.7rem;" onclick="openEditPaymentModal()">EDIT INFO</button>
+                                                <button class="neo-btn btn-sm flex-grow-1 py-0" style="font-size: 0.7rem;" onclick="openEditDueDateModal()">EDIT DUE DATE</button>
+                                            </div>
+                                        </div>
+                                    </div>
 
                             <!-- Method specifics -->
                             <div id="check-details" class="neo-card p-3 bg-white mb-3" style="display: none;">
@@ -191,64 +204,129 @@
 
 <!-- MODALS -->
 
-<!-- Edit Payment Modal -->
+<!-- Edit Payment Info Modal -->
 <div class="modal fade" id="editPaymentModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-neo-warning">
-                <h5 class="modal-title fw-black text-uppercase">Update Payment context</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Edit Payment Information</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                <input type="hidden" id="editPaymentOrderId" />
-                <div class="mb-4">
-                    <label class="form-label fw-black text-uppercase small">Method</label>
-                    <select class="form-select" id="editPaymentMethod" onchange="togglePaymentMethodFields()" disabled>
-                        <option value="1">CASH</option>
-                        <option value="2">CHECK</option>
-                        <option value="3">BANK TRANSFER</option>
-                    </select>
-                </div>
-                <div class="mb-4">
-                    <label class="form-label fw-black text-uppercase small">Lifecycle Status</label>
-                    <select class="form-select" id="editPaymentStatus">
-                        <option value="0">PENDING</option>
-                        <option value="1">PAID</option>
-                        <option value="2">OVERDUE</option>
-                    </select>
-                </div>
-                
-                <div id="edit-check-fields" class="neo-card p-4 mb-3" style="display: none; background: #fff;">
-                    <h6 class="fw-black text-uppercase small mb-3 border-bottom border-2 pb-2">Check Details</h6>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="editCheckReceived">
-                        <label class="form-check-label fw-bold small ms-2">RECEIVED</label>
+                <form id="editPaymentInfoForm">
+                    <input type="hidden" id="editPaymentOrderId" />
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-black text-uppercase small">Payment Method</label>
+                        <select class="form-select fw-bold" id="editPaymentMethod" onchange="togglePaymentMethodFields()">
+                            <option value="1">CASH</option>
+                            <option value="2">CHECK</option>
+                            <option value="3">BANK TRANSFER</option>
+                        </select>
                     </div>
-                    <div class="mb-4">
-                        <label class="form-label fw-bold small text-muted">RECEIVED DATE</label>
-                        <input type="date" class="form-control" id="editCheckReceivedDate">
+
+                    <div id="edit-check-fields" style="display: none;">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editCheckReceived">
+                                <label class="form-check-label fw-bold small">Check Received</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Received Date</label>
+                            <input type="date" class="form-control fw-bold" id="editCheckReceivedDate">
+                        </div>
+                        <hr class="border-2 opacity-100">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editCheckCashed">
+                                <label class="form-check-label fw-bold small">Check Cashed</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Cashed Date</label>
+                            <input type="date" class="form-control fw-bold" id="editCheckCashedDate">
+                        </div>
                     </div>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="editCheckCashed">
-                        <label class="form-check-label fw-bold small ms-2">CASHED</label>
+
+                    <div id="edit-bank-transfer-fields" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Transfer ID / Reference</label>
+                            <input type="text" class="form-control fw-bold" id="editTransferId">
+                        </div>
                     </div>
+
                     <div class="mb-0">
-                        <label class="form-label fw-bold small text-muted">CASHED DATE</label>
-                        <input type="date" class="form-control" id="editCheckCashedDate">
+                        <label class="form-label fw-black text-uppercase small">Internal Note</label>
+                        <textarea class="form-control fw-bold" id="editOrderNote" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" id="savePaymentInfoBtn" onclick="savePaymentInfo()">SAVE CHANGES</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Record Payment Modal -->
+<div class="modal fade" id="recordPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Record New Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-4 text-center">
+                    <div class="small fw-bold text-uppercase opacity-50">Remaining Balance</div>
+                    <div class="h2 fw-black text-danger mb-0" id="record-remaining-balance">$0.00</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Payment Amount</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-black text-white fw-bold">$</span>
+                        <input type="number" class="form-control form-control-lg fw-black" id="paymentAmount" step="0.01">
                     </div>
                 </div>
 
-                <div id="edit-bank-transfer-fields" class="neo-card p-4 mb-3" style="display: none; background: #fff;">
-                    <h6 class="fw-black text-uppercase small mb-3 border-bottom border-2 pb-2">Transfer context</h6>
-                    <div class="mb-0">
-                        <label class="form-label fw-bold small text-muted">TRACE ID / REFERENCE</label>
-                        <input type="text" class="form-control" id="editTransferId" placeholder="e.g. TR-999999">
-                    </div>
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Reference / ID</label>
+                    <input type="text" class="form-control fw-bold" id="paymentReference" placeholder="e.g. CASH, CHECK #123, etc.">
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Note</label>
+                    <textarea class="form-control fw-bold" id="paymentNote" rows="2"></textarea>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="neo-btn" data-bs-dismiss="modal">CANCEL</button>
-                <button class="neo-btn neo-btn-primary" onclick="savePaymentInfo()">SAVE CONTEXT</button>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-success btn-sm px-4" id="submitPaymentBtn" onclick="submitPayment()">SUBMIT PAYMENT</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Due Date Modal -->
+<div class="modal fade" id="editDueDateModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small text-white">Edit Due Date</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">New Due Date</label>
+                    <input type="date" class="form-control fw-black text-center" id="newDueDateInput">
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" onclick="saveDueDate()">UPDATE</button>
             </div>
         </div>
     </div>
@@ -606,6 +684,12 @@
                     document.getElementById('detail-vat').textContent = formatCurrency(o.vatAmount);
                     document.getElementById('detail-man-tax').textContent = formatCurrency(o.manufacturingTaxAmount);
                     document.getElementById('detail-total').textContent = formatCurrency(o.totalAmount);
+                    document.getElementById('detail-paid').textContent = formatCurrency(o.paidAmount || 0);
+                    
+                    const rem = o.remainingAmount || 0;
+                    const remEl = document.getElementById('detail-remaining');
+                    remEl.textContent = formatCurrency(rem);
+                    remEl.className = rem > 0 ? 'fw-bold text-danger' : 'fw-bold text-success';
 
                     const rr = document.getElementById('detail-refunded-row');
                     if (o.refundedAmount > 0) { rr.style.setProperty('display', 'flex', 'important'); document.getElementById('detail-refunded').textContent = '-' + formatCurrency(o.refundedAmount); }
@@ -657,7 +741,6 @@
             window.openEditPaymentModal = () => {
                 const o = window.currentDetailOrder; if (!o) return;
                 document.getElementById('editPaymentOrderId').value = o.id;
-                document.getElementById('editPaymentStatus').value = o.paymentStatus;
                 document.getElementById('editPaymentMethod').value = o.paymentMethod || 1; 
                 togglePaymentMethodFields(); 
                 document.getElementById('editCheckReceived').checked = o.checkReceived;
@@ -665,6 +748,7 @@
                 document.getElementById('editCheckCashed').checked = o.checkCashed;
                 document.getElementById('editCheckCashedDate').value = o.checkCashedDate ? o.checkCashedDate.split('T')[0] : '';
                 document.getElementById('editTransferId').value = o.transferId || '';
+                document.getElementById('editOrderNote').value = o.note || '';
                 new bootstrap.Modal(document.getElementById('editPaymentModal')).show();
             };
 
@@ -675,24 +759,104 @@
             };
 
             window.savePaymentInfo = async () => {
+                const btn = document.getElementById('savePaymentInfoBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>SAVING...';
+
                 const od = document.getElementById('editPaymentOrderId').value;
                 const pm = parseInt(document.getElementById('editPaymentMethod').value);
-                const d = { orderId: parseInt(od), paymentStatus: parseInt(document.getElementById('editPaymentStatus').value), paymentMethod: pm };
-                if (pm === 2) { 
-                    d.checkReceived = document.getElementById('editCheckReceived').checked;
-                    const rd = document.getElementById('editCheckReceivedDate').value; d.checkReceivedDate = rd ? new Date(rd).toISOString() : null;
-                    d.checkCashed = document.getElementById('editCheckCashed').checked;
-                    const cd = document.getElementById('editCheckCashedDate').value; d.checkCashedDate = cd ? new Date(cd).toISOString() : null;
-                } else if (pm === 3) { d.transferId = document.getElementById('editTransferId').value; }
-                else { d.checkReceived = false; d.checkCashed = false; d.checkReceivedDate = null; d.checkCashedDate = null; d.transferId = null; }
+                const payload = { 
+                    orderId: parseInt(od), 
+                    paymentMethod: pm,
+                    checkReceived: document.getElementById('editCheckReceived').checked,
+                    checkReceivedDate: document.getElementById('editCheckReceivedDate').value || null,
+                    checkCashed: document.getElementById('editCheckCashed').checked,
+                    checkCashedDate: document.getElementById('editCheckCashedDate').value || null,
+                    transferId: document.getElementById('editTransferId').value,
+                    note: document.getElementById('editOrderNote').value
+                };
 
                 try {
-                    const r = await fetch(`/api/sales-orders/${od}/payment`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, body: JSON.stringify(d) });
+                    const r = await fetch(`/api/sales-orders/${od}/payment`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, body: JSON.stringify(payload) });
                     if (!r.ok) throw new Error(await r.text());
                     bootstrap.Modal.getInstance(document.getElementById('editPaymentModal')).hide();
                     await viewOrderDetails(od);
                     if (currentCustomerId) await refreshCustomerData(currentCustomerId);
-                } catch (e) { alert('Sync failed: ' + e.message); }
+                } catch (e) { 
+                    alert('Sync failed: ' + e.message); 
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = 'SAVE CHANGES';
+                }
+            };
+
+            window.openRecordPaymentModal = () => {
+                const o = window.currentDetailOrder; if (!o) return;
+                const remaining = o.remainingAmount || 0;
+                document.getElementById('record-remaining-balance').textContent = formatCurrency(remaining);
+                document.getElementById('paymentAmount').value = remaining.toFixed(2);
+                document.getElementById('paymentReference').value = '';
+                document.getElementById('paymentNote').value = '';
+                new bootstrap.Modal(document.getElementById('recordPaymentModal')).show();
+            };
+
+            window.submitPayment = async () => {
+                const btn = document.getElementById('submitPaymentBtn');
+                const amount = parseFloat(document.getElementById('paymentAmount').value);
+                if (isNaN(amount) || amount <= 0) { alert('Enter a valid amount'); return; }
+
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>PROCESSING...';
+
+                const od = window.currentDetailOrder.id;
+                const payload = {
+                    amount: amount,
+                    paymentDate: new Date().toISOString(),
+                    paymentMethod: window.currentDetailOrder.paymentMethod || 1,
+                    paymentType: 0, // Sale
+                    reference: document.getElementById('paymentReference').value,
+                    note: document.getElementById('paymentNote').value
+                };
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${od}/payments`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(payload) 
+                    });
+                    if (!r.ok) throw new Error(await r.text());
+                    bootstrap.Modal.getInstance(document.getElementById('recordPaymentModal')).hide();
+                    await viewOrderDetails(od);
+                    if (currentCustomerId) await refreshCustomerData(currentCustomerId);
+                } catch (e) {
+                    alert('Payment failed: ' + e.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = 'SUBMIT PAYMENT';
+                }
+            };
+
+            window.openEditDueDateModal = () => {
+                const o = window.currentDetailOrder; if (!o) return;
+                document.getElementById('newDueDateInput').value = o.dueDate ? o.dueDate.split('T')[0] : '';
+                new bootstrap.Modal(document.getElementById('editDueDateModal')).show();
+            };
+
+            window.saveDueDate = async () => {
+                const od = window.currentDetailOrder.id;
+                const newDate = document.getElementById('newDueDateInput').value;
+                if (!newDate) return;
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${od}/due-date`, { 
+                        method: 'PUT', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(new Date(newDate).toISOString()) 
+                    });
+                    if (!r.ok) throw new Error();
+                    bootstrap.Modal.getInstance(document.getElementById('editDueDateModal')).hide();
+                    await viewOrderDetails(od);
+                } catch (e) { alert('Failed to update due date'); }
             };
 
             function renderDocumentsSection(o) {

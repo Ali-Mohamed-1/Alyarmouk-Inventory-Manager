@@ -465,12 +465,7 @@
 
         public class MockFinancialServices : IFinancialServices
         {
-            public Task ProcessSalesPaymentAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
-            public Task ProcessPurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
-            public Task ReverseSalesPaymentAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
-            public Task ReversePurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
-            public Task ProcessSalesRefundPaymentAsync(long salesOrderId, decimal amount, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
-            public Task ProcessPurchaseRefundPaymentAsync(long purchaseOrderId, decimal amount, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task CreateFinancialTransactionFromPaymentAsync(PaymentRecord payment, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
         }
     }
 }

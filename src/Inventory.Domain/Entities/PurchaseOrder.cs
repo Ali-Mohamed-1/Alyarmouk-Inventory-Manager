@@ -24,12 +24,113 @@ public class PurchaseOrder
     public string SupplierNameSnapshot { get; set; } = "";
 
     public PurchaseOrderStatus Status { get; set; } = PurchaseOrderStatus.Pending;
-    public PurchasePaymentStatus PaymentStatus { get; set; } = PurchasePaymentStatus.Unpaid;
+
+    /// <summary>
+    /// Payment method used for this order.
+    /// </summary>
+    public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.Cash;
+
+    public PurchasePaymentStatus PaymentStatus { get; private set; } = PurchasePaymentStatus.Unpaid;
+
+    public List<PaymentRecord> Payments { get; set; } = new();
+
+    public void RecalculatePaymentStatus()
+    {
+        // GUARD: Ensure Payments collection is loaded before recalculation
+        if (Payments == null)
+            throw new InvalidOperationException(
+                $"Cannot recalculate payment status for PurchaseOrder {Id}: Payments collection is not loaded. " +
+                "Ensure .Include(o => o.Payments) is used when loading the order.");
+
+        var paid = Payments
+            .Where(p => p.PaymentType == PaymentRecordType.Payment)
+            .Sum(p => p.Amount);
+            
+        var refunded = Payments
+            .Where(p => p.PaymentType == PaymentRecordType.Refund)
+            .Sum(p => p.Amount);
+
+        var netPaid = paid - refunded;
+        var remaining = TotalAmount - netPaid;
+
+        // CRITICAL INVARIANT: Overpayment is illegal
+        if (remaining < 0)
+            throw new InvalidOperationException(
+                $"Invalid payment state for PurchaseOrder {Id}: RemainingAmount ({remaining:C}) is negative. Total: {TotalAmount:C}, Paid: {netPaid:C}");
+
+        // STRICT STATUS DERIVATION
+        if (remaining == 0 && TotalAmount > 0)
+        {
+            PaymentStatus = PurchasePaymentStatus.Paid;
+        }
+        else if (netPaid > 0)
+        {
+            PaymentStatus = PurchasePaymentStatus.PartiallyPaid;
+        }
+        else
+        {
+            PaymentStatus = PurchasePaymentStatus.Unpaid;
+        }
+
+        // Final Invariant Check
+        if (PaymentStatus == PurchasePaymentStatus.Paid && remaining > 0)
+            throw new InvalidOperationException($"Domain Logic Failure: Order {Id} is marked PAID but has remaining balance {remaining:C}.");
+    }
+
+    public decimal GetPaidAmount()
+    {
+        if (Payments == null) return 0;
+        var paid = Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount);
+        var refunded = Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount);
+        return paid - refunded;
+    }
+
+    public decimal GetRemainingAmount()
+    {
+        return TotalAmount - GetPaidAmount();
+    }
+
+    public bool IsOverdue() => PaymentDeadline.HasValue && PaymentDeadline.Value < DateTimeOffset.UtcNow && PaymentStatus != PurchasePaymentStatus.Paid;
+
+    public decimal GetDeservedAmount()
+    {
+        return IsOverdue() ? GetRemainingAmount() : 0;
+    }
+
+    public decimal GetTotalPending()
+    {
+        return GetRemainingAmount();
+    }
 
     /// <summary>
     /// When payment to the supplier is expected/due.
     /// </summary>
     public DateTimeOffset? PaymentDeadline { get; set; }
+
+    /// <summary>
+    /// For check payments: whether we received/issued the check.
+    /// </summary>
+    public bool? CheckReceived { get; set; }
+
+    /// <summary>
+    /// For check payments: date when the check was received/issued.
+    /// </summary>
+    public DateTimeOffset? CheckReceivedDate { get; set; }
+
+    /// <summary>
+    /// For check payments: whether the check has been cashed.
+    /// </summary>
+    public bool? CheckCashed { get; set; }
+
+    /// <summary>
+    /// For check payments: date when the check was cashed.
+    /// </summary>
+    public DateTimeOffset? CheckCashedDate { get; set; }
+
+    /// <summary>
+    /// For bank transfer payments: unique transfer identifier/reference.
+    /// </summary>
+    public string? TransferId { get; set; }
 
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public string CreatedByUserId { get; set; } = "";

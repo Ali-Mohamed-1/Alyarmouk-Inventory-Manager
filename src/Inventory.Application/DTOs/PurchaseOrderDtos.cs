@@ -1,4 +1,5 @@
 using Inventory.Domain.Entities;
+using Inventory.Application.DTOs.Payment;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -35,6 +36,18 @@ namespace Inventory.Application.DTOs
         DateTimeOffset? InvoiceUploadedUtc,
         string? ReceiptPath,
         DateTimeOffset? ReceiptUploadedUtc,
+        PaymentMethod PaymentMethod,
+        bool? CheckReceived,
+        DateTimeOffset? CheckReceivedDate,
+        bool? CheckCashed,
+        DateTimeOffset? CheckCashedDate,
+        string? TransferId,
+        decimal PaidAmount,
+        decimal RemainingAmount,
+        decimal TotalPending,
+        decimal DeservedAmount,
+        bool IsOverdue,
+        List<PaymentRecordDto> Payments,
         List<PurchaseOrderLineResponse> Lines);
 
     public record PurchaseOrderLineResponse(

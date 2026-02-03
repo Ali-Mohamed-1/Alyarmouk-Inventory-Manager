@@ -114,13 +114,30 @@
                                     </div>
                                 </div>
                                 <div class="col-md-6 ps-md-4">
-                                    <h6 class="fw-black text-uppercase small mb-3">Financial Overview</h6>
-                                    <div class="mb-3 d-flex align-items-center gap-2">
-                                        <strong>PAYMENT:</strong> <span id="view-payment-status"></span>
-                                        <button class="neo-btn btn-sm py-0 ms-2" style="font-size: 0.7rem;" onclick="openEditPaymentStatusModal()">EDIT</button>
+                                    <div class="neo-card p-3 my-4 bg-white bg-neo-warning">
+                                        <div class="mb-3 d-flex align-items-center justify-content-between">
+                                            <div>
+                                                <div class="small fw-bold text-muted">PAYMENT STATUS</div>
+                                                <span id="view-payment-status"></span>
+                                            </div>
+                                            <button class="neo-btn neo-btn-primary btn-sm" onclick="openRecordPaymentModal()">RECORD PAYMENT</button>
+                                        </div>
+
+                                        <div class="mb-2 d-flex justify-content-between border-top pt-2">
+                                            <span class="small fw-bold">METHOD:</span>
+                                            <span id="detail-payment-method" class="fw-black text-uppercase small"></span>
+                                        </div>
+
+                                        <div class="mb-2 d-flex justify-content-between">
+                                            <span class="small fw-bold">DEADLINE:</span>
+                                            <span id="view-payment-deadline" class="fw-black text-uppercase small"></span>
+                                        </div>
+
+                                        <div class="d-flex gap-2 mt-3">
+                                            <button class="neo-btn btn-sm flex-grow-1 py-1" style="font-size: 0.7rem;" onclick="openEditPaymentModal()">EDIT INFO</button>
+                                            <button class="neo-btn btn-sm flex-grow-1 py-1" style="font-size: 0.7rem;" onclick="openEditDeadlineModal()">EDIT DEADLINE</button>
+                                        </div>
                                     </div>
-
-
 
                                     <div class="d-flex justify-content-between mb-1">
                                         <span class="small fw-bold">SUBTOTAL:</span>
@@ -134,9 +151,17 @@
                                         <span class="small fw-bold">TAX:</span>
                                         <span id="view-order-man-tax"></span>
                                     </div>
-                                    <div class="d-flex justify-content-between mt-3 pt-2 border-top border-2">
+                                    <div class="d-flex justify-content-between mt-2 pt-2 border-top border-2">
                                         <span class="fw-black">TOTAL:</span>
                                         <span id="view-order-total" class="fw-black fs-4 text-success"></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <span class="small fw-bold">PAID:</span>
+                                        <span id="view-order-paid" class="fw-bold text-success"></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <span class="small fw-bold">REMAINING:</span>
+                                        <span id="view-order-remaining" class="fw-bold"></span>
                                     </div>
                                 </div>
                             </div>
@@ -377,25 +402,129 @@
     </div>
 </div>
 
-<!-- Update Payment Status Modal -->
-<div class="modal fade" id="updatePaymentStatusModal" tabindex="-1">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content">
+<!-- Edit Payment Info Modal -->
+<div class="modal fade" id="editPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
             <div class="modal-header bg-black text-white">
-                <h5 class="modal-title fw-black text-uppercase small">Payment status</h5>
+                <h5 class="modal-title fw-black text-uppercase small">Edit Payment Information</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="editPaymentInfoForm">
+                    <input type="hidden" id="editPaymentOrderId" />
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-black text-uppercase small">Payment Method</label>
+                        <select class="form-select fw-bold" id="editPaymentMethod" onchange="togglePaymentMethodFields()">
+                            <option value="1">CASH</option>
+                            <option value="2">CHECK</option>
+                            <option value="3">BANK TRANSFER</option>
+                        </select>
+                    </div>
+
+                    <div id="edit-check-fields" style="display: none;">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editCheckReceived">
+                                <label class="form-check-label fw-bold small">Check Received</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Received Date</label>
+                            <input type="date" class="form-control fw-bold" id="editCheckReceivedDate">
+                        </div>
+                        <hr class="border-2 opacity-100">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editCheckCashed">
+                                <label class="form-check-label fw-bold small">Check Cashed</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Cashed Date</label>
+                            <input type="date" class="form-control fw-bold" id="editCheckCashedDate">
+                        </div>
+                    </div>
+
+                    <div id="edit-bank-transfer-fields" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Transfer ID / Reference</label>
+                            <input type="text" class="form-control fw-bold" id="editTransferId">
+                        </div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label fw-black text-uppercase small">Internal Note</label>
+                        <textarea class="form-control fw-bold" id="editOrderNote" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" id="savePaymentInfoBtn" onclick="savePaymentInfo()">SAVE CHANGES</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Record Payment Modal -->
+<div class="modal fade" id="recordPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Record New Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-4 text-center">
+                    <div class="small fw-bold text-uppercase opacity-50">Remaining Balance</div>
+                    <div class="h2 fw-black text-danger mb-0" id="record-remaining-balance">$0.00</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Payment Amount</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-black text-white fw-bold">$</span>
+                        <input type="number" class="form-control form-control-lg fw-black" id="paymentAmount" step="0.01">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Reference / ID</label>
+                    <input type="text" class="form-control fw-bold" id="paymentReference" placeholder="e.g. CASH, CHECK #123, etc.">
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Note</label>
+                    <textarea class="form-control fw-bold" id="paymentNote" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-success btn-sm px-4" id="submitPaymentBtn" onclick="submitPayment()">SUBMIT PAYMENT</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Deadline Modal -->
+<div class="modal fade" id="editDeadlineModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small text-white">Edit Deadline</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4 text-center">
-                <input type="hidden" id="paymentStatusOrderId" />
-                <label class="form-label fw-black text-uppercase small mb-3">Set Payment Status</label>
-                <select class="form-select fw-black mb-0 text-center" id="newPaymentStatus">
-                    <option value="0">UNPAID</option>
-                    <option value="1">PAID</option>
-                </select>
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">New Payment Deadline</label>
+                    <input type="date" class="form-control fw-black text-center" id="newDeadlineInput">
+                </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer border-0 p-4 pt-0">
                 <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
-                <button class="neo-btn neo-btn-warning btn-sm" onclick="savePaymentStatusChange()">UPDATE</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" onclick="saveDeadline()">UPDATE</button>
             </div>
         </div>
     </div>
@@ -536,7 +665,7 @@
                     const r = await fetch(`/api/purchase-orders/${id}`);
                     if(!r.ok) throw new Error();
                     const o = await r.json();
-
+                    window.currentDetailOrder = o;
                     renderDocumentActions(o.invoicePath, o.receiptPath);
 
                     document.getElementById('view-order-number').innerText = o.orderNumber;
@@ -546,10 +675,23 @@
                     document.getElementById('view-payment-status').innerHTML = getPayBadge(o.paymentStatus);
                     document.getElementById('view-order-note').innerText = o.note || 'NO NOTES PROVIDED.';
 
+                    document.getElementById('detail-payment-method').innerText = 
+                        o.paymentMethod === 1 ? 'CASH' : 
+                        o.paymentMethod === 2 ? 'CHECK' : 
+                        o.paymentMethod === 3 ? 'BANK TRANSFER' : 'N/A';
+                    
+                    document.getElementById('view-payment-deadline').innerText = o.paymentDeadline ? formatDate(o.paymentDeadline) : 'N/A';
+
                     document.getElementById('view-order-subtotal').innerText = formatCurrency(o.subtotal);
                     document.getElementById('view-order-vat').innerText = formatCurrency(o.vatAmount);
                     document.getElementById('view-order-man-tax').innerText = formatCurrency(o.manufacturingTaxAmount);
                     document.getElementById('view-order-total').innerText = formatCurrency(o.totalAmount);
+                    document.getElementById('view-order-paid').innerText = formatCurrency(o.paidAmount || 0);
+                    
+                    const rem = o.remainingAmount || 0;
+                    const remEl = document.getElementById('view-order-remaining');
+                    remEl.innerText = formatCurrency(rem);
+                    remEl.className = rem > 0 ? 'fw-bold text-danger' : 'fw-bold text-success';
 
                     const tbody = document.getElementById('view-lines-body');
                     tbody.innerHTML = o.lines.map(l => `
@@ -627,23 +769,129 @@
                 } catch(e) { alert("Update failed"); }
             };
 
-            window.openEditPaymentStatusModal = () => { document.getElementById('paymentStatusOrderId').value = currentOrderId; new bootstrap.Modal(document.getElementById('updatePaymentStatusModal')).show(); };
-            window.savePaymentStatusChange = async () => {
-                const id = document.getElementById('paymentStatusOrderId').value;
-                const status = parseInt(document.getElementById('newPaymentStatus').value);
+            window.openEditPaymentModal = () => {
+                const o = window.currentDetailOrder; if (!o) return;
+                document.getElementById('editPaymentOrderId').value = o.id;
+                document.getElementById('editPaymentMethod').value = o.paymentMethod || 1; 
+                togglePaymentMethodFields(); 
+                document.getElementById('editCheckReceived').checked = o.checkReceived;
+                document.getElementById('editCheckReceivedDate').value = o.checkReceivedDate ? o.checkReceivedDate.split('T')[0] : '';
+                document.getElementById('editCheckCashed').checked = o.checkCashed;
+                document.getElementById('editCheckCashedDate').value = o.checkCashedDate ? o.checkCashedDate.split('T')[0] : '';
+                document.getElementById('editTransferId').value = o.transferId || '';
+                document.getElementById('editOrderNote').value = o.note || '';
+                new bootstrap.Modal(document.getElementById('editPaymentModal')).show();
+            };
+
+            window.togglePaymentMethodFields = () => {
+                const m = parseInt(document.getElementById('editPaymentMethod').value);
+                document.getElementById('edit-check-fields').style.display = m === 2 ? 'block' : 'none';
+                document.getElementById('edit-bank-transfer-fields').style.display = m === 3 ? 'block' : 'none';
+            };
+
+            window.savePaymentInfo = async () => {
+                const btn = document.getElementById('savePaymentInfoBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>SAVING...';
+
+                const od = document.getElementById('editPaymentOrderId').value;
+                const pm = parseInt(document.getElementById('editPaymentMethod').value);
+                const payload = { 
+                    orderId: parseInt(od), 
+                    paymentMethod: pm,
+                    checkReceived: document.getElementById('editCheckReceived').checked,
+                    checkReceivedDate: document.getElementById('editCheckReceivedDate').value || null,
+                    checkCashed: document.getElementById('editCheckCashed').checked,
+                    checkCashedDate: document.getElementById('editCheckCashedDate').value || null,
+                    transferId: document.getElementById('editTransferId').value,
+                    note: document.getElementById('editOrderNote').value
+                };
+
                 try {
-                    const r = await fetch(`/api/purchase-orders/${id}/payment-status`, { 
-                        method:'PUT', 
-                        headers:{
-                            'Content-Type':'application/json',
-                            'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value
-                        }, 
-                        body:JSON.stringify(status) 
+                    const r = await fetch(`/api/purchase-orders/${od}/payment-info`, { 
+                        method: 'PUT', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(payload) 
                     });
-                    if(!r.ok) throw new Error();
-                    bootstrap.Modal.getInstance(document.getElementById('updatePaymentStatusModal')).hide();
-                    loadOrderDetails(id); viewHistory(currentSupplierId);
-                } catch(e) { alert("Update failed"); }
+                    if (!r.ok) throw new Error(await r.text());
+                    bootstrap.Modal.getInstance(document.getElementById('editPaymentModal')).hide();
+                    await loadOrderDetails(od);
+                    if (currentSupplierId) await viewHistory(currentSupplierId);
+                } catch (e) { 
+                    alert('Sync failed: ' + e.message); 
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = 'SAVE CHANGES';
+                }
+            };
+
+            window.openRecordPaymentModal = () => {
+                const o = window.currentDetailOrder; if (!o) return;
+                const remaining = o.remainingAmount || 0;
+                document.getElementById('record-remaining-balance').textContent = formatCurrency(remaining);
+                document.getElementById('paymentAmount').value = remaining.toFixed(2);
+                document.getElementById('paymentReference').value = '';
+                document.getElementById('paymentNote').value = '';
+                new bootstrap.Modal(document.getElementById('recordPaymentModal')).show();
+            };
+
+            window.submitPayment = async () => {
+                const btn = document.getElementById('submitPaymentBtn');
+                const amount = parseFloat(document.getElementById('paymentAmount').value);
+                if (isNaN(amount) || amount <= 0) { alert('Enter a valid amount'); return; }
+
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>PROCESSING...';
+
+                const od = window.currentDetailOrder.id;
+                const payload = {
+                    amount: amount,
+                    paymentDate: new Date().toISOString(),
+                    paymentMethod: window.currentDetailOrder.paymentMethod || 1,
+                    paymentType: 1, // Purchase
+                    reference: document.getElementById('paymentReference').value,
+                    note: document.getElementById('paymentNote').value
+                };
+
+                try {
+                    const r = await fetch(`/api/purchase-orders/${od}/payments`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(payload) 
+                    });
+                    if (!r.ok) throw new Error(await r.text());
+                    bootstrap.Modal.getInstance(document.getElementById('recordPaymentModal')).hide();
+                    await loadOrderDetails(od);
+                    if (currentSupplierId) await viewHistory(currentSupplierId);
+                } catch (e) {
+                    alert('Payment failed: ' + e.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = 'SUBMIT PAYMENT';
+                }
+            };
+
+            window.openEditDeadlineModal = () => {
+                const o = window.currentDetailOrder; if (!o) return;
+                document.getElementById('newDeadlineInput').value = o.paymentDeadline ? o.paymentDeadline.split('T')[0] : '';
+                new bootstrap.Modal(document.getElementById('editDeadlineModal')).show();
+            };
+
+            window.saveDeadline = async () => {
+                const od = window.currentDetailOrder.id;
+                const newDate = document.getElementById('newDeadlineInput').value;
+                if (!newDate) return;
+
+                try {
+                    const r = await fetch(`/api/purchase-orders/${od}/deadline`, { 
+                        method: 'PUT', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(new Date(newDate).toISOString()) 
+                    });
+                    if (!r.ok) throw new Error();
+                    bootstrap.Modal.getInstance(document.getElementById('editDeadlineModal')).hide();
+                    await loadOrderDetails(od);
+                } catch (e) { alert('Failed to update deadline'); }
             };
 
             window.switchView = (v) => {

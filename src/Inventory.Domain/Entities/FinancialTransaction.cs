@@ -58,6 +58,9 @@ public sealed class FinancialTransaction
     public long? PurchaseOrderId { get; set; }
     public PurchaseOrder? PurchaseOrder { get; set; }
     
+    public long? PaymentRecordId { get; set; }
+    public PaymentRecord? PaymentRecord { get; set; }
+    
     public DateTimeOffset TimestampUtc { get; set; }
     public string UserId { get; set; } = "";
     public string UserDisplayName { get; set; } = "";

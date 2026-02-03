@@ -91,9 +91,12 @@
                         <!-- Right: Financials -->
                         <div class="col-md-6 ps-md-4">
                             <h6 class="fw-black text-uppercase small mb-3">Financial Overview</h6>
-                            <div class="mb-2 d-flex align-items-center gap-2">
+                            <div class="mb-2">
                                 <strong>PAYMENT:</strong> <span id="so-detail-payment"></span>
-                                <button class="neo-btn btn-sm py-0 ms-2" style="font-size: 0.7rem;" onclick="openSoPaymentModal()">EDIT PAYMENT</button>
+                            </div>
+                            <div class="mb-4 d-flex gap-2">
+                                <button class="neo-btn neo-btn-success btn-sm flex-grow-1" style="font-size: 0.7rem;" onclick="openSoRecordPaymentModal()">RECORD PAYMENT</button>
+                                <button class="neo-btn neo-btn-primary btn-sm flex-grow-1" style="font-size: 0.7rem;" onclick="openSoEditInfoModal()">EDIT INFO</button>
                             </div>
                             <div class="d-flex justify-content-between mb-1">
                                 <span class="small fw-bold">SUBTOTAL:</span>
@@ -195,9 +198,12 @@
                         </div>
                         <div class="col-md-6 ps-md-4">
                             <h6 class="fw-black text-uppercase small mb-3">Financial Overview</h6>
-                            <div class="mb-2 d-flex align-items-center gap-2">
+                            <div class="mb-2">
                                 <strong>PAYMENT:</strong> <span id="po-detail-payment"></span>
-                                <button class="neo-btn btn-sm py-0 ms-2" style="font-size: 0.7rem;" onclick="openPoPaymentModal()">EDIT</button>
+                            </div>
+                            <div class="mb-4 d-flex gap-2">
+                                <button class="neo-btn neo-btn-success btn-sm flex-grow-1" style="font-size: 0.7rem;" onclick="openPoRecordPaymentModal()">RECORD PAYMENT</button>
+                                <button class="neo-btn neo-btn-primary btn-sm flex-grow-1" style="font-size: 0.7rem;" onclick="openPoEditInfoModal()">EDIT INFO</button>
                             </div>
                             <div class="d-flex justify-content-between mb-1">
                                 <span class="small fw-bold">SUBTOTAL:</span>
@@ -330,64 +336,105 @@
     </div>
 </div>
 
-<!-- SO: Edit Payment -->
-<div class="modal fade" id="soPaymentModal" tabindex="-1">
+<!-- SO: Record Payment Modal -->
+<div class="modal fade" id="soRecordPaymentModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-neo-warning">
-                <h5 class="modal-title fw-black text-uppercase">Update SO Payment</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Record Customer Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                <input type="hidden" id="soEditPaymentOrderId" />
-                <div class="mb-4">
-                    <label class="form-label fw-black text-uppercase small">Method</label>
-                    <select class="form-select" id="soEditPaymentMethod" onchange="toggleSoPaymentMethodFields()" disabled>
-                        <option value="1">CASH</option>
-                        <option value="2">CHECK</option>
-                        <option value="3">BANK TRANSFER</option>
-                    </select>
+                <div class="mb-4 text-center">
+                    <div class="small fw-bold text-uppercase opacity-50">Remaining Balance</div>
+                    <div class="h2 fw-black text-danger mb-0" id="so-record-remaining-balance">$0.00</div>
                 </div>
-                <div class="mb-4">
-                    <label class="form-label fw-black text-uppercase small">Payment Status</label>
-                    <select class="form-select" id="soEditPaymentStatus">
-                        <option value="0">PENDING</option>
-                        <option value="1">PAID</option>
-                        <option value="2">OVERDUE</option>
-                    </select>
-                </div>
-                
-                <div id="so-edit-check-fields" class="neo-card p-4 mb-3" style="display: none; background: #fff;">
-                    <h6 class="fw-black text-uppercase small mb-3 border-bottom border-2 pb-2">Check Details</h6>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="soEditCheckReceived">
-                        <label class="form-check-label fw-bold small ms-2">RECEIVED</label>
-                    </div>
-                    <div class="mb-4">
-                        <label class="form-label fw-bold small text-muted">RECEIVED DATE</label>
-                        <input type="date" class="form-control" id="soEditCheckReceivedDate">
-                    </div>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="soEditCheckCashed">
-                        <label class="form-check-label fw-bold small ms-2">CASHED</label>
-                    </div>
-                    <div class="mb-0">
-                        <label class="form-label fw-bold small text-muted">CASHED DATE</label>
-                        <input type="date" class="form-control" id="soEditCheckCashedDate">
+
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Payment Amount</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-black text-white fw-bold">$</span>
+                        <input type="number" class="form-control form-control-lg fw-black" id="soPaymentAmount" step="0.01">
                     </div>
                 </div>
 
-                <div id="so-edit-bank-transfer-fields" class="neo-card p-4 mb-3" style="display: none; background: #fff;">
-                    <h6 class="fw-black text-uppercase small mb-3 border-bottom border-2 pb-2">Transfer context</h6>
-                    <div class="mb-0">
-                        <label class="form-label fw-bold small text-muted">TRACE ID / REFERENCE</label>
-                        <input type="text" class="form-control" id="soEditTransferId" placeholder="e.g. TR-999999">
-                    </div>
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Reference / ID</label>
+                    <input type="text" class="form-control fw-bold" id="soPaymentReference" placeholder="e.g. CASH, CHECK #123, etc.">
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Note</label>
+                    <textarea class="form-control fw-bold" id="soPaymentNote" rows="2"></textarea>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="neo-btn" data-bs-dismiss="modal">CANCEL</button>
-                <button class="neo-btn neo-btn-primary" onclick="saveSoPaymentInfo()">SAVE CONTEXT</button>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-success btn-sm px-4" id="submitSoPaymentBtn" onclick="submitSoPayment()">SUBMIT PAYMENT</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SO: Edit Info Modal -->
+<div class="modal fade" id="soEditInfoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Edit Payment Metadata</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="soEditPaymentInfoForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-black text-uppercase small">Payment Method</label>
+                        <select class="form-select fw-bold" id="soEditPaymentMethod" onchange="toggleSoEditPaymentFields()">
+                            <option value="1">CASH</option>
+                            <option value="2">CHECK</option>
+                            <option value="3">BANK TRANSFER</option>
+                        </select>
+                    </div>
+
+                    <div id="so-edit-check-fields" style="display: none;">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="soEditCheckReceived">
+                                <label class="form-check-label fw-bold small">Check Received</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Received Date</label>
+                            <input type="date" class="form-control fw-bold" id="soEditCheckReceivedDate">
+                        </div>
+                        <hr class="border-2 opacity-100">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="soEditCheckCashed">
+                                <label class="form-check-label fw-bold small">Check Cashed</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Cashed Date</label>
+                            <input type="date" class="form-control fw-bold" id="soEditCheckCashedDate">
+                        </div>
+                    </div>
+
+                    <div id="so-edit-bank-transfer-fields" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Transfer ID / Reference</label>
+                            <input type="text" class="form-control fw-bold" id="soEditTransferId">
+                        </div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label fw-black text-uppercase small">Internal Note</label>
+                        <textarea class="form-control fw-bold" id="soEditOrderNote" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" id="saveSoPaymentInfoBtn" onclick="saveSoPaymentInfo()">SAVE CHANGES</button>
             </div>
         </div>
     </div>
@@ -485,25 +532,105 @@
     </div>
 </div>
 
-<!-- PO: Update Payment Status Modal -->
-<div class="modal fade" id="poPaymentModal" tabindex="-1">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-            <div class="modal-header bg-black text-white">
-                <h5 class="modal-title fw-black text-uppercase small">PO Payment Status</h5>
+<!-- PO: Record Payment Modal -->
+<div class="modal fade" id="poRecordPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Record Supplier Payment</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4 text-center">
-                <input type="hidden" id="poPaymentStatusOrderId" />
-                <label class="form-label fw-black text-uppercase small mb-3">Set Payment Status</label>
-                <select class="form-select fw-black mb-0 text-center" id="poNewPaymentStatus">
-                    <option value="0">UNPAID</option>
-                    <option value="1">PAID</option>
-                </select>
+            <div class="modal-body p-4">
+                <div class="mb-4 text-center">
+                    <div class="small fw-bold text-uppercase opacity-50">Remaining Balance</div>
+                    <div class="h2 fw-black text-danger mb-0" id="po-record-remaining-balance">$0.00</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Payment Amount</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-black text-white fw-bold">$</span>
+                        <input type="number" class="form-control form-control-lg fw-black" id="poPaymentAmount" step="0.01">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Reference / ID</label>
+                    <input type="text" class="form-control fw-bold" id="poPaymentReference" placeholder="e.g. CASH, CHECK #123, etc.">
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Note</label>
+                    <textarea class="form-control fw-bold" id="poPaymentNote" rows="2"></textarea>
+                </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer border-0 p-4 pt-0">
                 <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
-                <button class="neo-btn neo-btn-warning btn-sm" onclick="savePoPaymentStatusChange()">UPDATE</button>
+                <button class="neo-btn neo-btn-success btn-sm px-4" id="submitPoPaymentBtn" onclick="submitPoPayment()">SUBMIT PAYMENT</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PO: Edit Info Modal -->
+<div class="modal fade" id="poEditInfoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Edit Payment Metadata</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="poEditPaymentInfoForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-black text-uppercase small">Payment Method</label>
+                        <select class="form-select fw-bold" id="poEditPaymentMethod" onchange="togglePoEditPaymentFields()">
+                            <option value="1">CASH</option>
+                            <option value="2">CHECK</option>
+                            <option value="3">BANK TRANSFER</option>
+                        </select>
+                    </div>
+
+                    <div id="po-edit-check-fields" style="display: none;">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="poEditCheckReceived">
+                                <label class="form-check-label fw-bold small">Check Issued</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Issued Date</label>
+                            <input type="date" class="form-control fw-bold" id="poEditCheckReceivedDate">
+                        </div>
+                        <hr class="border-2 opacity-100">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="poEditCheckCashed">
+                                <label class="form-check-label fw-bold small">Check Cashed</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Cashed Date</label>
+                            <input type="date" class="form-control fw-bold" id="poEditCheckCashedDate">
+                        </div>
+                    </div>
+
+                    <div id="po-edit-bank-transfer-fields" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Transfer ID / Reference</label>
+                            <input type="text" class="form-control fw-bold" id="poEditTransferId">
+                        </div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label fw-black text-uppercase small">Internal Note</label>
+                        <textarea class="form-control fw-bold" id="poEditOrderNote" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" id="savePoPaymentInfoBtn" onclick="savePoPaymentInfo()">SAVE CHANGES</button>
             </div>
         </div>
     </div>
@@ -640,7 +767,7 @@
 
             const getPaymentBadge = (s) => {
                 if(s===1) return '<span class="badge neo-btn-success">PAID</span>';
-                if(s===2) return '<span class="badge neo-btn-warning">OVERDUE</span>';
+                if(s===2) return '<span class="badge neo-btn-warning">PARTIAL</span>';
                 return '<span class="badge neo-btn-danger text-white">UNPAID</span>';
             };
 
@@ -781,6 +908,8 @@
                     const r = await fetch(`/api/purchase-orders/${id}`);
                     if(!r.ok) throw new Error();
                     const o = await r.json();
+                    window.currentPoId = id;
+                    window.currentPoOrder = o;
                     
                     document.getElementById('po-detail-number').innerText = o.orderNumber;
                     document.getElementById('btn-print-po-activity').href = `/PurchaseOrders/Details/${o.id}`;
@@ -853,51 +982,95 @@
                 } catch (e) { alert('Status push failed: ' + e.message); }
             };
 
-            window.openSoPaymentModal = () => {
-                if(!window.currentSoId) return;
-                // ideally pre-fill. Since we don't have the full object 'o' here easily unless global var.
-                // Let's modify viewSoDetails to set window.currentSoOrder = o;
-                const o = window.currentSoOrder;
-                if(!o) return;
+            window.openSoRecordPaymentModal = () => {
+                const o = window.currentSoOrder; if (!o) return;
+                const remaining = o.remainingAmount || 0;
+                document.getElementById('so-record-remaining-balance').textContent = formatCurrency(remaining);
+                document.getElementById('soPaymentAmount').value = remaining.toFixed(2);
+                document.getElementById('soPaymentReference').value = '';
+                document.getElementById('soPaymentNote').value = '';
+                new bootstrap.Modal(document.getElementById('soRecordPaymentModal')).show();
+            };
 
-                document.getElementById('soEditPaymentOrderId').value = o.id;
-                document.getElementById('soEditPaymentStatus').value = o.paymentStatus;
+            window.submitSoPayment = async () => {
+                const btn = document.getElementById('submitSoPaymentBtn');
+                const amount = parseFloat(document.getElementById('soPaymentAmount').value);
+                if (isNaN(amount) || amount <= 0) { alert('Enter a valid amount'); return; }
+
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>PROCESSING...';
+
+                const od = window.currentSoId;
+                const payload = {
+                    amount: amount,
+                    paymentDate: new Date().toISOString(),
+                    paymentMethod: window.currentSoOrder.paymentMethod || 1,
+                    paymentType: 0, // Sales
+                    reference: document.getElementById('soPaymentReference').value,
+                    note: document.getElementById('soPaymentNote').value
+                };
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${od}/payments`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!r.ok) throw new Error(await r.text());
+                    bootstrap.Modal.getInstance(document.getElementById('soRecordPaymentModal')).hide();
+                    await viewSoDetails(od); loadSalesOrders();
+                } catch (e) { alert('Payment failed: ' + e.message); }
+                finally { btn.disabled = false; btn.innerText = 'SUBMIT PAYMENT'; }
+            };
+
+            window.openSoEditInfoModal = () => {
+                const o = window.currentSoOrder; if(!o) return;
                 document.getElementById('soEditPaymentMethod').value = o.paymentMethod || 1; 
-                toggleSoPaymentMethodFields();
+                window.toggleSoEditPaymentFields();
                 document.getElementById('soEditCheckReceived').checked = o.checkReceived;
                 document.getElementById('soEditCheckReceivedDate').value = o.checkReceivedDate ? o.checkReceivedDate.split('T')[0] : '';
                 document.getElementById('soEditCheckCashed').checked = o.checkCashed;
                 document.getElementById('soEditCheckCashedDate').value = o.checkCashedDate ? o.checkCashedDate.split('T')[0] : '';
                 document.getElementById('soEditTransferId').value = o.transferId || '';
-
-                new bootstrap.Modal(document.getElementById('soPaymentModal')).show();
+                document.getElementById('soEditOrderNote').value = o.note || '';
+                new bootstrap.Modal(document.getElementById('soEditInfoModal')).show();
             };
 
-            window.toggleSoPaymentMethodFields = () => {
+            window.toggleSoEditPaymentFields = () => {
                 const m = parseInt(document.getElementById('soEditPaymentMethod').value);
                 document.getElementById('so-edit-check-fields').style.display = m === 2 ? 'block' : 'none';
                 document.getElementById('so-edit-bank-transfer-fields').style.display = m === 3 ? 'block' : 'none';
             };
 
             window.saveSoPaymentInfo = async () => {
-                const od = document.getElementById('soEditPaymentOrderId').value;
+                const btn = document.getElementById('saveSoPaymentInfoBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>SAVING...';
+
+                const od = window.currentSoId;
                 const pm = parseInt(document.getElementById('soEditPaymentMethod').value);
-                const d = { orderId: parseInt(od), paymentStatus: parseInt(document.getElementById('soEditPaymentStatus').value), paymentMethod: pm };
-                
-                if (pm === 2) { 
-                    d.checkReceived = document.getElementById('soEditCheckReceived').checked;
-                    const rd = document.getElementById('soEditCheckReceivedDate').value; d.checkReceivedDate = rd ? new Date(rd).toISOString() : null;
-                    d.checkCashed = document.getElementById('soEditCheckCashed').checked;
-                    const cd = document.getElementById('soEditCheckCashedDate').value; d.checkCashedDate = cd ? new Date(cd).toISOString() : null;
-                } else if (pm === 3) { d.transferId = document.getElementById('soEditTransferId').value; }
-                else { d.checkReceived = false; d.checkCashed = false; d.checkReceivedDate = null; d.checkCashedDate = null; d.transferId = null; }
+                const payload = { 
+                    orderId: parseInt(od), 
+                    paymentMethod: pm,
+                    checkReceived: document.getElementById('soEditCheckReceived').checked,
+                    checkReceivedDate: document.getElementById('soEditCheckReceivedDate').value || null,
+                    checkCashed: document.getElementById('soEditCheckCashed').checked,
+                    checkCashedDate: document.getElementById('soEditCheckCashedDate').value || null,
+                    transferId: document.getElementById('soEditTransferId').value,
+                    note: document.getElementById('soEditOrderNote').value
+                };
 
                 try {
-                    const r = await fetch(`/api/sales-orders/${od}/payment`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, body: JSON.stringify(d) });
+                    const r = await fetch(`/api/sales-orders/${od}/payment-info`, { 
+                        method: 'PUT', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(payload) 
+                    });
                     if (!r.ok) throw new Error(await r.text());
-                    bootstrap.Modal.getInstance(document.getElementById('soPaymentModal')).hide();
+                    bootstrap.Modal.getInstance(document.getElementById('soEditInfoModal')).hide();
                     await viewSoDetails(od); loadSalesOrders();
                 } catch (e) { alert('Sync failed: ' + e.message); }
+                finally { btn.disabled = false; btn.innerText = 'SAVE CHANGES'; }
             };
 
             window.openSoCancelModal = (od) => { 
@@ -1006,26 +1179,95 @@
                 } catch(e) { alert("Update failed"); }
             };
 
-            window.openPoPaymentModal = () => {
-                 if(!window.currentPoId) return;
-                 if(window.currentPoOrder) document.getElementById('poNewPaymentStatus').value = window.currentPoOrder.paymentStatus;
-                 document.getElementById('poPaymentStatusOrderId').value = window.currentPoId; 
-                 new bootstrap.Modal(document.getElementById('poPaymentModal')).show(); 
+            window.openPoRecordPaymentModal = () => {
+                const o = window.currentPoOrder; if (!o) return;
+                const remaining = o.remainingAmount || 0;
+                document.getElementById('po-record-remaining-balance').textContent = formatCurrency(remaining);
+                document.getElementById('poPaymentAmount').value = remaining.toFixed(2);
+                document.getElementById('poPaymentReference').value = '';
+                document.getElementById('poPaymentNote').value = '';
+                new bootstrap.Modal(document.getElementById('poRecordPaymentModal')).show();
             };
-            
-            window.savePoPaymentStatusChange = async () => {
-                const id = document.getElementById('poPaymentStatusOrderId').value;
-                const status = parseInt(document.getElementById('poNewPaymentStatus').value);
+
+            window.submitPoPayment = async () => {
+                const btn = document.getElementById('submitPoPaymentBtn');
+                const amount = parseFloat(document.getElementById('poPaymentAmount').value);
+                if (isNaN(amount) || amount <= 0) { alert('Enter a valid amount'); return; }
+
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>PROCESSING...';
+
+                const od = window.currentPoId;
+                const payload = {
+                    amount: amount,
+                    paymentDate: new Date().toISOString(),
+                    paymentMethod: window.currentPoOrder.paymentMethod || 1,
+                    paymentType: 1, // Purchase
+                    reference: document.getElementById('poPaymentReference').value,
+                    note: document.getElementById('poPaymentNote').value
+                };
+
                 try {
-                    const r = await fetch(`/api/purchase-orders/${id}/payment-status`, { 
-                        method:'PUT', 
-                        headers:{ 'Content-Type':'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
-                        body:JSON.stringify(status) 
+                    const r = await fetch(`/api/purchase-orders/${od}/payments`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value },
+                        body: JSON.stringify(payload)
                     });
-                    if(!r.ok) throw new Error();
-                    bootstrap.Modal.getInstance(document.getElementById('poPaymentModal')).hide();
-                    viewPoDetails(id); loadPurchaseOrders();
-                } catch(e) { alert("Update failed"); }
+                    if (!r.ok) throw new Error(await r.text());
+                    bootstrap.Modal.getInstance(document.getElementById('poRecordPaymentModal')).hide();
+                    await viewPoDetails(od); loadPurchaseOrders();
+                } catch (e) { alert('Payment failed: ' + e.message); }
+                finally { btn.disabled = false; btn.innerText = 'SUBMIT PAYMENT'; }
+            };
+
+            window.openPoEditInfoModal = () => {
+                const o = window.currentPoOrder; if(!o) return;
+                document.getElementById('poEditPaymentMethod').value = o.paymentMethod || 1; 
+                window.togglePoEditPaymentFields();
+                document.getElementById('poEditCheckReceived').checked = o.checkReceived;
+                document.getElementById('poEditCheckReceivedDate').value = o.checkReceivedDate ? o.checkReceivedDate.split('T')[0] : '';
+                document.getElementById('poEditCheckCashed').checked = o.checkCashed;
+                document.getElementById('poEditCheckCashedDate').value = o.checkCashedDate ? o.checkCashedDate.split('T')[0] : '';
+                document.getElementById('poEditTransferId').value = o.transferId || '';
+                document.getElementById('poEditOrderNote').value = o.note || '';
+                new bootstrap.Modal(document.getElementById('poEditInfoModal')).show();
+            };
+
+            window.togglePoEditPaymentFields = () => {
+                const m = parseInt(document.getElementById('poEditPaymentMethod').value);
+                document.getElementById('po-edit-check-fields').style.display = m === 2 ? 'block' : 'none';
+                document.getElementById('po-edit-bank-transfer-fields').style.display = m === 3 ? 'block' : 'none';
+            };
+
+            window.savePoPaymentInfo = async () => {
+                const btn = document.getElementById('savePoPaymentInfoBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>SAVING...';
+
+                const od = window.currentPoId;
+                const pm = parseInt(document.getElementById('poEditPaymentMethod').value);
+                const payload = { 
+                    orderId: parseInt(od), 
+                    paymentMethod: pm,
+                    checkReceived: document.getElementById('poEditCheckReceived').checked,
+                    checkReceivedDate: document.getElementById('poEditCheckReceivedDate').value || null,
+                    checkCashed: document.getElementById('poEditCheckCashed').checked,
+                    checkCashedDate: document.getElementById('poEditCheckCashedDate').value || null,
+                    transferId: document.getElementById('poEditTransferId').value,
+                    note: document.getElementById('poEditOrderNote').value
+                };
+
+                try {
+                    const r = await fetch(`/api/purchase-orders/${od}/payment-info`, { 
+                        method: 'PUT', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(payload) 
+                    });
+                    if (!r.ok) throw new Error(await r.text());
+                    bootstrap.Modal.getInstance(document.getElementById('poEditInfoModal')).hide();
+                    await viewPoDetails(od); loadPurchaseOrders();
+                } catch (e) { alert('Sync failed: ' + e.message); }
+                finally { btn.disabled = false; btn.innerText = 'SAVE CHANGES'; }
             };
 
             window.openPoRefundModal = (id, num, tot, ref) => {
