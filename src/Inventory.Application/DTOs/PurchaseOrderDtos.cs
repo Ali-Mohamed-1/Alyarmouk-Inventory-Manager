@@ -17,6 +17,7 @@ namespace Inventory.Application.DTOs
         int SupplierId,
         string SupplierName,
         DateTimeOffset CreatedUtc,
+        DateTimeOffset? PaymentDeadline,
         Inventory.Domain.Entities.PurchaseOrderStatus Status,
         Inventory.Domain.Entities.PurchasePaymentStatus PaymentStatus,
         string CreatedByUserDisplayName,
@@ -48,5 +49,6 @@ namespace Inventory.Application.DTOs
         decimal LineSubtotal,
         decimal LineVatAmount,
         decimal LineManufacturingTaxAmount,
-        decimal LineTotal);
+        decimal LineTotal,
+        decimal RefundedQuantity);
 }

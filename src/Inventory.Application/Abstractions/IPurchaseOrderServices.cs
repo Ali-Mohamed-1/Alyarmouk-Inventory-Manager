@@ -15,6 +15,7 @@ namespace Inventory.Application.Abstractions
         Task<long> CreateAsync(CreatePurchaseOrderRequest req, UserContext user, CancellationToken ct = default);
         Task UpdateStatusAsync(long id, PurchaseOrderStatus status, UserContext user, CancellationToken ct = default);
         Task UpdatePaymentStatusAsync(long id, PurchasePaymentStatus status, UserContext user, CancellationToken ct = default);
+        Task UpdatePaymentDeadlineAsync(long id, DateTimeOffset? newDeadline, UserContext user, CancellationToken ct = default);
         Task RefundAsync(RefundPurchaseOrderRequest req, UserContext user, CancellationToken ct = default);
         
         /// <summary>

@@ -205,6 +205,13 @@
                             @Model.PaymentStatus.ToString().ToUpper()
                         </span>
                     </div>
+                    <div class="row g-3 fw-bold border-top border-black pt-3">
+                        <div class="col-5 text-uppercase small">Deadline:</div>
+                        <div class="col-7 text-end d-flex justify-content-end align-items-center gap-2">
+                             <span>@(Model.PaymentDeadline.HasValue ? Model.PaymentDeadline.Value.ToString("MMM dd, yyyy").ToUpper() : "N/A")</span>
+                            <button class="neo-btn btn-sm py-0 no-print" style="font-size: 0.7rem;" onclick="openEditPaymentDeadlineModal()">EDIT</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -241,3 +248,61 @@
         </div>
     </div>
 </div>
+
+<!-- Edit Payment Deadline Modal -->
+<div class="modal fade" id="editPaymentDeadlineModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Update Payment Deadline</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">New Deadline</label>
+                    <input type="date" class="form-control fw-bold" id="newPaymentDeadline" value="@(Model.PaymentDeadline.HasValue ? Model.PaymentDeadline.Value.ToString("yyyy-MM-dd") : "")">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm" onclick="savePaymentDeadline()">UPDATE</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openEditPaymentDeadlineModal() {
+            new bootstrap.Modal(document.getElementById('editPaymentDeadlineModal')).show();
+        }
+
+        async function savePaymentDeadline() {
+            const date = document.getElementById('newPaymentDeadline').value;
+            let payload = null;
+            if (date) {
+                payload = new Date(date).toISOString();
+            }
+
+            try {
+                const response = await fetch('/api/purchase-orders/@Model.Id/payment-deadline', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    },
+                    body: JSON.stringify(payload) 
+                });
+
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to update payment deadline.');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('An error occurred.');
+            }
+        }
+    </script>
+}

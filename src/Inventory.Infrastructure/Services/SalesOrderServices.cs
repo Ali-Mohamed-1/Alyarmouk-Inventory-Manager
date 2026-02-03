@@ -370,7 +370,8 @@ namespace Inventory.Infrastructure.Services
                         LineSubtotal = l.LineSubtotal,
                         LineVatAmount = l.LineVatAmount,
                         LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
-                        LineTotal = l.LineTotal
+                        LineTotal = l.LineTotal,
+                        RefundedQuantity = l.RefundedQuantity
                     }).ToList()
                 })
                 .SingleOrDefaultAsync(ct);
@@ -431,7 +432,8 @@ namespace Inventory.Infrastructure.Services
                         LineSubtotal = l.LineSubtotal,
                         LineVatAmount = l.LineVatAmount,
                         LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
-                        LineTotal = l.LineTotal
+                        LineTotal = l.LineTotal,
+                        RefundedQuantity = l.RefundedQuantity
                     }).ToList()
                 })
                 .ToListAsync(ct);
@@ -490,7 +492,8 @@ namespace Inventory.Infrastructure.Services
                         LineSubtotal = l.LineSubtotal,
                         LineVatAmount = l.LineVatAmount,
                         LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
-                        LineTotal = l.LineTotal
+                        LineTotal = l.LineTotal,
+                        RefundedQuantity = l.RefundedQuantity
                     }).ToList()
                 })
                 .ToListAsync(ct);
@@ -612,6 +615,35 @@ namespace Inventory.Infrastructure.Services
             {
                 await transaction.RollbackAsync(ct);
                 throw new ConflictException("Could not update payment status.", ex);
+            }
+        }
+        
+        public async Task UpdateDueDateAsync(long orderId, DateTimeOffset newDate, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+
+            var salesOrder = await _db.SalesOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            if (salesOrder is null)
+                throw new NotFoundException($"Sales order id {orderId} was not found.");
+
+            if (salesOrder.DueDate == newDate) return;
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousDate = salesOrder.DueDate;
+                salesOrder.DueDate = newDate;
+
+                await _db.SaveChangesAsync(ct);
+                await _auditWriter.LogUpdateAsync<SalesOrder>(orderId, user, new { DueDate = previousDate }, new { DueDate = newDate }, ct);
+
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not update due date.", ex);
             }
         }
 
@@ -779,6 +811,121 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
+        public async Task RefundAsync(RefundSalesOrderRequest req, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            if (req is null) throw new ArgumentNullException(nameof(req));
+
+
+            // 1. Load Order
+            var order = await _db.SalesOrders
+                .Include(o => o.Lines)
+                .FirstOrDefaultAsync(o => o.Id == req.OrderId, ct);
+            
+            if (order == null) throw new NotFoundException($"Sales order {req.OrderId} not found.");
+
+            // 2. Validate Refund Input
+            bool hasAmount = req.Amount > 0;
+            bool hasLines = req.LineItems != null && req.LineItems.Any(l => l.Quantity > 0);
+
+            if (!hasAmount && !hasLines)
+                throw new ValidationException("You must specify either a refund amount or products to return.");
+
+            if (req.Amount < 0)
+                 throw new ValidationException("Refund amount cannot be negative.");
+
+            // 3. Independent Eligibility Validation (Stock vs Money)
+            // Stock refund requires order to be Done
+            if (hasLines && order.Status != SalesOrderStatus.Done)
+                throw new ValidationException("Cannot refund stock before order is completed.");
+            
+            // Money refund requires payment to be Paid
+            if (hasAmount && order.PaymentStatus != PaymentStatus.Paid)
+                throw new ValidationException("Cannot refund money before payment is completed.");
+
+            // Validate Amount Cap
+            decimal remainingRefundableAmount = order.TotalAmount - order.RefundedAmount;
+            if (hasAmount && req.Amount > remainingRefundableAmount)
+                throw new ValidationException($"Refund amount exceeds remaining refundable amount. Max refundable: {remainingRefundableAmount:C}");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var before = new { order.RefundedAmount };
+                
+                // 4. Create Refund Transaction
+                var refundTx = new RefundTransaction
+                {
+                    Type = RefundType.SalesOrder,
+                    SalesOrderId = order.Id,
+                    Amount = req.Amount,
+                    Reason = req.Reason,
+                    ProcessedUtc = DateTimeOffset.UtcNow,
+                    ProcessedByUserId = user.UserId,
+                    ProcessedByUserDisplayName = user.UserDisplayName,
+                    Note = req.Reason
+                };
+
+                // 5. Line Item Processing (Product Refund)
+                if (req.LineItems != null && req.LineItems.Any())
+                {
+                    foreach (var refundItem in req.LineItems)
+                    {
+                        var line = order.Lines.FirstOrDefault(l => l.Id == refundItem.SalesOrderLineId);
+                        if (line == null) 
+                            throw new NotFoundException($"Sales Order Line {refundItem.SalesOrderLineId} not found in Order {order.Id}.");
+
+                        // Validate Quantity
+                        if (refundItem.Quantity <= 0)
+                            throw new ValidationException("Refund quantity must be positive.");
+
+                        if (line.RefundedQuantity + refundItem.Quantity > line.Quantity)
+                            throw new ValidationException($"Cannot refund {refundItem.Quantity} for product '{line.ProductNameSnapshot}'. Max refundable: {line.Quantity - line.RefundedQuantity}");
+
+                        // Update Line state
+                        line.RefundedQuantity += refundItem.Quantity;
+
+                        // Add to Audit Transaction Lines
+                        refundTx.Lines.Add(new RefundTransactionLine
+                        {
+                            SalesOrderLineId = line.Id,
+                            ProductId = line.ProductId,
+                            ProductNameSnapshot = line.ProductNameSnapshot,
+                            Quantity = refundItem.Quantity,
+                            BatchNumber = refundItem.BatchNumber ?? line.BatchNumber,
+                            ProductBatchId = refundItem.ProductBatchId ?? line.ProductBatchId,
+                            UnitPriceSnapshot = line.UnitPrice,
+                            // Estimate line refund amount derived from quantity * unit price?
+                            // Or leave it 0 if not explicitly tracked per line financially.
+                            // We will store value for reference.
+                            LineRefundAmount = refundItem.Quantity * line.UnitPrice 
+                        });
+                    }
+
+                    // Process Stock Return
+                    await _inventoryServices.RefundSalesOrderStockAsync(order.Id, req.LineItems, user, ct);
+                }
+
+                _db.RefundTransactions.Add(refundTx);
+
+                // 6. Update Order Totals
+                order.RefundedAmount += req.Amount;
+
+                // 7. Process Financial Refund (Expense)
+                await _financialServices.ProcessSalesRefundPaymentAsync(order.Id, req.Amount, user, ct);
+
+                await _db.SaveChangesAsync(ct);
+                await _auditWriter.LogUpdateAsync<SalesOrder>(order.Id, user, before, new { order.RefundedAmount }, ct);
+
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+        }
+
         public async Task UpdatePaymentInfoAsync(long orderId, UpdateSalesOrderPaymentRequest req, UserContext user, CancellationToken ct = default)
         {
             ValidateUser(user);
@@ -901,171 +1048,7 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
-        /// <summary>
-        /// Processes a refund for a completed sales order.
-        /// Supports both full order refunds and line-item specific refunds.
-        /// Reverses revenue, COGS, and restores inventory accordingly.
-        /// </summary>
-        public async Task RefundAsync(RefundSalesOrderRequest req, UserContext user, CancellationToken ct = default)
-        {
-            ValidateUser(user);
-            if (req is null) throw new ArgumentNullException(nameof(req));
-            if (req.Amount <= 0) throw new ValidationException("Refund amount must be positive.");
 
-            var salesOrder = await _db.SalesOrders
-                .Include(o => o.Lines)
-                .ThenInclude(l => l.Product)
-                .FirstOrDefaultAsync(o => o.Id == req.OrderId, ct);
-
-            if (salesOrder is null)
-                throw new NotFoundException($"Sales order id {req.OrderId} was not found.");
-
-            // Validate order status
-            if (salesOrder.Status != SalesOrderStatus.Done)
-                throw new ValidationException("Only completed sales orders can be refunded.");
-
-            // Validate payment status
-            if (salesOrder.PaymentStatus != PaymentStatus.Paid)
-                throw new ValidationException("Only paid sales orders can be refunded.");
-
-            // Validate refund amount doesn't exceed available amount
-            var availableToRefund = salesOrder.TotalAmount - salesOrder.RefundedAmount;
-            if (req.Amount > availableToRefund)
-                throw new ValidationException($"Refund amount ({req.Amount}) exceeds available amount ({availableToRefund}).");
-
-            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-            try
-            {
-                var beforeRefundedAmount = salesOrder.RefundedAmount;
-                salesOrder.RefundedAmount += req.Amount;
-
-                // Create RefundTransaction audit record
-                var refundTransaction = new RefundTransaction
-                {
-                    Type = RefundType.SalesOrder,
-                    SalesOrderId = salesOrder.Id,
-                    Amount = req.Amount,
-                    Reason = req.Reason,
-                    ProcessedUtc = DateTimeOffset.UtcNow,
-                    ProcessedByUserId = user.UserId,
-                    ProcessedByUserDisplayName = user.UserDisplayName,
-                    Note = $"Refund processed for Sales Order {salesOrder.OrderNumber}"
-                };
-                _db.RefundTransactions.Add(refundTransaction);
-
-                // Determine refund type
-                if (req.LineItems != null && req.LineItems.Any())
-                {
-                    // Line-item refund: Restore specific quantities to inventory
-                    await ProcessLineItemRefundAsync(salesOrder, req.LineItems, user, ct);
-                }
-                else
-                {
-                    // Full order refund: Restore all inventory
-                    await ProcessFullRefundAsync(salesOrder, user, ct);
-                }
-
-                await _db.SaveChangesAsync(ct);
-
-                // Audit log
-                await _auditWriter.LogUpdateAsync<SalesOrder>(
-                    salesOrder.Id,
-                    user,
-                    beforeState: new { RefundedAmount = beforeRefundedAmount },
-                    afterState: new { RefundedAmount = salesOrder.RefundedAmount, Reason = req.Reason },
-                    ct);
-
-                await _db.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(ct);
-                if (ex is ValidationException or NotFoundException) throw;
-                throw new ConflictException("Could not process refund due to a database conflict.", ex);
-            }
-        }
-
-        /// <summary>
-        /// Processes line-item refunds with inventory restoration.
-        /// </summary>
-        private async Task ProcessLineItemRefundAsync(
-            SalesOrder salesOrder, 
-            List<RefundLineItem> lineItems, 
-            UserContext user, 
-            CancellationToken ct)
-        {
-            foreach (var refundItem in lineItems)
-            {
-                // Find the corresponding order line
-                var orderLine = salesOrder.Lines.FirstOrDefault(l => l.Id == refundItem.SalesOrderLineId);
-                if (orderLine is null)
-                    throw new ValidationException($"Sales order line {refundItem.SalesOrderLineId} not found in order {salesOrder.OrderNumber}.");
-
-                // Validate quantity
-                if (refundItem.Quantity <= 0 || refundItem.Quantity > orderLine.Quantity)
-                    throw new ValidationException($"Invalid refund quantity {refundItem.Quantity} for line {refundItem.SalesOrderLineId}. Original quantity: {orderLine.Quantity}");
-
-                // Restore inventory using Adjust transaction
-                var adjustReq = new CreateInventoryTransactionRequest
-                {
-                    ProductId = orderLine.ProductId,
-                    Quantity = refundItem.Quantity, // Positive for adjustment
-                    Type = InventoryTransactionType.Adjust,
-                    BatchNumber = refundItem.BatchNumber ?? orderLine.BatchNumber,
-                    ProductBatchId = refundItem.ProductBatchId ?? orderLine.ProductBatchId,
-                    CustomerId = salesOrder.CustomerId,
-                    Note = $"Refund for Sales Order {salesOrder.OrderNumber} - {orderLine.ProductNameSnapshot}"
-                };
-
-                await _inventoryServices.CreateTransactionAsync(adjustReq, user, ct);
-
-                // Reverse Revenue (create Expense)
-                var revenueAmount = orderLine.UnitPrice * refundItem.Quantity;
-                var revenueReversalTx = new FinancialTransaction
-                {
-                    Type = FinancialTransactionType.Expense,
-                    Amount = revenueAmount,
-                    SalesOrderId = salesOrder.Id,
-                    ProductId = orderLine.ProductId,
-                    CustomerId = salesOrder.CustomerId,
-                    TimestampUtc = DateTimeOffset.UtcNow,
-                    UserId = user.UserId,
-                    UserDisplayName = user.UserDisplayName,
-                    Note = $"Revenue Reversal - Refund for SO {salesOrder.OrderNumber} - {orderLine.ProductNameSnapshot}"
-                };
-                _db.FinancialTransactions.Add(revenueReversalTx);
-
-                // Reverse COGS (create Revenue)
-                var cogsAmount = 0m; // Batch-based COGS reversal to be implemented in Phase 3
-
-                var cogsReversalTx = new FinancialTransaction
-                {
-                    Type = FinancialTransactionType.Revenue,
-                    Amount = cogsAmount,
-                    SalesOrderId = salesOrder.Id,
-                    ProductId = orderLine.ProductId,
-                    CustomerId = salesOrder.CustomerId,
-                    TimestampUtc = DateTimeOffset.UtcNow,
-                    UserId = user.UserId,
-                    UserDisplayName = user.UserDisplayName,
-                    Note = $"COGS Reversal - Refund for SO {salesOrder.OrderNumber} - {orderLine.ProductNameSnapshot}"
-                };
-                _db.FinancialTransactions.Add(cogsReversalTx);
-            }
-        }
-
-        /// <summary>
-        /// Processes full order refund by restoring all inventory.
-        /// </summary>
-        private async Task ProcessFullRefundAsync(SalesOrder salesOrder, UserContext user, CancellationToken ct)
-        {
-            // Reverse the entire sales order stock
-            await _inventoryServices.ReverseSalesOrderStockAsync(salesOrder.Id, user, ct);
-
-            // Reverse financial effects (revenue)
-            await _financialServices.ReverseSalesPaymentAsync(salesOrder.Id, user, ct);
-        }
 
         #region Helper Methods
 

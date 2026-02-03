@@ -25,6 +25,7 @@ namespace Inventory.Infrastructure.Data
         public DbSet<FinancialTransaction> FinancialTransactions { get; set; }
         public DbSet<ProductBatch> ProductBatches { get; set; }
         public DbSet<RefundTransaction> RefundTransactions { get; set; }
+        public DbSet<RefundTransactionLine> RefundTransactionLines { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -212,6 +213,20 @@ namespace Inventory.Infrastructure.Data
                 b.HasIndex(x => x.PurchaseOrderId);
                 b.HasOne(x => x.SalesOrder).WithMany().HasForeignKey(x => x.SalesOrderId).OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.PurchaseOrder).WithMany().HasForeignKey(x => x.PurchaseOrderId).OnDelete(DeleteBehavior.Restrict);
+                b.HasMany(x => x.Lines).WithOne(x => x.RefundTransaction).HasForeignKey(x => x.RefundTransactionId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<RefundTransactionLine>(b =>
+            {
+                b.Property(x => x.Quantity).HasPrecision(18, 2);
+                b.Property(x => x.UnitPriceSnapshot).HasPrecision(18, 2);
+                b.Property(x => x.LineRefundAmount).HasPrecision(18, 2);
+                b.Property(x => x.ProductNameSnapshot).HasMaxLength(200).IsRequired();
+                b.Property(x => x.BatchNumber).HasMaxLength(100);
+                b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+                b.HasOne(x => x.SalesOrderLine).WithMany().HasForeignKey(x => x.SalesOrderLineId).OnDelete(DeleteBehavior.Restrict);
+                b.HasOne(x => x.PurchaseOrderLine).WithMany().HasForeignKey(x => x.PurchaseOrderLineId).OnDelete(DeleteBehavior.Restrict);
+                b.HasOne(x => x.ProductBatch).WithMany().HasForeignKey(x => x.ProductBatchId).OnDelete(DeleteBehavior.Restrict);
             });
 
             builder.Entity<ProductBatch>(b =>

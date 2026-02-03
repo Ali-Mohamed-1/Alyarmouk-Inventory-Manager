@@ -39,6 +39,9 @@
                             <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Activity" ? "active" : "")" asp-area="" asp-controller="Activity" asp-action="Index">TRANSACTIONS</a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Notifications" ? "active" : "")" asp-area="" asp-controller="Notifications" asp-action="Index">NOTIFICATIONS</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Financial" ? "active" : "")" asp-area="" asp-controller="Financial" asp-action="Index">FINANCIAL</a>
                         </li>
                     </ul>

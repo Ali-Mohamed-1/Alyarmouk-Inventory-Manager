@@ -53,6 +53,7 @@
                             <tr>
                                 <th>ORDER #</th>
                                 <th>DATE</th>
+                                <th>DUE DATE</th>
                                 <th>STATUS</th>
                                 <th>PAYMENT</th>
                                 <th class="text-end">SUBTOTAL</th>
@@ -378,7 +379,7 @@
 
 <!-- Refund Sales Order Modal -->
 <div class="modal fade" id="refundOrderModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-neo-danger">
                 <h5 class="modal-title fw-black text-uppercase text-white">Inbound Refund Request</h5>
@@ -386,33 +387,60 @@
             </div>
             <div class="modal-body p-4">
                 <input type="hidden" id="refundOrderId" />
-                <div class="mb-4">
-                    <label class="form-label fw-black text-uppercase small">Order Ref</label>
-                    <input type="text" class="form-control fw-bold bg-light" id="refundOrderNumber" readonly />
-                </div>
                 <div class="row g-3 mb-4">
                     <div class="col-6">
-                        <label class="form-label fw-black text-uppercase small">Total</label>
-                        <input type="text" class="form-control fw-bold" id="refundOrderTotal" readonly />
+                        <label class="form-label fw-black text-uppercase small">Order Ref</label>
+                        <input type="text" class="form-control fw-bold bg-light" id="refundOrderNumber" readonly />
                     </div>
-                    <div class="col-6">
+                    <div class="col-3">
+                         <label class="form-label fw-black text-uppercase small">Total</label>
+                         <input type="text" class="form-control fw-bold" id="refundOrderTotal" readonly />
+                    </div>
+                    <div class="col-3">
                         <label class="form-label fw-black text-uppercase small text-success">Recovered</label>
                         <input type="text" class="form-control fw-bold" id="refundOrderAlreadyRefunded" readonly />
                     </div>
                 </div>
+
                 <div class="mb-4">
-                    <label class="form-label fw-black text-uppercase small">Amount to Refund</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-black text-white">$</span>
-                        <input type="number" class="form-control fw-black" id="refundAmount" step="0.01" />
+                    <h6 class="fw-black text-uppercase small mb-2 border-bottom border-2 pb-1">Product Returns (Stock Restoration)</h6>
+                    <div class="table-responsive neo-card p-0 mb-2" style="max-height: 250px; overflow-y: auto;">
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead class="table-dark text-white sticky-top">
+                                <tr>
+                                    <th>PRODUCT</th>
+                                    <th class="text-center">SOLD</th>
+                                    <th class="text-center">PREV. RET.</th>
+                                    <th class="text-center" style="width: 120px;">RETURN QTY</th>
+                                </tr>
+                            </thead>
+                            <tbody id="refund-lines-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="small fw-bold text-muted text-end"><i class="bi bi-info-circle me-1"></i> ENTER QUANTITIES TO RETURN TO STOCK.</div>
+                </div>
+                
+                <div class="mb-4 pt-3 border-top border-2">
+                    <h6 class="fw-black text-uppercase small mb-2">Financial Reversal</h6>
+                    <div class="row align-items-end">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-muted">CASH AMOUNT TO REFUND</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-black text-white">$</span>
+                                <input type="number" class="form-control fw-black" id="refundAmount" step="0.01" value="0" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                             <div class="alert neo-btn-warning p-2 small fw-bold mb-0" style="border-radius:0;">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i> INDEPENDENT OF STOCK. VERIFY MANUALLY.
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="mb-4">
-                    <label class="form-label fw-black text-uppercase small">Reason context</label>
-                    <textarea class="form-control" id="refundReason" rows="2"></textarea>
-                </div>
-                <div class="alert neo-btn-warning p-2 small fw-bold mb-0" style="border-radius:0;">
-                    <i class="bi bi-info-circle me-1"></i> INVENTORY RESTORATION WILL BE TRIGGERED AUTOMATICALLY.
+
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Reason Context</label>
+                    <textarea class="form-control" id="refundReason" rows="2" placeholder="Required for audit trail..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -444,7 +472,7 @@
                 let cls = 'neo-btn-danger text-white'; // Pending/Unpaid
                 let txt = 'PENDING';
                 if(s===1) { cls='neo-btn-success'; txt='PAID'; }
-                if(s===2) { cls='neo-btn-warning'; txt='OVERDUE'; }
+                if(s===2) { cls='neo-btn-warning'; txt='PARTIAL'; }
                 return `<span class="badge ${cls}">${txt}</span>`;
             };
 
@@ -540,8 +568,8 @@
                         <div class="d-flex justify-content-between"><span>ADDRESS:</span> <span class="text-end" style="max-width: 60%;">${escapeHtml(detail.customer.address || 'N/A')}</span></div>
                     `;
                     document.getElementById('balance-info').innerHTML = `
-                        <div class="d-flex justify-content-between mb-2"><span>PENDING:</span> <span>${formatCurrency(detail.balance.totalPending)}</span></div>
-                        <div class="d-flex justify-content-between pt-2 border-top border-black"><span>DUE NOW:</span> <span>${formatCurrency(detail.balance.totalDueNow)}</span></div>
+                        <div class="d-flex justify-content-between mb-2"><span>TOTAL PENDING:</span> <span>${formatCurrency(detail.balance.totalPending)}</span></div>
+                        <div class="d-flex justify-content-between pt-2 border-top border-white"><span class="text-warning">DESERVED (OVERDUE):</span> <span class="text-warning">${formatCurrency(detail.balance.deserved)}</span></div>
                     `;
                     renderSalesOrders(orders);
                 } catch(e) { console.error("Data refresh failed", e); }
@@ -747,6 +775,7 @@
                         <tr>
                             <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
                             <td class="small fw-bold">${formatDate(o.orderDate)}</td>
+                            <td class="small fw-bold ${new Date(o.dueDate) < new Date() && o.paymentStatus !== 1 ? 'text-danger' : ''}">${formatDate(o.dueDate)}</td>
                             <td>${getStatusBadge(o.status)}</td>
                             <td>${getPayBadge(o.paymentStatus)}</td>
                             <td class="text-end fw-bold">${formatCurrency(o.subtotal)}</td>
@@ -757,7 +786,7 @@
                             <td class="text-end">
                                 <div class="d-flex gap-1 justify-content-end">
                                     <button class="neo-btn neo-btn-info btn-sm p-1 px-2" onclick="viewOrderDetails(${o.id})">VIEW</button>
-                                    ${o.status === 1 ? `<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>` : ''}
+                                    ${(o.status === 1 || o.paymentStatus === 1) ? `<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>` : ''}
                                     ${o.status === 0 ? `<button class="neo-btn neo-btn-warning btn-sm p-1 px-2" onclick="cancelOrder(${o.id})">CANCEL</button>` : ''}
                                 </div>
                             </td>
@@ -779,23 +808,166 @@
                 } catch (e) { alert('Kill failed'); }
             };
 
-            window.openRefundModal = (id, num, tot, ref) => {
-                document.getElementById('refundOrderId').value = id; document.getElementById('refundOrderNumber').value = num;
-                document.getElementById('refundOrderTotal').value = formatCurrency(tot); document.getElementById('refundOrderAlreadyRefunded').value = formatCurrency(ref || 0);
-                document.getElementById('refundAmount').value = ''; document.getElementById('refundReason').value = '';
+            // -- REFUND VALIDATION HELPER --
+            function validateRefundForm() {
+                const amt = parseFloat(document.getElementById('refundAmount').value) || 0;
+                let hasLines = false;
+                document.querySelectorAll('.refund-line-qty').forEach(input => {
+                    if ((parseFloat(input.value) || 0) > 0) hasLines = true;
+                });
+                const btn = document.getElementById('btn-execute-refund');
+                if (btn) btn.disabled = !(amt > 0 || hasLines);
+            }
+
+            window.openRefundModal = async (id, num, tot, ref) => {
+                document.getElementById('refundOrderId').value = id; 
+                document.getElementById('refundOrderNumber').value = num;
+                document.getElementById('refundOrderTotal').value = formatCurrency(tot); 
+                document.getElementById('refundOrderAlreadyRefunded').value = formatCurrency(ref || 0);
+                document.getElementById('refundAmount').value = ''; 
+                document.getElementById('refundReason').value = '';
+                
+                // Disable button initially
+                const btn = document.getElementById('btn-execute-refund');
+                if (btn) btn.disabled = true;
+
+                // Attach amount change listener
+                document.getElementById('refundAmount').oninput = validateRefundForm;
+                
+                // Fetch latest lines info for refunds
+                const tbody = document.getElementById('refund-lines-body');
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></td></tr>';
                 new bootstrap.Modal(document.getElementById('refundOrderModal')).show();
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${id}`);
+                    if (!r.ok) throw new Error();
+                    const o = await r.json();
+                    
+                    // Determine eligibility based on order state
+                    // Status 1 = Done, PaymentStatus 1 = Paid
+                    const canRefundStock = (o.status === 1);
+                    const canRefundMoney = (o.paymentStatus === 1);
+                    const remainingRefundableAmount = o.totalAmount - (o.refundedAmount || 0);
+                    const moneyFullyRefunded = remainingRefundableAmount <= 0;
+
+                    // Money refund input
+                    const amountInput = document.getElementById('refundAmount');
+                    if (!canRefundMoney || moneyFullyRefunded) {
+                        amountInput.disabled = true;
+                        amountInput.value = '';
+                        amountInput.placeholder = moneyFullyRefunded ? 'Fully refunded' : 'Payment not received';
+                    } else {
+                        amountInput.disabled = false;
+                        amountInput.placeholder = `Max: ${formatCurrency(remainingRefundableAmount)}`;
+                        amountInput.max = remainingRefundableAmount;
+                    }
+                    
+                    tbody.innerHTML = o.lines.map(l => {
+                        const remaining = l.quantity - (l.refundedQuantity || 0);
+                        const lineFullyRefunded = remaining <= 0;
+                        const disabled = (!canRefundStock || lineFullyRefunded) ? 'disabled' : '';
+                        const hint = lineFullyRefunded ? 'Fully returned' : (!canRefundStock ? 'Order not complete' : '');
+                        return `
+                        <tr>
+                            <td>
+                                <div class="fw-black small text-uppercase">${escapeHtml(l.productName)}</div>
+                                <div class="small text-muted">${l.batchNumber ? `<code class="text-dark">${escapeHtml(l.batchNumber)}</code>` : 'NO BATCH'}</div>
+                            </td>
+                            <td class="text-center fw-bold">${l.quantity}</td>
+                            <td class="text-center text-muted col-refunded-qty">${l.refundedQuantity || 0}</td>
+                            <td class="text-center">
+                                <input type="number" class="form-control form-control-sm fw-black text-center refund-line-qty" 
+                                    data-line-id="${l.id}" 
+                                    data-batch-id="${l.productBatchId || ''}"
+                                    data-batch-number="${l.batchNumber || ''}"
+                                    min="0" max="${remaining}" 
+                                    value="" ${disabled} 
+                                    placeholder="${hint}"
+                                    title="${hint}"
+                                    style="border: 2px solid #000;">
+                            </td>
+                        </tr>`;
+                    }).join('');
+
+                    // Attach event listeners to line inputs
+                    document.querySelectorAll('.refund-line-qty').forEach(input => {
+                        input.oninput = validateRefundForm;
+                    });
+                    validateRefundForm();
+                } catch (e) {
+                     tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger fw-bold">FAILED TO LOAD LINES</td></tr>';
+                }
             };
 
             window.processRefund = async () => {
-                const id = document.getElementById('refundOrderId').value; const amt = parseFloat(document.getElementById('refundAmount').value); const rsn = document.getElementById('refundReason').value;
-                if (!amt || amt <= 0) return alert('INVALID VAL');
+                const id = parseInt(document.getElementById('refundOrderId').value); 
+                const amt = parseFloat(document.getElementById('refundAmount').value) || 0; 
+                const rsn = document.getElementById('refundReason').value;
+
+                // Collect line items with batch info
+                const lines = [];
+                document.querySelectorAll('.refund-line-qty').forEach(input => {
+                    const qty = parseFloat(input.value) || 0;
+                    if (qty > 0) {
+                        const item = { 
+                            salesOrderLineId: parseInt(input.dataset.lineId), 
+                            quantity: qty 
+                        };
+                        // Include batch info if available
+                        if (input.dataset.batchId) item.productBatchId = parseInt(input.dataset.batchId);
+                        if (input.dataset.batchNumber) item.batchNumber = input.dataset.batchNumber;
+                        lines.push(item);
+                    }
+                });
+
+                // UI-side validation (should not reach here if button is correctly disabled)
+                if (amt <= 0 && lines.length === 0) {
+                    return alert('Please specify a refund amount, returned products, or both.');
+                }
+
+                // Construct clean payload - only include meaningful fields
+                const payload = { orderId: id };
+                if (amt > 0) payload.amount = amt;
+                if (lines.length > 0) payload.lineItems = lines;
+                if (rsn && rsn.trim()) payload.reason = rsn.trim();
+
                 try {
-                    const r = await fetch(`/api/sales-orders/${id}/refund`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, body: JSON.stringify({ orderId: parseInt(id), amount: amt, reason: rsn }) });
-                    if (!r.ok) throw new Error(await r.text());
-                    bootstrap.Modal.getInstance(document.getElementById('refundOrderModal')).hide();
+                    const r = await fetch(`/api/sales-orders/${id}/refund`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(payload) 
+                    });
+                    
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        try { 
+                            const j = JSON.parse(errText); 
+                            if (j.errors) {
+                                let msg = "Validation failed:\n";
+                                for (const key in j.errors) {
+                                    msg += `- ${j.errors[key].join(', ')}\n`;
+                                }
+                                throw new Error(msg);
+                            }
+                            throw new Error(j.detail || j.title || "Request failed"); 
+                        } catch (parseErr) { 
+                             if (parseErr.message.startsWith("Validation") || parseErr.message.includes("Request failed")) throw parseErr;
+                             throw new Error(errText || "Unknown error occurred"); 
+                        }
+                    }
+
+                    // SUCCESS PATH
+                    const modalEl = document.getElementById('refundOrderModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                    modal.hide();
+                    
+                    alert("REFUND PROCESSED SUCCESSFULLY.");
+                    
+                    // Refresh data
                     if (currentCustomerId) await refreshCustomerData(currentCustomerId);
                     if (document.getElementById('order-details-section').style.display === 'block') await viewOrderDetails(id);
-                } catch (e) { alert("Refund error: " + e.message); }
+                } catch (e) { alert(e.message); }
             };
 
             document.getElementById('btn-close-detail').onclick = () => {

@@ -7,16 +7,16 @@ namespace Inventory.Application.DTOs.SalesOrder
         public int CustomerId { get; init; }
 
         /// <summary>
-        /// Sum of all open (unpaid) sales orders for this customer, regardless of due date.
+        /// Sum of all open (unpaid/partially paid) sales orders for this customer, regardless of due date.
         /// </summary>
         public decimal TotalPending { get; init; }
 
         /// <summary>
-        /// Subset of TotalPending that is already due or overdue as of AsOfUtc
-        /// (i.e. PaymentStatus = Pending and DueDate &lt;= AsOfUtc).
-        /// This is effectively "how much the customer owes us now".
+        /// Subset of TotalPending that is already overdue as of AsOfUtc
+        /// (i.e. PaymentStatus != Paid and DueDate &lt; AsOfUtc).
+        /// This is the "Deserved" balance - what the customer owes us NOW.
         /// </summary>
-        public decimal TotalDueNow { get; init; }
+        public decimal Deserved { get; init; }
 
         /// <summary>
         /// Balance calculation timestamp (UTC).
@@ -24,3 +24,4 @@ namespace Inventory.Application.DTOs.SalesOrder
         public DateTimeOffset AsOfUtc { get; init; }
     }
 }
+

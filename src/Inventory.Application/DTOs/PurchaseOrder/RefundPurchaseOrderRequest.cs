@@ -2,25 +2,24 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-namespace Inventory.Application.DTOs.SalesOrder
+namespace Inventory.Application.DTOs.PurchaseOrder
 {
-    public class RefundSalesOrderRequest
+    public class RefundPurchaseOrderRequest
     {
         [Required]
         public long OrderId { get; set; }
 
         /// <summary>
         /// Total monetary amount to refund.
-        /// For line-item refunds, this should equal sum of (LineRefunds.Quantity * UnitPrice).
+        /// Must be positive.
         /// </summary>
         public decimal Amount { get; set; }
 
         /// <summary>
-        /// Optional: Specific line items to refund.
-        /// If null or empty, treat as order-level monetary refund.
-        /// If populated, return specific items to inventory.
+        /// Optional: Specific line items to refund (return to supplier).
+        /// If populated, stock will be deducted (reversed).
         /// </summary>
-        public List<RefundLineItem>? LineItems { get; set; }
+        public List<RefundPurchaseLineItem>? LineItems { get; set; }
 
         /// <summary>
         /// Reason for refund (for audit trail).
@@ -28,21 +27,18 @@ namespace Inventory.Application.DTOs.SalesOrder
         public string? Reason { get; set; }
     }
 
-    public class RefundLineItem
+    public class RefundPurchaseLineItem
     {
         [Required]
-        public long SalesOrderLineId { get; set; }
+        public long PurchaseOrderLineId { get; set; }
 
         [Required]
         [Range(0.01, double.MaxValue)]
         public decimal Quantity { get; set; }
-
+        
         /// <summary>
-        /// Optional: If batch-tracked, specify which batch to return to.
-        /// If null, will use the original batch from the sales order line.
+        /// Optional: If batch number is known/required for verification.
         /// </summary>
-        public long? ProductBatchId { get; set; }
-
         public string? BatchNumber { get; set; }
     }
 }

@@ -50,6 +50,8 @@ public class RefundTransaction
     /// Additional notes about the refund
     /// </summary>
     public string? Note { get; set; }
+
+    public List<RefundTransactionLine> Lines { get; set; } = new();
 }
 
 /// <summary>

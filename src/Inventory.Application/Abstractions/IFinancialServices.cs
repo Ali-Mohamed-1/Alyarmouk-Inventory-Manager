@@ -28,5 +28,8 @@ namespace Inventory.Application.Abstractions
         /// Reverses a payment for a Purchase Order.
         /// </summary>
         Task ReversePurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default);
+
+        Task ProcessSalesRefundPaymentAsync(long salesOrderId, decimal amount, UserContext user, CancellationToken ct = default);
+        Task ProcessPurchaseRefundPaymentAsync(long purchaseOrderId, decimal amount, UserContext user, CancellationToken ct = default);
     }
 }

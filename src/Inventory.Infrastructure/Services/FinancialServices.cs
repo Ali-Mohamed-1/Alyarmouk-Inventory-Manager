@@ -140,5 +140,54 @@ namespace Inventory.Infrastructure.Services
             order.PaymentStatus = PurchasePaymentStatus.Unpaid;
             await _db.SaveChangesAsync(ct);
         }
+
+        public async Task ProcessSalesRefundPaymentAsync(long salesOrderId, decimal amount, UserContext user, CancellationToken ct = default)
+        {
+            var order = await _db.SalesOrders.FirstOrDefaultAsync(o => o.Id == salesOrderId, ct);
+            if (order == null) throw new NotFoundException($"Sales order {salesOrderId} not found.");
+
+            // Sales Refund = We pay money BACK to customer. This is an EXPENSE.
+            // Or 'Revenue Reversal'? Usually treated as Expense or Contra-Revenue.
+            // System uses Expense/Revenue types. Refund to customer reduces our cash, so Expense.
+            
+            var refundTx = new FinancialTransaction
+            {
+                Type = FinancialTransactionType.Expense,
+                Amount = amount,
+                SalesOrderId = order.Id,
+                CustomerId = order.CustomerId,
+                TimestampUtc = DateTimeOffset.UtcNow,
+                UserId = user.UserId,
+                UserDisplayName = user.UserDisplayName,
+                Note = $"Refund for Sales Order {order.OrderNumber}"
+            };
+            
+            _db.FinancialTransactions.Add(refundTx);
+            await _db.SaveChangesAsync(ct);
+        }
+
+        public async Task ProcessPurchaseRefundPaymentAsync(long purchaseOrderId, decimal amount, UserContext user, CancellationToken ct = default)
+        {
+            var order = await _db.PurchaseOrders.FirstOrDefaultAsync(o => o.Id == purchaseOrderId, ct);
+            if (order == null) throw new NotFoundException($"Purchase order {purchaseOrderId} not found.");
+
+            // Purchase Refund = Supplier pays money BACK to us. This is REVENUE (or Contra-Expense).
+            // Refund from supplier increases our cash, so Revenue.
+
+            var refundTx = new FinancialTransaction
+            {
+                Type = FinancialTransactionType.Revenue,
+                Amount = amount,
+                PurchaseOrderId = order.Id,
+                SupplierId = order.SupplierId,
+                TimestampUtc = DateTimeOffset.UtcNow,
+                UserId = user.UserId,
+                UserDisplayName = user.UserDisplayName,
+                Note = $"Refund for Purchase Order {order.OrderNumber}"
+            };
+
+            _db.FinancialTransactions.Add(refundTx);
+            await _db.SaveChangesAsync(ct);
+        }
     }
 }

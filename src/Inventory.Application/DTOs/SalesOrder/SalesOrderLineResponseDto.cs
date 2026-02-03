@@ -14,5 +14,10 @@
         public decimal LineVatAmount { get; init; }
         public decimal LineManufacturingTaxAmount { get; init; }
         public decimal LineTotal { get; init; }
+        
+        /// <summary>
+        /// Total quantity of this line that has been refunded (Prev. Ret.).
+        /// </summary>
+        public decimal RefundedQuantity { get; init; }
     }
 }

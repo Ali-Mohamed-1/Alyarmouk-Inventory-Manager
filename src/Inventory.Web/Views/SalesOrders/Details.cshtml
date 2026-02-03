@@ -210,10 +210,16 @@
                     </div>
                     <div class="row g-3 fw-bold">
                         <div class="col-5 text-uppercase small">Method:</div>
-                        <div class="col-7 text-end fw-black">@Model.PaymentMethod.ToString().ToUpper()</div>
+                        <div class="col-7 text-end fw-black d-flex justify-content-end align-items-center gap-2">
+                             <span>@Model.PaymentMethod.ToString().ToUpper()</span>
+                             <button class="neo-btn btn-sm py-0 no-print" style="font-size: 0.7rem;" onclick="openEditPaymentModal()">EDIT</button>
+                        </div>
 
                         <div class="col-5 text-uppercase small">Deadline:</div>
-                        <div class="col-7 text-end">@Model.DueDate.ToString("MMM dd, yyyy").ToUpper()</div>
+                        <div class="col-7 text-end d-flex justify-content-end align-items-center gap-2">
+                            <span>@Model.DueDate.ToString("MMM dd, yyyy").ToUpper()</span>
+                            <button class="neo-btn btn-sm py-0 no-print" style="font-size: 0.7rem;" onclick="openEditDueDateModal()">EDIT</button>
+                        </div>
 
                         @if (Model.PaymentMethod == Inventory.Domain.Entities.PaymentMethod.Check)
                         {
@@ -276,4 +282,241 @@
         </div>
     </div>
 </div>
+
+<!-- Edit Due Date Modal -->
+<div class="modal fade" id="editDueDateModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Update Deadline</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">New Due Date</label>
+                    <input type="date" class="form-control fw-bold" id="newDueDate" value="@Model.DueDate.ToString("yyyy-MM-dd")">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm" onclick="saveDueDate()">UPDATE</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Payment Info Modal -->
+<div class="modal fade" id="editPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Update Payment Info</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="paymentForm">
+                    <!-- Status -->
+                    <div class="mb-3">
+                        <label class="form-label fw-black text-uppercase small">Payment Status</label>
+                        <select class="form-select fw-bold" id="editPaymentStatus">
+                            @foreach (var status in Enum.GetValues<Inventory.Domain.Entities.PaymentStatus>())
+                            {
+                                <option value="@status">@status.ToString()</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Method -->
+                    <div class="mb-3">
+                        <label class="form-label fw-black text-uppercase small">Payment Method</label>
+                        <select class="form-select fw-bold" id="editPaymentMethod" onchange="togglePaymentFields()">
+                            @foreach (var method in Enum.GetValues<Inventory.Domain.Entities.PaymentMethod>())
+                            {
+                                <option value="@method">@method.ToString()</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Dynamic Fields: Check -->
+                    <div id="checkFields" class="d-none border-top border-2 pt-3 mt-3">
+                        <h6 class="fw-black text-uppercase small mb-3">Check Details</h6>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="editCheckReceived" onchange="toggleDateFields()">
+                            <label class="form-check-label fw-bold" for="editCheckReceived">Received</label>
+                        </div>
+                        <div class="mb-3 ps-4" id="receivedDateConfig">
+                            <label class="form-label small text-muted fw-bold">Received Date</label>
+                            <input type="date" class="form-control" id="editCheckReceivedDate">
+                        </div>
+
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="editCheckCashed" onchange="toggleDateFields()">
+                            <label class="form-check-label fw-bold" for="editCheckCashed">Cashed</label>
+                        </div>
+                        <div class="mb-3 ps-4" id="cashedDateConfig">
+                            <label class="form-label small text-muted fw-bold">Cashed Date</label>
+                            <input type="date" class="form-control" id="editCheckCashedDate">
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Fields: Bank Transfer -->
+                    <div id="bankTransferFields" class="d-none border-top border-2 pt-3 mt-3">
+                        <h6 class="fw-black text-uppercase small mb-3">Transfer Details</h6>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted fw-bold">Transfer / Trace ID</label>
+                            <input type="text" class="form-control fw-bold" id="editTransferId" placeholder="Enter Transaction Reference">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm" onclick="savePaymentInfo()">SAVE CHANGES</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Initialize with server values
+        const currentData = {
+            status: '@Model.PaymentStatus',
+            method: '@Model.PaymentMethod',
+            checkReceived: @(Model.CheckReceived == true ? "true" : "false"),
+            checkReceivedDate: '@(Model.CheckReceivedDate?.ToString("yyyy-MM-dd") ?? "")',
+            checkCashed: @(Model.CheckCashed == true ? "true" : "false"),
+            checkCashedDate: '@(Model.CheckCashedDate?.ToString("yyyy-MM-dd") ?? "")',
+            transferId: '@Model.TransferId'
+        };
+
+        function openEditDueDateModal() {
+            new bootstrap.Modal(document.getElementById('editDueDateModal')).show();
+        }
+
+        function openEditPaymentModal() {
+            document.getElementById('editPaymentStatus').value = currentData.status;
+            document.getElementById('editPaymentMethod').value = currentData.method;
+            
+            // Set fields provided they are relevant, otherwise defaults
+            document.getElementById('editCheckReceived').checked = currentData.checkReceived;
+            document.getElementById('editCheckReceivedDate').value = currentData.checkReceivedDate;
+            document.getElementById('editCheckCashed').checked = currentData.checkCashed;
+            document.getElementById('editCheckCashedDate').value = currentData.checkCashedDate;
+            document.getElementById('editTransferId').value = currentData.transferId;
+
+            togglePaymentFields();
+            new bootstrap.Modal(document.getElementById('editPaymentModal')).show();
+        }
+
+        function togglePaymentFields() {
+            const method = document.getElementById('editPaymentMethod').value;
+            const checkFields = document.getElementById('checkFields');
+            const bankFields = document.getElementById('bankTransferFields');
+
+            checkFields.classList.add('d-none');
+            bankFields.classList.add('d-none');
+
+            if (method === 'Check') {
+                checkFields.classList.remove('d-none');
+                toggleDateFields();
+            } else if (method === 'BankTransfer') {
+                bankFields.classList.remove('d-none');
+            }
+        }
+
+        function toggleDateFields() {
+            const isReceived = document.getElementById('editCheckReceived').checked;
+            const receivedDateInput = document.getElementById('editCheckReceivedDate');
+            receivedDateInput.disabled = !isReceived;
+            if (isReceived && !receivedDateInput.value) {
+                receivedDateInput.value = new Date().toISOString().split('T')[0];
+            }
+
+            const isCashed = document.getElementById('editCheckCashed').checked;
+            const cashedDateInput = document.getElementById('editCheckCashedDate');
+            cashedDateInput.disabled = !isCashed;
+             if (isCashed && !cashedDateInput.value) {
+                cashedDateInput.value = new Date().toISOString().split('T')[0];
+            }
+        }
+
+        async function savePaymentInfo() {
+            const method = document.getElementById('editPaymentMethod').value;
+            
+            const payload = {
+                orderId: @Model.Id,
+                paymentStatus: document.getElementById('editPaymentStatus').value,
+                paymentMethod: method,
+                // Check fields
+                checkReceived: document.getElementById('editCheckReceived').checked,
+                checkReceivedDate: document.getElementById('editCheckReceivedDate').value ? new Date(document.getElementById('editCheckReceivedDate').value).toISOString() : null,
+                checkCashed: document.getElementById('editCheckCashed').checked,
+                checkCashedDate: document.getElementById('editCheckCashedDate').value ? new Date(document.getElementById('editCheckCashedDate').value).toISOString() : null,
+                // Bank fields
+                transferId: document.getElementById('editTransferId').value
+            };
+
+            // Sanitation based on method
+            if (method !== 'Check') {
+                payload.checkReceived = false;
+                payload.checkReceivedDate = null;
+                payload.checkCashed = false;
+                payload.checkCashedDate = null;
+            }
+            if (method !== 'BankTransfer') {
+                payload.transferId = null;
+            }
+
+            try {
+                const response = await fetch('/api/sales-orders/@Model.Id/payment', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    const err = await response.text();
+                    alert('Failed to update payment info: ' + err);
+                }
+            } catch (error) {
+                console.error(error);
+                alert('An error occurred.');
+            }
+        }
+
+        async function saveDueDate() {
+            const date = document.getElementById('newDueDate').value;
+            if (!date) return;
+            
+            try {
+                // Ensure the date string is preserved as is or ISO
+                const d = new Date(date);
+                
+                const response = await fetch('/api/sales-orders/@Model.Id/due-date', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    },
+                    body: JSON.stringify(d.toISOString()) 
+                });
+
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to update due date.');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('An error occurred.');
+            }
+        }
+    </script>
+}
 

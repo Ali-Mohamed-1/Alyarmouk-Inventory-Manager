@@ -412,7 +412,6 @@
             
             Assert.Equal(11.10m, order.TotalAmount);
         }
-    }
 
         public class MockAuditLogWriter : IAuditLogWriter
         {
@@ -460,6 +459,8 @@
             public Task ReversePurchaseOrderStockAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
             public Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
             public Task ReverseSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task RefundSalesOrderStockAsync(long salesOrderId, List<RefundLineItem> lines, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task RefundPurchaseOrderStockAsync(long purchaseOrderId, List<RefundPurchaseLineItem> lines, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
         }
 
         public class MockFinancialServices : IFinancialServices
@@ -468,5 +469,8 @@
             public Task ProcessPurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
             public Task ReverseSalesPaymentAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
             public Task ReversePurchasePaymentAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task ProcessSalesRefundPaymentAsync(long salesOrderId, decimal amount, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task ProcessPurchaseRefundPaymentAsync(long purchaseOrderId, decimal amount, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
         }
     }
+}

@@ -391,12 +391,38 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
+        public async Task UpdatePaymentDeadlineAsync(long id, DateTimeOffset? newDeadline, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            var order = await _db.PurchaseOrders.FindAsync(new object[] { id }, ct);
+            if (order == null) throw new NotFoundException($"Purchase order {id} not found.");
+
+            if (order.PaymentDeadline == newDeadline) return;
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousDeadline = order.PaymentDeadline;
+                order.PaymentDeadline = newDeadline;
+
+                await _db.SaveChangesAsync(ct);
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(id, user, new { PaymentDeadline = previousDeadline }, new { PaymentDeadline = newDeadline }, ct);
+
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+        }
+
 
         public async Task RefundAsync(RefundPurchaseOrderRequest req, UserContext user, CancellationToken ct = default)
         {
             ValidateUser(user);
             if (req is null) throw new ArgumentNullException(nameof(req));
-            if (req.Amount <= 0) throw new ValidationException("Refund amount must be positive.");
+
 
             var order = await _db.PurchaseOrders
                 .Include(o => o.Lines)
@@ -404,25 +430,37 @@ namespace Inventory.Infrastructure.Services
 
             if (order == null) throw new NotFoundException($"Purchase order {req.OrderId} not found.");
 
-            // Validate order status
-            if (order.Status != PurchaseOrderStatus.Received)
-                throw new ValidationException("Only received purchase orders can be refunded.");
+            // Validate Refund Input
+            bool hasAmount = req.Amount > 0;
+            bool hasLines = req.LineItems != null && req.LineItems.Any(l => l.Quantity > 0);
 
-            // Validate payment status
-            if (order.PaymentStatus != PurchasePaymentStatus.Paid)
-                throw new ValidationException("Only paid purchase orders can be refunded.");
+            if (!hasAmount && !hasLines)
+                throw new ValidationException("You must specify either a refund amount or products to return.");
 
-            if (order.RefundedAmount + req.Amount > order.TotalAmount)
-                throw new ValidationException("Total refunded amount cannot exceed the total order amount.");
+            if (req.Amount < 0)
+                 throw new ValidationException("Refund amount cannot be negative.");
+
+            // Independent Eligibility Validation (Stock vs Money)
+            // Stock refund requires order to be Received
+            if (hasLines && order.Status != PurchaseOrderStatus.Received)
+                throw new ValidationException("Cannot refund stock before order is received.");
+            
+            // Money refund requires payment to be Paid
+            if (hasAmount && order.PaymentStatus != PurchasePaymentStatus.Paid)
+                throw new ValidationException("Cannot refund money before payment is completed.");
+
+            // Validate Amount Cap
+            decimal remainingRefundableAmount = order.TotalAmount - order.RefundedAmount;
+            if (hasAmount && req.Amount > remainingRefundableAmount)
+                throw new ValidationException($"Refund amount exceeds remaining refundable amount. Max refundable: {remainingRefundableAmount:C}");
 
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
             {
                 var before = new { order.RefundedAmount };
-                order.RefundedAmount += req.Amount;
-
-                // Create RefundTransaction audit record
-                var refundTransaction = new RefundTransaction
+                
+                // Create Refund Audit
+                var refundTx = new RefundTransaction
                 {
                     Type = RefundType.PurchaseOrder,
                     PurchaseOrderId = order.Id,
@@ -433,24 +471,51 @@ namespace Inventory.Infrastructure.Services
                     ProcessedByUserDisplayName = user.UserDisplayName,
                     Note = $"Refund processed for Purchase Order {order.OrderNumber}"
                 };
-                _db.RefundTransactions.Add(refundTransaction);
 
-                // Reverse inventory (stock goes back to supplier)
-                await _inventoryServices.ReversePurchaseOrderStockAsync(order.Id, user, ct);
-
-                // Create financial transaction (money back from supplier)
-                var refundTx = new FinancialTransaction
+                // Line Item Processing
+                if (req.LineItems != null && req.LineItems.Any())
                 {
-                    Type = FinancialTransactionType.Revenue, // Revenue because it's money coming IN (reversal of expense)
-                    Amount = req.Amount,
-                    PurchaseOrderId = order.Id,
-                    SupplierId = order.SupplierId,
-                    TimestampUtc = DateTimeOffset.UtcNow,
-                    UserId = user.UserId,
-                    UserDisplayName = user.UserDisplayName,
-                    Note = $"Refund for Purchase Order {order.OrderNumber}. {req.Reason}"
-                };
-                _db.FinancialTransactions.Add(refundTx);
+                    foreach (var refundItem in req.LineItems)
+                    {
+                        var line = order.Lines.FirstOrDefault(l => l.Id == refundItem.PurchaseOrderLineId);
+                        if (line == null) 
+                            throw new NotFoundException($"Purchase Order Line {refundItem.PurchaseOrderLineId} not found in Order {order.Id}.");
+
+                        // Validate Quantity
+                        if (refundItem.Quantity <= 0)
+                            throw new ValidationException("Refund quantity must be positive.");
+
+                        if (line.RefundedQuantity + refundItem.Quantity > line.Quantity)
+                            throw new ValidationException($"Cannot refund {refundItem.Quantity} for product '{line.ProductNameSnapshot}'. Max refundable: {line.Quantity - line.RefundedQuantity}");
+
+                        // Update Line state
+                        line.RefundedQuantity += refundItem.Quantity;
+
+                        // Add to Audit Transaction Lines
+                        refundTx.Lines.Add(new RefundTransactionLine
+                        {
+                            PurchaseOrderLineId = line.Id,
+                            ProductId = line.ProductId,
+                            ProductNameSnapshot = line.ProductNameSnapshot,
+                            Quantity = refundItem.Quantity,
+                            BatchNumber = refundItem.BatchNumber ?? line.BatchNumber,
+                            UnitPriceSnapshot = line.UnitPrice,
+                            LineRefundAmount = refundItem.Quantity * line.UnitPrice 
+                        });
+                    }
+
+                    // Process Stock Return (to Supplier = Reduce Stock)
+                    await _inventoryServices.RefundPurchaseOrderStockAsync(order.Id, req.LineItems, user, ct);
+                }
+                // Else: Money only refund, no stock movement
+
+                _db.RefundTransactions.Add(refundTx);
+
+                // Update Order Totals
+                order.RefundedAmount += req.Amount;
+
+                // Process Financial Refund (Revenue)
+                await _financialServices.ProcessPurchaseRefundPaymentAsync(order.Id, req.Amount, user, ct);
 
                 await _db.SaveChangesAsync(ct);
                 await _auditWriter.LogUpdateAsync<PurchaseOrder>(order.Id, user, before, new { order.RefundedAmount }, ct);
@@ -620,6 +685,7 @@ namespace Inventory.Infrastructure.Services
                 o.SupplierId,
                 o.SupplierNameSnapshot,
                 o.CreatedUtc,
+                o.PaymentDeadline,
                 o.Status,
                 o.PaymentStatus,
                 o.CreatedByUserDisplayName,
@@ -649,7 +715,8 @@ namespace Inventory.Infrastructure.Services
                     l.LineSubtotal,
                     l.LineVatAmount,
                     l.LineManufacturingTaxAmount,
-                    l.LineTotal)).ToList());
+                    l.LineTotal,
+                    l.RefundedQuantity)).ToList());
         }
 
         #endregion

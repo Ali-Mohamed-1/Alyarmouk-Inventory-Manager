@@ -109,12 +109,29 @@ namespace Inventory.Infrastructure.Services
 
             var asOf = DateTimeOffset.UtcNow;
 
+            // Query for unpaid/partially-paid purchase orders
+            var pendingQuery = _db.PurchaseOrders
+                .AsNoTracking()
+                .Where(po => po.SupplierId == supplierId && 
+                            po.Status != PurchaseOrderStatus.Cancelled &&
+                            (po.PaymentStatus == PurchasePaymentStatus.Unpaid || po.PaymentStatus == PurchasePaymentStatus.PartiallyPaid));
+
+            // Total Pending: sum of all unpaid/partially-paid orders
+            var totalPending = await pendingQuery.SumAsync(po => (decimal?)po.TotalAmount - (decimal?)po.RefundedAmount, ct) ?? 0m;
+
+            // Deserved: subset where payment deadline has passed (overdue)
+            var deserved = await pendingQuery
+                .Where(po => po.PaymentDeadline.HasValue && po.PaymentDeadline.Value < asOf)
+                .SumAsync(po => (decimal?)po.TotalAmount - (decimal?)po.RefundedAmount, ct) ?? 0m;
+
             return new SupplierBalanceResponseDto
             {
                 SupplierId = supplier.Id,
                 SupplierName = supplier.Name,
                 TotalOrders = totalOrders,
                 TotalPayments = totalPayments,
+                TotalPending = totalPending,
+                Deserved = deserved,
                 AsOfUtc = asOf
             };
         }
@@ -125,23 +142,25 @@ namespace Inventory.Infrastructure.Services
 
             var asOf = asOfUtc ?? DateTimeOffset.UtcNow;
 
-            // Consider only orders that are still unpaid.
+            // Consider orders that are unpaid OR partially paid (not fully paid)
             var query = _db.SalesOrders
                 .AsNoTracking()
-                .Where(o => o.CustomerId == customerId && o.PaymentStatus == PaymentStatus.Pending);
+                .Where(o => o.CustomerId == customerId && 
+                           (o.PaymentStatus == PaymentStatus.Pending || o.PaymentStatus == PaymentStatus.PartiallyPaid));
 
-            var totalPending = await query.SumAsync(o => o.TotalAmount, ct);
+            // Total Pending: sum of all unpaid/partially-paid orders
+            var totalPending = await query.SumAsync(o => o.TotalAmount - o.RefundedAmount, ct);
 
-            // Due now or overdue: unpaid and due date is on or before the "as of" timestamp.
-            var totalDueNow = await query
-                .Where(o => o.DueDate <= asOf)
-                .SumAsync(o => o.TotalAmount, ct);
+            // Deserved: subset where due date has passed (overdue)
+            var deserved = await query
+                .Where(o => o.DueDate < asOf)
+                .SumAsync(o => o.TotalAmount - o.RefundedAmount, ct);
 
             return new CustomerBalanceResponseDto
             {
                 CustomerId = customerId,
                 TotalPending = totalPending,
-                TotalDueNow = totalDueNow,
+                Deserved = deserved,
                 AsOfUtc = asOf
             };
         }

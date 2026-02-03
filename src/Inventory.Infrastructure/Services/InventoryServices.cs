@@ -7,6 +7,8 @@ using Inventory.Application.Abstractions;
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.StockSnapshot;
 using Inventory.Application.DTOs.Transaction;
+using Inventory.Application.DTOs.SalesOrder;
+using Inventory.Application.DTOs.PurchaseOrder;
 using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -93,6 +95,7 @@ namespace Inventory.Infrastructure.Services
                 Quantity = req.Quantity,
                 Type = Domain.Entities.InventoryTransactionType.Issue,
                 BatchNumber = req.BatchNumber,
+                ProductBatchId = req.ProductBatchId,
                 Note = req.Note
             };
 
@@ -101,7 +104,19 @@ namespace Inventory.Infrastructure.Services
 
         public async Task UpdateStockAsync(UpdateStockRequest req, UserContext user, CancellationToken ct = default)
         {
-            await _snapshotServices.UpdateAsync(req, user, ct);
+            if (req is null) throw new ArgumentNullException(nameof(req));
+
+            var txReq = new CreateInventoryTransactionRequest
+            {
+                ProductId = req.ProductId,
+                Quantity = req.Adjustment, // If negative, it reduces stock. If positive, it increases.
+                Type = InventoryTransactionType.Adjust,
+                BatchNumber = req.BatchNumber,
+                ProductBatchId = req.ProductBatchId,
+                Note = req.Note
+            };
+
+            await _transactionServices.CreateAsync(txReq, user, ct);
         }
 
         public async Task<long> CreateTransactionAsync(CreateInventoryTransactionRequest req, UserContext user, CancellationToken ct = default)
@@ -164,13 +179,14 @@ namespace Inventory.Infrastructure.Services
                     Quantity = line.Quantity,
                     Type = InventoryTransactionType.Receive,
                     BatchNumber = line.BatchNumber,
-                    CustomerId = 0, // Not applicable for PO
+                    CustomerId = null, // Not applicable for PO
                     Note = $"Purchase Order {order.OrderNumber}"
                 };
 
                 await _transactionServices.CreateAsync(txReq, user, ct);
             }
 
+            // Note: PurchaseOrderServices handles status update.
             await _db.SaveChangesAsync(ct);
         }
 
@@ -249,6 +265,69 @@ namespace Inventory.Infrastructure.Services
             }
 
             await _db.SaveChangesAsync(ct);
+        }
+
+        public async Task RefundSalesOrderStockAsync(long salesOrderId, List<RefundLineItem> lines, UserContext user, CancellationToken ct = default)
+        {
+            var order = await _db.SalesOrders
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => o.Id == salesOrderId, ct);
+            if (order == null) throw new NotFoundException($"Sales order {salesOrderId} not found.");
+
+            foreach (var line in lines)
+            {
+                var txReq = new CreateInventoryTransactionRequest
+                {
+                    ProductId = await GetProductIdFromLineAsync(line.SalesOrderLineId, ct),
+                    Quantity = line.Quantity,
+                    Type = InventoryTransactionType.Receive, // Refund = Stock comes back
+                    BatchNumber = line.BatchNumber,
+                    ProductBatchId = line.ProductBatchId,
+                    CustomerId = order.CustomerId,
+                    Note = $"Refund for Sales Order {order.OrderNumber}"
+                };
+
+                await _transactionServices.CreateAsync(txReq, user, ct);
+            }
+        }
+
+        public async Task RefundPurchaseOrderStockAsync(long purchaseOrderId, List<RefundPurchaseLineItem> lines, UserContext user, CancellationToken ct = default)
+        {
+             var order = await _db.PurchaseOrders
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => o.Id == purchaseOrderId, ct);
+            if (order == null) throw new NotFoundException($"Purchase order {purchaseOrderId} not found.");
+
+            foreach (var line in lines)
+            {
+                // We need the productId. Helper method or simple query.
+                // Assuming we can get it from the line ID or trust the caller? 
+                // Better to look it up to be safe and correct.
+                var poLine = await _db.PurchaseOrderLines.FindAsync(new object[] { line.PurchaseOrderLineId }, ct);
+                if (poLine == null) throw new NotFoundException($"Purchase Order Line {line.PurchaseOrderLineId} not found.");
+
+                var txReq = new CreateInventoryTransactionRequest
+                {
+                    ProductId = poLine.ProductId,
+                    Quantity = line.Quantity,
+                    Type = InventoryTransactionType.Issue, // Refund = Stock goes back to supplier
+                    BatchNumber = line.BatchNumber ?? poLine.BatchNumber,
+                    Note = $"Refund for Purchase Order {order.OrderNumber}"
+                };
+
+                await _transactionServices.CreateAsync(txReq, user, ct);
+            }
+        }
+
+        private async Task<int> GetProductIdFromLineAsync(long salesOrderLineId, CancellationToken ct)
+        {
+            var line = await _db.SalesOrderLines
+                .AsNoTracking()
+                .Select(l => new { l.Id, l.ProductId })
+                .FirstOrDefaultAsync(l => l.Id == salesOrderLineId, ct);
+            
+            if (line == null) throw new NotFoundException($"Sales order line {salesOrderLineId} not found.");
+            return line.ProductId;
         }
     }
 }

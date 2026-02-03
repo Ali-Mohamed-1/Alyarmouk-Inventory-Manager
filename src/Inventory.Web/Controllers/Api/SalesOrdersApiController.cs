@@ -159,6 +159,14 @@ public class SalesOrdersApiController : ControllerBase
         return NoContent();
     }
 
+    [HttpPut("{id}/due-date")]
+    public async Task<IActionResult> UpdateDueDate(long id, [FromBody] DateTimeOffset newDate, CancellationToken ct)
+    {
+        var user = GetUserContext();
+        await _salesOrderServices.UpdateDueDateAsync(id, newDate, user, ct);
+        return Ok();
+    }
+
     [HttpPost("{id}/refund")]
     public async Task<IActionResult> Refund(long id, [FromBody] RefundSalesOrderRequest request, CancellationToken ct)
     {

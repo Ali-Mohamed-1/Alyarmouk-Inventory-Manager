@@ -11,7 +11,8 @@ public enum PurchaseOrderStatus
 public enum PurchasePaymentStatus
 {
     Unpaid = 0,
-    Paid = 1
+    Paid = 1,
+    PartiallyPaid = 2
 }
 
 public class PurchaseOrder
@@ -24,6 +25,11 @@ public class PurchaseOrder
 
     public PurchaseOrderStatus Status { get; set; } = PurchaseOrderStatus.Pending;
     public PurchasePaymentStatus PaymentStatus { get; set; } = PurchasePaymentStatus.Unpaid;
+
+    /// <summary>
+    /// When payment to the supplier is expected/due.
+    /// </summary>
+    public DateTimeOffset? PaymentDeadline { get; set; }
 
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public string CreatedByUserId { get; set; } = "";
@@ -82,6 +88,12 @@ public class PurchaseOrderLine
     public decimal Quantity { get; set; }
     public string UnitSnapshot { get; set; } = "";
     public decimal UnitPrice { get; set; }
+
+    /// <summary>
+    /// Total quantity of this line that has been refunded (returned to supplier).
+    /// Must never exceed Quantity.
+    /// </summary>
+    public decimal RefundedQuantity { get; set; }
     
     // Tax System Fields
     public bool IsTaxInclusive { get; set; }

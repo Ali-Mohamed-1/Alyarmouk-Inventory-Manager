@@ -9,6 +9,7 @@
 
     <!-- TABS NAVIGATION -->
     <ul class="nav nav-tabs border-0 mb-0" id="activityTabs" role="tablist">
+
         <li class="nav-item">
             <button class="neo-btn active me-2" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales-content" type="button" role="tab">SALES ACTIVITY</button>
         </li>
@@ -23,6 +24,8 @@
     <!-- TABS CONTENT -->
     <div class="tab-content neo-card mt-0 border-top-0 p-4" style="background: white; border-width: 3px;">
         
+
+
         <!-- SALES CONTENT -->
         <div class="tab-pane fade show active" id="sales-content" role="tabpanel">
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -38,6 +41,7 @@
                                 <th>ORDER #</th>
                                 <th>CUSTOMER</th>
                                 <th>DATE</th>
+                                <th>DEADLINE</th>
                                 <th>STATUS</th>
                                 <th>PAYMENT</th>
                                 <th class="text-end">TOTAL</th>
@@ -144,6 +148,7 @@
                                 <th>ORDER #</th>
                                 <th>SUPPLIER</th>
                                 <th>DATE</th>
+                                <th>DEADLINE</th>
                                 <th>STATUS</th>
                                 <th>PAYMENT</th>
                                 <th class="text-end">TOTAL</th>
@@ -674,6 +679,7 @@
                         <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
                         <td>${escapeHtml(o.customerName)}</td>
                         <td class="small fw-bold">${formatDate(o.orderDate)}</td>
+                        <td class="small fw-bold ${new Date(o.dueDate) < new Date() && o.paymentStatus !== 1 ? 'text-danger' : ''}">${formatDate(o.dueDate)}</td>
                         <td>${getSoStatusBadge(o.status)}</td>
                         <td>${getPaymentBadge(o.paymentStatus)}</td>
                         <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
@@ -758,6 +764,7 @@
                         <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
                         <td>${escapeHtml(o.supplierName)}</td>
                         <td class="small fw-bold">${formatDate(o.createdUtc)}</td>
+                        <td class="small fw-bold ${o.paymentDeadline && new Date(o.paymentDeadline) < new Date() && o.paymentStatus !== 1 ? 'text-danger' : ''}">${o.paymentDeadline ? formatDate(o.paymentDeadline) : '-'}</td>
                         <td>${getPoStatusBadge(o.status)}</td>
                         <td>${getPaymentBadge(o.paymentStatus)}</td>
                         <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>

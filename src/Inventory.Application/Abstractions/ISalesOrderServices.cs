@@ -1,5 +1,6 @@
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.SalesOrder;
+using Inventory.Domain.Entities;
 
 namespace Inventory.Application.Abstractions
 {
@@ -34,6 +35,8 @@ namespace Inventory.Application.Abstractions
         /// Updates the status of a sales order
         /// </summary>
         Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default);
+        Task UpdatePaymentStatusAsync(long orderId, PaymentStatus status, UserContext user, CancellationToken ct = default);
+        Task UpdateDueDateAsync(long orderId, DateTimeOffset newDate, UserContext user, CancellationToken ct = default);
 
         /// <summary>
         /// Attaches or updates an Invoice PDF file reference for an existing sales order.

@@ -1,6 +1,8 @@
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.StockSnapshot;
 using Inventory.Application.DTOs.Transaction;
+using Inventory.Application.DTOs.SalesOrder;
+using Inventory.Application.DTOs.PurchaseOrder;
 
 namespace Inventory.Application.Abstractions
 {
@@ -62,6 +64,11 @@ namespace Inventory.Application.Abstractions
         Task ReversePurchaseOrderStockAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default);
 
         /// <summary>
+        /// Refunds stock for a Purchase Order (e.g. partial refund)
+        /// </summary>
+        Task RefundPurchaseOrderStockAsync(long purchaseOrderId, List<RefundPurchaseLineItem> lines, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
         /// Processes stock issue for a Sales Order (SalesOrder.Status = Done)
         /// </summary>
         Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default);
@@ -70,5 +77,10 @@ namespace Inventory.Application.Abstractions
         /// Reverses stock issue for a Sales Order (e.g. Done -> Cancelled)
         /// </summary>
         Task ReverseSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Refunds stock for a Sales Order (e.g. partial refund)
+        /// </summary>
+        Task RefundSalesOrderStockAsync(long salesOrderId, List<RefundLineItem> lines, UserContext user, CancellationToken ct = default);
     }
 }

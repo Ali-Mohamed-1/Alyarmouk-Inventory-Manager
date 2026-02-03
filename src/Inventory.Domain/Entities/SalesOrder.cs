@@ -17,7 +17,8 @@ public enum PaymentMethod
 public enum PaymentStatus
 {
     Pending = 0,
-    Paid = 1
+    Paid = 1,
+    PartiallyPaid = 2
 }
 
 public  class SalesOrder
@@ -139,6 +140,12 @@ public class SalesOrderLine
     public decimal Quantity { get; set; }
     public string UnitSnapshot { get; set; } = "";
     public decimal UnitPrice { get; set; } // Price per unit at time of order (snapshot)
+    
+    /// <summary>
+    /// Total quantity of this line that has been refunded.
+    /// Must never exceed Quantity.
+    /// </summary>
+    public decimal RefundedQuantity { get; set; }
     
     // Tax System Fields
     public decimal LineSubtotal { get; set; }
