@@ -111,7 +111,6 @@
             </div>
             <div class="modal-body p-4">
                 <form id="receiveStockForm">
-                    <!-- Header Info -->
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
                             <label for="receiveSupplierId" class="form-label fw-black text-uppercase small">Supplier</label>
@@ -119,7 +118,11 @@
                                 <option value="">-- LOADING SUPPLIERS --</option>
                             </select>
                         </div>
-                        <div class="col-md-8">
+                        <div class="col-md-3">
+                            <label for="receiveDueDate" class="form-label fw-black text-uppercase small">Payment Deadline</label>
+                            <input type="date" id="receiveDueDate" name="DueDate" class="form-control border-2 border-black" value="@DateTime.Today.AddDays(14).ToString("yyyy-MM-dd")" />
+                        </div>
+                        <div class="col-md-5">
                             <label for="receiveNote" class="form-label fw-black text-uppercase small">Notes</label>
                             <input type="text" id="receiveNote" name="Note" class="form-control border-2 border-black" placeholder="Order remarks...">
                         </div>

@@ -201,6 +201,10 @@
                             <div class="mb-2">
                                 <strong>PAYMENT:</strong> <span id="po-detail-payment"></span>
                             </div>
+                            <div class="mb-2 d-flex justify-content-between">
+                                <span class="small fw-bold">DEADLINE:</span>
+                                <span id="po-detail-deadline" class="fw-black small"></span>
+                            </div>
                             <div class="mb-4 d-flex gap-2">
                                 <button class="neo-btn neo-btn-success btn-sm flex-grow-1" style="font-size: 0.7rem;" onclick="openPoRecordPaymentModal()">RECORD PAYMENT</button>
                                 <button class="neo-btn neo-btn-primary btn-sm flex-grow-1" style="font-size: 0.7rem;" onclick="openPoEditInfoModal()">EDIT INFO</button>
@@ -953,6 +957,7 @@
                     document.getElementById('po-detail-date').innerText = formatDate(o.createdUtc);
                     document.getElementById('po-detail-status').innerHTML = getPoStatusBadge(o.status);
                     document.getElementById('po-detail-payment').innerHTML = getPaymentBadge(o.paymentStatus);
+                    document.getElementById('po-detail-deadline').innerText = o.paymentDeadline ? formatDate(o.paymentDeadline) : 'N/A';
                     
                     document.getElementById('po-detail-subtotal').innerText = formatCurrency(o.subtotal);
                     document.getElementById('po-detail-vat').innerText = formatCurrency(o.vatAmount);

@@ -46,6 +46,7 @@
         <div>
             <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Record ID: @Model.OrderNumber</h1>
             <p class="fw-bold text-muted mb-0">ORIGINATED: @Model.CreatedUtc.ToLocalTime().ToString("f").ToUpper()</p>
+            <p class="fw-bold text-danger mb-0">DEADLINE: @Model.DueDate.ToLocalTime().ToString("f").ToUpper()</p>
         </div>
         <div class="d-flex gap-2">
             <a asp-action="Index" class="neo-btn">BACK TO LOG</a>
@@ -59,6 +60,7 @@
         <div class="d-flex justify-content-between fw-bold border-bottom border-2 border-black pb-2 mt-2">
             <span>REF: @Model.OrderNumber</span>
             <span>DATE: @Model.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd")</span>
+            <span>DEADLINE: @Model.DueDate.ToLocalTime().ToString("yyyy-MM-dd")</span>
         </div>
     </div>
 

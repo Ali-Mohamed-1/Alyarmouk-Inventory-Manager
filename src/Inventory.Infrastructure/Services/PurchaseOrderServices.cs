@@ -141,12 +141,15 @@ namespace Inventory.Infrastructure.Services
                     CreatedUtc = DateTimeOffset.UtcNow,
                     CreatedByUserId = user.UserId,
                     CreatedByUserDisplayName = user.UserDisplayName,
+                    // Treat the incoming DueDate as the initial supplier payment deadline
+                    PaymentDeadline = req.DueDate,
                     Note = req.Note,
                     IsTaxInclusive = req.IsTaxInclusive,
                     ApplyVat = req.ApplyVat,
                     ApplyManufacturingTax = req.ApplyManufacturingTax,
                     ReceiptExpenses = req.ReceiptExpenses,
-                    Status = PurchaseOrderStatus.Draft // Hardened: Stock NOT affected on creation
+                    // Default status is Pending; stock is only affected when moved to Received.
+                    Status = PurchaseOrderStatus.Pending
                     // PaymentStatus is derived from ledger - defaults to Unpaid
                 };
 

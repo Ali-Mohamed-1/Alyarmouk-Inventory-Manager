@@ -262,6 +262,7 @@
         const payload = {
             supplierId: parseInt(supplierSelect.value),
             note: document.getElementById('receiveNote').value,
+            dueDate: document.getElementById('receiveDueDate').value || null,
             connectToReceiveStock: true,
             isTaxInclusive: false, // Updated to Base Price model
             applyVat: document.getElementById('receiveApplyVat').checked,
