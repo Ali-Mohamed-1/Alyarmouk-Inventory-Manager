@@ -417,7 +417,6 @@
                     <select class="form-select fw-black text-center" id="updateStatusSelect">
                         <option value="0">PENDING</option>
                         <option value="1">DONE</option>
-                        <option value="2">CANCELLED</option>
                     </select>
                 </div>
                 <div id="status-warning" class="alert neo-btn-warning fw-bold p-3 mb-0" style="display: none; border-radius:0;">
@@ -553,6 +552,23 @@
                 if(s===2) { cls='neo-btn-warning'; txt='PARTIAL'; }
                 return `<span class="badge ${cls}">${txt}</span>`;
             };
+
+            const canCancelSalesOrder = (o) => {
+                // Money: no net paid amount and payment status is Pending
+                const netPaidAmount = (o.paidAmount || 0) - (o.refundedAmount || 0);
+                const paymentClear = netPaidAmount === 0 && o.paymentStatus === 0;
+                
+                // Stock: if Done, all must be refunded
+                let stockClear = true;
+                if (o.status === 1 && o.lines) { // Done
+                    const remainingStock = o.lines.reduce((sum, l) => sum + (l.quantity - (l.refundedQuantity || 0)), 0);
+                    stockClear = remainingStock === 0;
+                }
+                
+                return paymentClear && stockClear;
+            };
+
+
 
             async function loadCustomers() {
                 try {
@@ -935,6 +951,10 @@
                 }
                 tbody.innerHTML = orders.map(o => {
                     const ps = o.lines.map(l => `${l.productName} (${l.quantity})`).join(', ');
+                    const canCancel = canCancelSalesOrder(o);
+                    const cancelTooltip = canCancel
+                        ? 'Cancel this order (no automatic refunds will occur).'
+                        : 'You must fully refund stock and money before cancelling this order.';
                     return `
                         <tr>
                             <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
@@ -951,12 +971,13 @@
                                 <div class="d-flex gap-1 justify-content-end">
                                     <button class="neo-btn neo-btn-info btn-sm p-1 px-2" onclick="viewOrderDetails(${o.id})">VIEW</button>
                                     ${(o.status === 1 || o.paymentStatus === 1) ? `<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>` : ''}
-                                    ${o.status === 0 ? `<button class="neo-btn neo-btn-warning btn-sm p-1 px-2" onclick="cancelOrder(${o.id})">CANCEL</button>` : ''}
+                                    ${o.status !== 2 ? `<button class="neo-btn neo-btn-warning btn-sm p-1 px-2" onclick="cancelOrder(${o.id})" ${canCancel ? '' : 'disabled'} title="${cancelTooltip}">CANCEL</button>` : ''}
                                 </div>
                             </td>
                         </tr>
                     `;
                 }).join('');
+
             }
 
             window.cancelOrder = (od) => { document.getElementById('cancelOrderId').value = od; new bootstrap.Modal(document.getElementById('cancelOrderModal')).show(); };
@@ -964,12 +985,16 @@
                 const od = parseInt(document.getElementById('cancelOrderId').value);
                 try {
                     const ft = document.querySelector('[name="__RequestVerificationToken"]').value;
-                    const fd = new FormData(); fd.append('__RequestVerificationToken', ft); fd.append('OrderId', od); fd.append('Status', '3');
-                    const r = await fetch(`/SalesOrders/UpdateStatus?id=${od}`, { method: 'POST', body: fd });
-                    if (!r.ok) throw new Error();
+                    const fd = new FormData(); 
+                    fd.append('__RequestVerificationToken', ft);
+                    const r = await fetch(`/SalesOrders/Cancel?id=${od}`, { method: 'POST', body: fd });
+                    if (!r.ok) {
+                        const msg = await r.text();
+                        throw new Error(msg || 'Cancellation failed.');
+                    }
                     bootstrap.Modal.getInstance(document.getElementById('cancelOrderModal')).hide();
                     if (currentCustomerId) { viewCustomerHistory(currentCustomerId); if (document.getElementById('order-details-section').style.display === 'block') viewOrderDetails(od); }
-                } catch (e) { alert('Kill failed'); }
+                } catch (e) { alert(e.message || 'Cancellation failed'); }
             };
 
             // -- REFUND VALIDATION HELPER --

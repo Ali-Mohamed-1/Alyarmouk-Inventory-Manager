@@ -28,27 +28,36 @@ namespace Inventory.Infrastructure.Services
             var notifications = new List<PaymentNotificationDto>();
 
             // 1. Sales Orders Notifications
-            // Criteria: Not Paid, DueDate within next 7 days, Not Overdue (DueDate >= Now)
+            // Criteria:
+            // - Not Cancelled
+            // - RemainingAmount > 0 (money still owed)
+            // - DueDate within next 7 days and not in the past
             var salesOrders = await _db.SalesOrders
                 .AsNoTracking()
+                .Include(o => o.Payments)
                 .Where(o => o.Status != SalesOrderStatus.Cancelled &&
-                            o.PaymentStatus != PaymentStatus.Paid &&
                             o.DueDate >= now &&
                             o.DueDate <= upcomingWindow)
-                .Select(o => new
-                {
-                    o.Id,
-                    o.OrderNumber,
-                    o.CustomerId,
-                    o.CustomerNameSnapshot,
-                    o.DueDate,
-                    o.TotalAmount,
-                    o.RefundedAmount
-                })
                 .ToListAsync(ct);
 
             foreach (var so in salesOrders)
             {
+                var paid = so.Payments
+                    .Where(p => p.PaymentType == PaymentRecordType.Payment)
+                    .Sum(p => p.Amount);
+
+                var refunded = so.Payments
+                    .Where(p => p.PaymentType == PaymentRecordType.Refund)
+                    .Sum(p => p.Amount);
+
+                var netPaid = paid - refunded;
+                var remainingAmount = so.TotalAmount - netPaid;
+
+                if (remainingAmount <= 0)
+                {
+                    continue;
+                }
+
                 var daysUntil = (so.DueDate - now).Days;
                 // Ensure at least 0 if it's due today but technically "future" by time
                 if (daysUntil < 0) daysUntil = 0; 
@@ -62,36 +71,46 @@ namespace Inventory.Infrastructure.Services
                     CounterpartyId = so.CustomerId,
                     CounterpartyName = so.CustomerNameSnapshot,
                     PaymentDeadline = so.DueDate,
-                    RemainingAmount = so.TotalAmount - so.RefundedAmount,
+                    RemainingAmount = remainingAmount,
                     DaysUntilDue = daysUntil,
                     Message = $"Payment due in {daysUntil} days for Sales Order #{so.OrderNumber} from {so.CustomerNameSnapshot}"
                 });
             }
 
             // 2. Purchase Orders Notifications
-            // Criteria: Not Paid, PaymentDeadline exists, within 7 days, Not Overdue
+            // Criteria:
+            // - Not Cancelled
+            // - RemainingAmount > 0 (money still owed)
+            // - PaymentDeadline exists and is within the next 7 days
             var purchaseOrders = await _db.PurchaseOrders
                 .AsNoTracking()
+                .Include(o => o.Payments)
                 .Where(o => o.Status != PurchaseOrderStatus.Cancelled &&
-                            o.PaymentStatus != PurchasePaymentStatus.Paid &&
                             o.PaymentDeadline.HasValue &&
                             o.PaymentDeadline.Value >= now &&
                             o.PaymentDeadline.Value <= upcomingWindow)
-                .Select(o => new
-                {
-                    o.Id,
-                    o.OrderNumber,
-                    o.SupplierId,
-                    o.SupplierNameSnapshot,
-                    PaymentDeadline = o.PaymentDeadline.Value,
-                    o.TotalAmount,
-                    o.RefundedAmount
-                })
                 .ToListAsync(ct);
 
             foreach (var po in purchaseOrders)
             {
-                var daysUntil = (po.PaymentDeadline - now).Days;
+                var paid = po.Payments
+                    .Where(p => p.PaymentType == PaymentRecordType.Payment)
+                    .Sum(p => p.Amount);
+
+                var refunded = po.Payments
+                    .Where(p => p.PaymentType == PaymentRecordType.Refund)
+                    .Sum(p => p.Amount);
+
+                var netPaid = paid - refunded;
+                var remainingAmount = po.TotalAmount - netPaid;
+
+                if (remainingAmount <= 0)
+                {
+                    continue;
+                }
+
+                var paymentDeadline = po.PaymentDeadline!.Value;
+                var daysUntil = (paymentDeadline - now).Days;
                  if (daysUntil < 0) daysUntil = 0;
 
                 notifications.Add(new PaymentNotificationDto
@@ -102,8 +121,8 @@ namespace Inventory.Infrastructure.Services
                     Type = "Purchase",
                     CounterpartyId = po.SupplierId,
                     CounterpartyName = po.SupplierNameSnapshot,
-                    PaymentDeadline = po.PaymentDeadline,
-                    RemainingAmount = po.TotalAmount - po.RefundedAmount,
+                    PaymentDeadline = paymentDeadline,
+                    RemainingAmount = remainingAmount,
                     DaysUntilDue = daysUntil,
                     Message = $"Payment due in {daysUntil} days for Purchase Order #{po.OrderNumber} to {po.SupplierNameSnapshot}"
                 });

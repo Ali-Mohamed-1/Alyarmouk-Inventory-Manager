@@ -13,6 +13,14 @@ namespace Inventory.Application.Abstractions
         Task<PurchaseOrderResponse?> GetByIdAsync(long id, CancellationToken ct = default);
         Task<IEnumerable<PurchaseOrderResponse>> GetBySupplierAsync(int supplierId, CancellationToken ct = default);
         Task<long> CreateAsync(CreatePurchaseOrderRequest req, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Cancels a purchase order.
+        /// Does NOT perform any automatic stock or payment refunds.
+        /// Cancellation is only allowed when all refunds have been processed manually.
+        /// </summary>
+        Task CancelAsync(long id, UserContext user, CancellationToken ct = default);
+
         Task UpdateStatusAsync(long id, PurchaseOrderStatus status, UserContext user, CancellationToken ct = default);
         Task UpdatePaymentDeadlineAsync(long id, DateTimeOffset? newDeadline, UserContext user, CancellationToken ct = default);
         Task RefundAsync(RefundPurchaseOrderRequest req, UserContext user, CancellationToken ct = default);

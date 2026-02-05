@@ -169,16 +169,44 @@
 
                     @if (Model.Status != Inventory.Domain.Entities.SalesOrderStatus.Cancelled)
                     {
-                        <form asp-action="UpdateStatus" asp-route-id="@Model.Id" method="post" class="d-flex gap-2">
+                            var allowedStatuses = new[]
+                            {
+                                Inventory.Domain.Entities.SalesOrderStatus.Pending,
+                                Inventory.Domain.Entities.SalesOrderStatus.Done
+                            };
+
+                            var remainingStockQuantity = Model.Lines.Sum(l => l.Quantity - l.RefundedQuantity);
+                            var canCancel =
+                                Model.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.Pending &&
+                                Model.PaidAmount == 0m &&
+                                (Model.Status != Inventory.Domain.Entities.SalesOrderStatus.Done || remainingStockQuantity == 0m);
+
+                            var cancelTooltip = canCancel
+                                ? "Cancel this order (no automatic refunds will occur)."
+                                : "You must fully refund stock and money before cancelling this order.";
+
+
+                        <form asp-action="UpdateStatus" asp-route-id="@Model.Id" method="post" class="d-flex gap-2 mb-2">
                             <input type="hidden" name="OrderId" value="@Model.Id" />
                             <select name="Status" class="form-select fw-black">
-                                @foreach (var status in Enum.GetValues<Inventory.Domain.Entities.SalesOrderStatus>())
+                                @foreach (var status in allowedStatuses)
                                 {
                                     <option value="@status" selected="@(status == Model.Status)">@status.ToString().ToUpper()</option>
                                 }
                             </select>
                             <button type="submit" class="neo-btn neo-btn-primary">UPDATE</button>
                         </form>
+
+                        <form asp-action="Cancel" asp-route-id="@Model.Id" method="post" class="d-flex gap-2 mt-2">
+                            @Html.AntiForgeryToken()
+                            <button type="submit"
+                                    class="neo-btn neo-btn-danger w-100"
+                                    title="@cancelTooltip"
+                                    @(canCancel ? "" : "disabled")>
+                                CANCEL ORDER
+                            </button>
+                        </form>
+
                         if (Model.Status != Inventory.Domain.Entities.SalesOrderStatus.Done)
                         {
                             <div class="mt-3 neo-card p-2 mb-0 border-2 bg-light small fw-bold">

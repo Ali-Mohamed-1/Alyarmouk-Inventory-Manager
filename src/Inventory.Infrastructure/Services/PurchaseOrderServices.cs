@@ -319,12 +319,74 @@ namespace Inventory.Infrastructure.Services
             return orderNumber;
         }
 
+        public async Task CancelAsync(long id, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+
+            if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id), "Order ID must be positive.");
+
+            var order = await _db.PurchaseOrders
+                .Include(o => o.Lines)
+                .Include(o => o.Payments)
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
+
+            if (order == null) throw new NotFoundException($"Purchase order {id} not found.");
+
+            if (order.Status == PurchaseOrderStatus.Cancelled)
+                throw new ValidationException("Order is already cancelled.");
+
+            // Money condition: no net paid amount and status must be Unpaid
+            var netPaidAmount = order.GetPaidAmount();
+            if (netPaidAmount != 0 || order.PaymentStatus != PurchasePaymentStatus.Unpaid)
+            {
+                throw new ValidationException("You must fully refund stock and money before cancelling this order.");
+            }
+
+            // Stock condition: if order was Received, all quantities must be fully refunded
+            if (order.Status == PurchaseOrderStatus.Received)
+            {
+                var remainingStockQuantity = order.Lines.Sum(l => l.Quantity - l.RefundedQuantity);
+                if (remainingStockQuantity > 0)
+                {
+                    throw new ValidationException($"[Detail] You must fully refund stock before cancelling. RemainingStock: {remainingStockQuantity}");
+                }
+            }
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var previousStatus = order.Status;
+                order.Status = PurchaseOrderStatus.Cancelled;
+
+                await _db.SaveChangesAsync(ct);
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
+                    id,
+                    user,
+                    new { Status = previousStatus },
+                    new { Status = order.Status },
+                    ct);
+
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(ct);
+                throw new ConflictException("Could not cancel purchase order due to a database conflict.", ex);
+            }
+        }
+
         public async Task UpdateStatusAsync(long id, PurchaseOrderStatus status, UserContext user, CancellationToken ct = default)
         {
             var order = await _db.PurchaseOrders.FindAsync(new object[] { id }, ct);
             if (order == null) throw new NotFoundException($"Purchase order {id} not found.");
 
             if (order.Status == status) return; // Idempotent
+
+            if (status == PurchaseOrderStatus.Cancelled)
+            {
+                // All cancellation must go through CancelAsync to enforce invariants.
+                throw new ValidationException("Direct status change to Cancelled is not allowed. Use the dedicated cancel operation after completing all refunds.");
+            }
 
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
@@ -365,6 +427,9 @@ namespace Inventory.Infrastructure.Services
             var order = await _db.PurchaseOrders.FindAsync(new object[] { id }, ct);
             if (order == null) throw new NotFoundException($"Purchase order {id} not found.");
 
+            if (order.Status == PurchaseOrderStatus.Cancelled)
+                throw new ValidationException("Cannot modify the payment deadline of a cancelled order.");
+
             if (order.PaymentDeadline == newDeadline) return;
 
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
@@ -395,6 +460,9 @@ namespace Inventory.Infrastructure.Services
                 .FirstOrDefaultAsync(o => o.Id == orderId, ct);
 
             if (order == null) throw new NotFoundException($"Purchase order {orderId} not found.");
+
+            if (order.Status == PurchaseOrderStatus.Cancelled)
+                throw new ValidationException("Cannot add payments to a cancelled order.");
 
             var remaining = order.GetRemainingAmount();
             if (req.Amount > remaining)
@@ -451,6 +519,9 @@ namespace Inventory.Infrastructure.Services
                 .FirstOrDefaultAsync(o => o.Id == req.OrderId, ct);
 
             if (order == null) throw new NotFoundException($"Purchase order {req.OrderId} not found.");
+
+            if (order.Status == PurchaseOrderStatus.Cancelled)
+                throw new ValidationException("Cannot process refunds for a cancelled order.");
 
             // Validate Refund Input
             bool hasAmount = req.Amount > 0;
@@ -545,7 +616,7 @@ namespace Inventory.Infrastructure.Services
                     Note = $"Refund for Order {order.OrderNumber}. Reason: {req.Reason}",
                     CreatedByUserId = user.UserId
                 };
-                _db.PaymentRecords.Add(refundPayment);
+
                 order.Payments.Add(refundPayment);
 
                 // Update Order Totals
@@ -578,6 +649,9 @@ namespace Inventory.Infrastructure.Services
             var purchaseOrder = await _db.PurchaseOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
             if (purchaseOrder is null)
                 throw new NotFoundException($"Purchase order id {orderId} was not found.");
+
+            if (purchaseOrder.Status == PurchaseOrderStatus.Cancelled)
+                throw new ValidationException("Cannot attach an invoice to a cancelled order.");
 
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
@@ -613,6 +687,9 @@ namespace Inventory.Infrastructure.Services
             var purchaseOrder = await _db.PurchaseOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
             if (purchaseOrder is null)
                 throw new NotFoundException($"Purchase order id {orderId} was not found.");
+
+            if (purchaseOrder.Status == PurchaseOrderStatus.Cancelled)
+                throw new ValidationException("Cannot modify documents for a cancelled order.");
 
             if (purchaseOrder.InvoicePath == null)
                 return; // Already removed
@@ -653,6 +730,9 @@ namespace Inventory.Infrastructure.Services
             if (purchaseOrder is null)
                 throw new NotFoundException($"Purchase order id {orderId} was not found.");
 
+            if (purchaseOrder.Status == PurchaseOrderStatus.Cancelled)
+                throw new ValidationException("Cannot attach a receipt to a cancelled order.");
+
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
             {
@@ -687,6 +767,9 @@ namespace Inventory.Infrastructure.Services
             var purchaseOrder = await _db.PurchaseOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
             if (purchaseOrder is null)
                 throw new NotFoundException($"Purchase order id {orderId} was not found.");
+
+            if (purchaseOrder.Status == PurchaseOrderStatus.Cancelled)
+                throw new ValidationException("Cannot modify documents for a cancelled order.");
 
             if (purchaseOrder.ReceiptPath == null)
                 return; // Already removed
@@ -730,6 +813,9 @@ namespace Inventory.Infrastructure.Services
 
             if (purchaseOrder is null)
                 throw new NotFoundException($"Purchase order id {id} was not found.");
+
+            if (purchaseOrder.Status == PurchaseOrderStatus.Cancelled)
+                throw new ValidationException("Cannot modify payment info for a cancelled order.");
 
             // Validate logic for checks
             if (purchaseOrder.PaymentMethod == PaymentMethod.Check || req.PaymentMethod == PaymentMethod.Check)

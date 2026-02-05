@@ -76,6 +76,15 @@ public sealed class PurchaseOrdersController : Controller
         return RedirectToAction(nameof(Details), new { id });
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Cancel(long id, CancellationToken cancellationToken)
+    {
+        var user = GetUserContext();
+        await _orders.CancelAsync(id, user, cancellationToken);
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
     private UserContext GetUserContext()
     {
         var userId = User?.Identity?.Name ?? "system";

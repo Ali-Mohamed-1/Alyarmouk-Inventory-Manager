@@ -198,7 +198,7 @@
                 container.innerHTML = `
                     <!-- Row 1: Key Metrics -->
                     <div class="row g-4 mb-5">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="p-4 border border-white border-opacity-10 rounded h-100" style="background: rgba(255, 255, 255, 0.05);">
                                 <div class="small text-uppercase opacity-50 mb-2">NET SALES REVENUE</div>
                                 <div class="h3 fw-bold mb-0 text-white">$${formatMoney(data.salesProfit)}</div>
@@ -206,10 +206,17 @@
                             </div>
                         </div>
                         
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="p-4 border border-white border-opacity-10 rounded h-100" style="background: rgba(255, 255, 255, 0.05);">
                                 <div class="small text-uppercase opacity-50 mb-2">Gross Profit</div>
                                 <div class="h3 fw-bold mb-0 text-white">$${formatMoney(data.grossProfit)}</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-2">
+                            <div class="p-4 border border-white border-opacity-10 rounded h-100" style="background: rgba(255, 255, 255, 0.05);">
+                                <div class="small text-uppercase opacity-50 mb-2">Profit Margin</div>
+                                <div class="h3 fw-bold mb-0 text-white">${margin}%</div>
                             </div>
                         </div>
 
@@ -222,9 +229,10 @@
                         </div>
 
                         <div class="col-md-3">
-                            <div class="p-4 border border-white border-opacity-10 rounded h-100" style="background: rgba(255, 255, 255, 0.05);">
-                                <div class="small text-uppercase opacity-50 mb-2">Profit Margin</div>
-                                <div class="h3 fw-bold mb-0 text-white">${margin}%</div>
+                            <div class="p-4 border border-primary border-2 rounded h-100 shadow-sm" style="background: rgba(13, 110, 253, 0.15);">
+                                <div class="text-uppercase fw-black text-primary small mb-2">BANK BALANCE</div>
+                                <div class="h2 fw-black text-white mb-0">$${formatMoney(data.bankBalance)}</div>
+                                <small class="opacity-50" style="font-size: 0.65rem;">Base: $100</small>
                             </div>
                         </div>
                     </div>
@@ -237,16 +245,22 @@
                         <div class="col-lg-6">
                             <h6 class="text-uppercase fw-black mb-4 opacity-50 small letter-spacing-1">PROFIT BREAKDOWN</h6>
                             <div class="row g-4">
-                                <div class="col-6">
+                                <div class="col-4">
                                     <div class="p-3 border-start border-3 border-white border-opacity-10">
                                         <div class="small text-uppercase opacity-50 mb-1">Cost of Goods (COGS)</div>
                                         <div class="h4 fw-bold text-white mb-0">$${formatMoney(data.costOfGoods)}</div>
                                     </div>
                                 </div>
-                                <div class="col-6">
+                                <div class="col-4">
                                     <div class="p-3 border-start border-3 border-white border-opacity-10">
                                         <div class="small text-uppercase opacity-50 mb-1">Internal Expenses</div>
                                         <div class="h4 fw-bold text-white mb-0">$${formatMoney(data.internalExpenses)}</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="p-3 border-start border-3 border-warning border-opacity-50">
+                                        <div class="small text-uppercase text-warning mb-1">Purchase Payments</div>
+                                        <div class="h4 fw-bold text-white mb-0">$${formatMoney(data.purchasePayments)}</div>
                                     </div>
                                 </div>
                             </div>

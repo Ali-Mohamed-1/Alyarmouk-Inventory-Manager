@@ -85,6 +85,16 @@ namespace Inventory.Application.DTOs.Reporting
         /// Expressed as a percentage (0-100).
         /// </summary>
         public decimal ProfitMargin { get; set; }
+
+        /// <summary>
+        /// Total payments made for purchase orders in the period.
+        /// </summary>
+        public decimal PurchasePayments { get; set; }
+
+        /// <summary>
+        /// Running bank balance: Base + Sales Revenue - Purchase Payments - VAT - Manufacturing Tax.
+        /// </summary>
+        public decimal BankBalance { get; set; }
     }
 
     /// <summary>

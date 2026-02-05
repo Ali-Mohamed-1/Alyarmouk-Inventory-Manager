@@ -324,7 +324,6 @@
                     <select class="form-select fw-black text-center" id="soUpdateStatusSelect">
                         <option value="0">PENDING</option>
                         <option value="1">DONE</option>
-                        <option value="2">CANCELLED</option>
                     </select>
                 </div>
             </div>
@@ -521,7 +520,6 @@
                 <select class="form-select fw-black mb-0 text-center" id="poNewOrderStatus">
                     <option value="0">PENDING</option>
                     <option value="1">RECEIVED</option>
-                    <option value="2">CANCELLED</option>
                 </select>
             </div>
             <div class="modal-footer">
@@ -754,21 +752,55 @@
             };
             
             const getSoStatusBadge = (s) => {
-                if(s===1) return '<span class="badge neo-btn-success">DONE</span>';
-                if(s===2) return '<span class="badge neo-btn-danger text-white">CANCELLED</span>';
+                if (s === 1) return '<span class="badge neo-btn-success">DONE</span>';
+                if (s === 2) return '<span class="badge neo-btn-danger text-white">CANCELLED</span>';
                 return '<span class="badge neo-btn-info">PENDING</span>';
             };
             
             const getPoStatusBadge = (s) => {
-                if(s===1) return '<span class="badge neo-btn-success">RECEIVED</span>';
-                if(s===2) return '<span class="badge neo-btn-danger text-white">CANCELLED</span>';
+                if (s === 1) return '<span class="badge neo-btn-success">RECEIVED</span>';
+                if (s === 2) return '<span class="badge neo-btn-danger text-white">CANCELLED</span>';
                 return '<span class="badge neo-btn-warning">PENDING</span>';
             };
 
             const getPaymentBadge = (s) => {
-                if(s===1) return '<span class="badge neo-btn-success">PAID</span>';
-                if(s===2) return '<span class="badge neo-btn-warning">PARTIAL</span>';
+                if (s === 1) return '<span class="badge neo-btn-success">PAID</span>';
+                if (s === 2) return '<span class="badge neo-btn-warning">PARTIAL</span>';
                 return '<span class="badge neo-btn-danger text-white">UNPAID</span>';
+            };
+
+            const canCancelSalesOrder = (o) => {
+                if (o.status === 2) return false; // Already cancelled
+
+                const paymentClear = (o.paidAmount || 0) === 0 && o.paymentStatus === 0;
+
+                let stockClear = true;
+                if (o.status === 1) { // Done
+                    const remainingStock = (o.lines || []).reduce((sum, l) => {
+                        const refunded = l.refundedQuantity || 0;
+                        return sum + (l.quantity - refunded);
+                    }, 0);
+                    stockClear = remainingStock === 0;
+                }
+
+                return paymentClear && stockClear;
+            };
+
+            const canCancelPurchaseOrder = (o) => {
+                if (o.status === 2) return false; // Already cancelled
+
+                const paymentClear = (o.paidAmount || 0) === 0 && o.paymentStatus === 0; // Unpaid
+
+                let stockClear = true;
+                if (o.status === 1) { // Received
+                    const remainingStock = (o.lines || []).reduce((sum, l) => {
+                        const refunded = l.refundedQuantity || 0;
+                        return sum + (l.quantity - refunded);
+                    }, 0);
+                    stockClear = remainingStock === 0;
+                }
+
+                return paymentClear && stockClear;
             };
 
             const getInvTypeBadge = (t) => {
@@ -841,10 +873,14 @@
                     // Actions Container
                     const actionsHtml = [];
                     if (o.status === 1) { // Done
-                         actionsHtml.push(`<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openSoRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>`);
+                        actionsHtml.push(`<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openSoRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>`);
                     }
-                    if (o.status === 0) { // Pending
-                         actionsHtml.push(`<button class="neo-btn neo-btn-warning btn-sm p-1 px-2" onclick="openSoCancelModal(${o.id})">CANCEL</button>`);
+                    if (o.status !== 2) { // Not cancelled
+                        const canCancel = canCancelSalesOrder(o);
+                        const tooltip = canCancel
+                            ? 'Cancel this order (no automatic refunds will occur).'
+                            : 'You must fully refund stock and money before cancelling this order.';
+                        actionsHtml.push(`<button class="neo-btn neo-btn-warning btn-sm p-1 px-2" onclick="openSoCancelModal(${o.id})" ${canCancel ? '' : 'disabled'} title="${tooltip}">CANCEL</button>`);
                     }
                     document.getElementById('so-actions-container').innerHTML = actionsHtml.join('');
                     
@@ -926,7 +962,14 @@
                     // PO Actions
                     const poActionsHtml = [];
                     if (o.status === 1) { // Received
-                         poActionsHtml.push(`<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openPoRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>`);
+                        poActionsHtml.push(`<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openPoRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>`);
+                    }
+                    if (o.status !== 2) { // Not cancelled
+                        const canCancelPo = canCancelPurchaseOrder(o);
+                        const tooltipPo = canCancelPo
+                            ? 'Cancel this order (no automatic refunds will occur).'
+                            : 'You must fully refund stock and money before cancelling this order.';
+                        poActionsHtml.push(`<button class="neo-btn neo-btn-warning btn-sm p-1 px-2" onclick="cancelPo(${o.id})" ${canCancelPo ? '' : 'disabled'} title="${tooltipPo}">CANCEL</button>`);
                     }
                     document.getElementById('po-actions-container').innerHTML = poActionsHtml.join('');
 
@@ -1082,49 +1125,16 @@
                 const od = parseInt(document.getElementById('soCancelOrderId').value);
                 try {
                     const ft = document.querySelector('[name="__RequestVerificationToken"]').value;
-                    const fd = new FormData(); fd.append('__RequestVerificationToken', ft); fd.append('OrderId', od); fd.append('Status', 3); // 3 for Cancelled? Check enums. 2 is Cancelled in badges?
-                    // Review Badge logic: 2 is Cancelled.
-                    // Wait, previous file said Status='3' for cancel in create.cshtml?
-                    // Let's check Customers/Index.cshtml... it sent Status '3' in cancelOrder.
-                    // But badge logic says if(s===2) return 'CANCELLED'.
-                    // Discrepancy? No, maybe enum has different mapping. 
-                    // I will stick to sending '3' if that's what was there, 
-                    // BUT checking badge logic: s===2 is Cancelled. 
-                    // Let's use 2. Wait, Customer/Index Step 118 Line 766 sends Status '3'.
-                    // But Line 433 checks if(s===2) { txt='CANCELLED' }.
-                    // This implies the backend maps 3 to 2, or there's a disconnect.
-                    // However, I must follow existing working code. I will send 3.
-                    
-                    // Actually, re-reading Customer/Index:
-                    // window.cancelOrder sends Status: '3'.
-                    // window.updateOrderStatus sends value from select which has 0,1,2.
-                    // This is confusing. 
-                    // ISalesOrderServices.UpdateStatusAsync takes req.
-                    // Let's assume sending '2' (Cancelled) is safe if the select has it.
-                    // But the specific Cancel Modal sent '3'.
-                    // I'll send '2' to match the select option Value=2 (CANCELLED).
-                    
-                    // Wait! The Customer Activity `updateOrderStatus` select has:
-                    // 0 PENDING, 1 DONE, 2 CANCELLED.
-                    // So I will send 2.
-                    
-                    const r = await fetch(`/SalesOrders/UpdateStatus?id=${od}`, { method: 'POST', body: fd }); 
-                     // Wait, body needs proper wrapping. 
-                    // Re-checking Customers/Index:
-                    // fd.append('Status', '3') was used in specific Cancel modal.
-                    // fd.append('Status', ns) where ns came from select 0-2.
-                    
-                    // Logic: If I send 2, it should work.
-                    
-                    const r2 = await fetch(`/SalesOrders/UpdateStatus?id=${od}`, { 
-                         method: 'POST', 
-                         body: new URLSearchParams({ '__RequestVerificationToken': ft, 'OrderId': od, 'Status': 2 }) 
-                    });
-
-                    if (!r2.ok) throw new Error();
+                    const fd = new FormData(); 
+                    fd.append('__RequestVerificationToken', ft);
+                    const r = await fetch(`/SalesOrders/Cancel?id=${od}`, { method: 'POST', body: fd });
+                    if (!r.ok) {
+                        const msg = await r.text();
+                        throw new Error(msg || 'Cancellation failed.');
+                    }
                     bootstrap.Modal.getInstance(document.getElementById('soCancelModal')).hide();
                     await viewSoDetails(od); loadSalesOrders();
-                } catch (e) { alert('Kill failed'); }
+                } catch (e) { alert(e.message || 'Cancellation failed'); }
             };
 
             window.openSoRefundModal = (id, num, tot, ref) => {
@@ -1290,6 +1300,23 @@
                     bootstrap.Modal.getInstance(document.getElementById('poRefundModal')).hide(); 
                     viewPoDetails(id); loadPurchaseOrders();
                 } catch(e) { alert("Refund processing failed"); }
+            };
+
+            window.cancelPo = async (id) => {
+                if (!confirm('PROCEED WITH CANCELLATION?')) return;
+                try {
+                    const r = await fetch(`/api/purchase-orders/${id}/cancel`, {
+                        method: 'POST'
+                    });
+                    if (!r.ok) {
+                        const msg = await r.text();
+                        throw new Error(msg || 'Cancellation failed.');
+                    }
+                    await viewPoDetails(id); 
+                    loadPurchaseOrders();
+                } catch (e) {
+                    alert(e.message || 'Cancellation failed');
+                }
             };
 
             window.switchPoView = (v) => {

@@ -391,7 +391,6 @@
                 <select class="form-select fw-black mb-0 text-center" id="newOrderStatus">
                     <option value="0">PENDING</option>
                     <option value="1">RECEIVED</option>
-                    <option value="2">CANCELLED</option>
                 </select>
             </div>
             <div class="modal-footer">
@@ -554,6 +553,23 @@
                 return `<span class="badge ${cls}">${txt}</span>`;
             };
 
+            const canCancelPurchaseOrder = (o) => {
+                if (o.status === 2) return false; // Already cancelled
+
+                const paymentClear = (o.paidAmount || 0) === 0 && o.paymentStatus === 0; // Unpaid
+
+                let stockClear = true;
+                if (o.status === 1) { // Received
+                    const remainingStock = (o.lines || []).reduce((sum, l) => {
+                        const refunded = l.refundedQuantity || 0;
+                        return sum + (l.quantity - refunded);
+                    }, 0);
+                    stockClear = remainingStock === 0;
+                }
+
+                return paymentClear && stockClear;
+            };
+
             async function init() {
                 await loadSuppliers();
             }
@@ -623,7 +639,12 @@
 
                     const tbody = document.getElementById('orders-table-body');
                     if(!orders.length) tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 fw-bold">NO ORDERS IN LOG.</td></tr>';
-                    else tbody.innerHTML = orders.map(o => `
+                    else tbody.innerHTML = orders.map(o => {
+                        const canCancel = canCancelPurchaseOrder(o);
+                        const cancelTooltip = canCancel
+                            ? 'Cancel this order (no automatic refunds will occur).'
+                            : 'You must fully refund stock and money before cancelling this order.';
+                        return `
                         <tr>
                             <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
                             <td class="small fw-bold">${formatDate(o.createdUtc)}</td>
@@ -634,11 +655,13 @@
                             <td class="text-end">
                                 <div class="d-flex gap-1 justify-content-end">
                                     ${(o.status===1 || o.paymentStatus===1) ? `<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>`:''}
+                                    ${o.status !== 2 ? `<button class="neo-btn neo-btn-warning btn-sm p-1 px-2" onclick="cancelSupplierOrder(${o.id})" ${canCancel ? '' : 'disabled'} title="${cancelTooltip}">CANCEL</button>` : ''}
                                     <button class="neo-btn neo-btn-info btn-sm p-1 px-2" onclick="loadOrderDetails(${o.id})">DETAILS</button>
                                 </div>
                             </td>
                         </tr>
-                    `).join('');
+                    `;
+                    }).join('');
 
                     const pGrid = document.getElementById('products-grid');
                     if(!products.length) pGrid.innerHTML = '<div class="col-12 text-center py-5 fw-bold text-muted">NO ASSOCIATED PRODUCTS.</div>';
@@ -704,6 +727,24 @@
                         </tr>
                     `).join('');
                 } catch(e) { alert("Load Failed"); switchView('list'); }
+            };
+
+            window.cancelSupplierOrder = async (id) => {
+                if (!confirm('PROCEED WITH CANCELLATION?')) return;
+                try {
+                    const r = await fetch(`/api/purchase-orders/${id}/cancel`, {
+                        method: 'POST'
+                    });
+                    if (!r.ok) {
+                        const msg = await r.text();
+                        throw new Error(msg || 'Cancellation failed.');
+                    }
+                    if (currentSupplierId) {
+                        await viewHistory(currentSupplierId);
+                    }
+                } catch (e) {
+                    alert(e.message || 'Cancellation failed');
+                }
             };
 
             function renderDocumentActions(iPath, rPath) {

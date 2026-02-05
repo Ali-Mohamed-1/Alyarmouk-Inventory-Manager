@@ -49,6 +49,14 @@ public class PurchaseOrdersApiController : ControllerBase
         return Ok();
     }
 
+    [HttpPost("{id}/cancel")]
+    public async Task<IActionResult> Cancel(long id, CancellationToken ct)
+    {
+        var user = GetUserContext();
+        await _purchaseOrderServices.CancelAsync(id, user, ct);
+        return Ok();
+    }
+
     [HttpPut("{id}/payment-deadline")]
     public async Task<IActionResult> UpdatePaymentDeadline(long id, [FromBody] DateTimeOffset? newDeadline, CancellationToken ct)
     {

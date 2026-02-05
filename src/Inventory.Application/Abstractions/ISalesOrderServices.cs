@@ -32,6 +32,13 @@ namespace Inventory.Application.Abstractions
         Task CompleteOrderAsync(long orderId, UserContext user, CancellationToken ct = default);
 
         /// <summary>
+        /// Cancels a sales order.
+        /// Does NOT perform any automatic stock or payment refunds.
+        /// Cancellation is only allowed when all refunds have been processed manually.
+        /// </summary>
+        Task CancelAsync(long orderId, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
         /// Updates the status of a sales order
         /// </summary>
         Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default);

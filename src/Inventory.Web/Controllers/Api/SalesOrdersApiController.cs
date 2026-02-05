@@ -178,6 +178,14 @@ public class SalesOrdersApiController : ControllerBase
         return Ok();
     }
 
+    [HttpPost("{id}/cancel")]
+    public async Task<IActionResult> Cancel(long id, CancellationToken ct)
+    {
+        var user = GetUserContext();
+        await _salesOrderServices.CancelAsync(id, user, ct);
+        return Ok();
+    }
+
     [HttpPost("{id}/payments")]
     public async Task<IActionResult> AddPayment(long id, [FromBody] Inventory.Application.DTOs.Payment.CreatePaymentRequest request, CancellationToken ct)
     {

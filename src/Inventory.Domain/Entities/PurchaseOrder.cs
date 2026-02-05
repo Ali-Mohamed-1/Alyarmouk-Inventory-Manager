@@ -62,7 +62,7 @@ public class PurchaseOrder
         if (remaining == 0 && TotalAmount > 0)
         {
             PaymentStatus = PurchasePaymentStatus.Paid;
-        }
+        } 
         else if (netPaid > 0)
         {
             PaymentStatus = PurchasePaymentStatus.PartiallyPaid;
