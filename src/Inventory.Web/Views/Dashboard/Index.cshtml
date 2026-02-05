@@ -517,6 +517,8 @@
                                     <tr>
                                         <th>BATCH #</th>
                                         <th class="text-end">ON HAND</th>
+                                        <th class="text-end">RESERVED</th>
+                                        <th class="text-end">AVAILABLE</th>
                                         <th class="text-end">COST</th>
                                         <th class="text-end">PRICE</th>
                                         <th>LAST MOVEMENT</th>
@@ -529,10 +531,12 @@
                                         <tr data-batch="${escapeHtml(b.batchNumber)}" data-rowversion="${escapeHtml(b.rowVersion || '')}">
                                             <td class="fw-bold">${escapeHtml(b.batchNumber)}</td>
                                             <td class="text-end">${formatNumber(b.onHand)}</td>
+                                            <td class="text-end text-muted">${formatNumber(b.reserved)}</td>
+                                            <td class="text-end fw-bold text-primary">${formatNumber(b.available)}</td>
                                             <td class="text-end fw-bold text-success">${b.unitCost == null ? '-' : formatNumber(b.unitCost)}</td>
                                             <td class="text-end fw-bold text-primary">${b.unitPrice == null ? '-' : formatNumber(b.unitPrice)}</td>
                                             <td>${b.lastMovementUtc ? formatDate(b.lastMovementUtc) : '-'}</td>
-                                            <td class="text-truncate" style="max-width: 300px;">${escapeHtml(b.notes || '')}</td>
+                                            <td class="text-truncate" style="max-width: 250px;">${escapeHtml(b.notes || '')}</td>
                                             <td class="text-end">
                                                 <button type="button" class="neo-btn btn-sm btn-edit-batch"
                                                         data-product-id="${productId}"

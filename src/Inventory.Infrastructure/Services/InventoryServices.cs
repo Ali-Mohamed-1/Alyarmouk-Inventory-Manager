@@ -215,6 +215,69 @@ namespace Inventory.Infrastructure.Services
             await _db.SaveChangesAsync(ct);
         }
 
+        public async Task ReserveSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default)
+        {
+            var order = await _db.SalesOrders
+                .Include(o => o.Lines)
+                .FirstOrDefaultAsync(o => o.Id == salesOrderId, ct);
+            if (order == null) throw new NotFoundException($"Sales order {salesOrderId} not found.");
+
+            foreach (var line in order.Lines)
+            {
+                var batchNumber = (line.BatchNumber ?? "").Trim();
+                ProductBatch? batch = null;
+
+                if (line.ProductBatchId.HasValue && line.ProductBatchId.Value > 0)
+                {
+                    batch = await _db.ProductBatches.FindAsync(new object[] { line.ProductBatchId.Value }, ct);
+                }
+                
+                if (batch == null)
+                {
+                    batch = await _db.ProductBatches.FirstOrDefaultAsync(b => b.ProductId == line.ProductId && b.BatchNumber == batchNumber, ct);
+                }
+
+                if (batch == null)
+                {
+                    batch = new ProductBatch
+                    {
+                        ProductId = line.ProductId,
+                        BatchNumber = batchNumber,
+                        OnHand = 0,
+                        Reserved = 0
+                    };
+                    _db.ProductBatches.Add(batch);
+                    await _db.SaveChangesAsync(ct); // To get the ID
+                }
+
+                batch.Reserved += line.Quantity;
+                line.ProductBatchId = batch.Id;
+            }
+            await _db.SaveChangesAsync(ct);
+        }
+
+        public async Task ReleaseSalesOrderReservationAsync(long salesOrderId, UserContext user, CancellationToken ct = default)
+        {
+            var order = await _db.SalesOrders
+                .Include(o => o.Lines)
+                .FirstOrDefaultAsync(o => o.Id == salesOrderId, ct);
+            if (order == null) throw new NotFoundException($"Sales order {salesOrderId} not found.");
+
+            foreach (var line in order.Lines)
+            {
+                if (line.ProductBatchId.HasValue)
+                {
+                    var batch = await _db.ProductBatches.FindAsync(new object[] { line.ProductBatchId.Value }, ct);
+                    if (batch != null)
+                    {
+                        batch.Reserved -= line.Quantity;
+                        if (batch.Reserved < 0) batch.Reserved = 0;
+                    }
+                }
+            }
+            await _db.SaveChangesAsync(ct);
+        }
+
         public async Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default)
         {
             var order = await _db.SalesOrders
@@ -224,6 +287,17 @@ namespace Inventory.Infrastructure.Services
 
             foreach (var line in order.Lines)
             {
+                // Release reservation first
+                if (line.ProductBatchId.HasValue)
+                {
+                    var batch = await _db.ProductBatches.FindAsync(new object[] { line.ProductBatchId.Value }, ct);
+                    if (batch != null)
+                    {
+                        batch.Reserved -= line.Quantity;
+                        if (batch.Reserved < 0) batch.Reserved = 0;
+                    }
+                }
+
                 var txReq = new CreateInventoryTransactionRequest
                 {
                     ProductId = line.ProductId,
@@ -262,6 +336,16 @@ namespace Inventory.Infrastructure.Services
                 };
 
                 await _transactionServices.CreateAsync(txReq, user, ct);
+
+                // Re-reserve the stock
+                if (line.ProductBatchId.HasValue)
+                {
+                    var batch = await _db.ProductBatches.FindAsync(new object[] { line.ProductBatchId.Value }, ct);
+                    if (batch != null)
+                    {
+                        batch.Reserved += line.Quantity;
+                    }
+                }
             }
 
             await _db.SaveChangesAsync(ct);

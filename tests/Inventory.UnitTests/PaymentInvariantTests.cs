@@ -296,6 +296,8 @@ namespace Inventory.UnitTests
             public Task ReversePurchaseOrderStockAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
             public Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
             public Task ReverseSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task ReserveSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task ReleaseSalesOrderReservationAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
         }
 
         public class CapturingFinancialServices : IFinancialServices

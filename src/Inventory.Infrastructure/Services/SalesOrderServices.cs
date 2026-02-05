@@ -325,6 +325,12 @@ namespace Inventory.Infrastructure.Services
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
+                // 2. Reserve stock if order is Pending (Done is handled by inventory processing already if requested)
+                if (salesOrder.Status == SalesOrderStatus.Pending)
+                {
+                    await _inventoryServices.ReserveSalesOrderStockAsync(salesOrder.Id, user, ct);
+                }
+
                 return salesOrder.Id;
             }
             catch (DbUpdateException ex)
@@ -677,6 +683,13 @@ namespace Inventory.Infrastructure.Services
                     ct);
 
                 await _db.SaveChangesAsync(ct);
+
+                // Release reservations if it was Pending
+                if (previousStatus == SalesOrderStatus.Pending)
+                {
+                    await _inventoryServices.ReleaseSalesOrderReservationAsync(order.Id, user, ct);
+                }
+
                 await transaction.CommitAsync(ct);
             }
             catch (Exception ex)

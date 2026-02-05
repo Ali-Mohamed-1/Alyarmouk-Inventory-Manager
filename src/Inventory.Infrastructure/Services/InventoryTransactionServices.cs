@@ -73,65 +73,77 @@ namespace Inventory.Infrastructure.Services
             
             try
             {
-                // Load or create stock snapshot
+                // 1. Ensure Product exists (already checked above, but keeping for consistency with provided snippet structure)
+                // var productExists = await _db.Products.AnyAsync(p => p.Id == req.ProductId, ct);
+                // if (!productExists)
+                //     throw new NotFoundException($"Product id {req.ProductId} was not found.");
+
+                // 2. Load or create StockSnapshot (mostly for RowVersion/existence)
                 var snapshot = await _db.StockSnapshots
                     .FirstOrDefaultAsync(s => s.ProductId == req.ProductId, ct);
 
                 if (snapshot is null)
                 {
-                    snapshot = new StockSnapshot
-                    {
-                        ProductId = req.ProductId,
-                        OnHand = 0
-                    };
+                    snapshot = new StockSnapshot { ProductId = req.ProductId, OnHand = 0 }; // Initialize OnHand
                     _db.StockSnapshots.Add(snapshot);
                 }
 
-                // For Issue transactions, ensure we have enough stock
-                if (req.Type == InventoryTransactionType.Issue)
+                // 3. Ensure ProductBatch exists
+                var batchNumber = (req.BatchNumber ?? "").Trim();
+                ProductBatch? batch = null;
+
+                if (req.ProductBatchId.HasValue && req.ProductBatchId.Value > 0)
                 {
-                    if (snapshot.OnHand + quantityDelta < 0)
-                        throw new ValidationException($"Insufficient stock. Available: {snapshot.OnHand}, Requested: {req.Quantity}");
+                    batch = await _db.ProductBatches.FindAsync(new object[] { req.ProductBatchId.Value }, ct);
+                }
+                
+                if (batch == null)
+                {
+                    batch = await _db.ProductBatches.FirstOrDefaultAsync(b => b.ProductId == req.ProductId && b.BatchNumber == batchNumber, ct);
                 }
 
-                // Update stock snapshot
-                snapshot.OnHand += quantityDelta;
+                if (batch == null)
+                {
+                    batch = new ProductBatch
+                    {
+                        ProductId = req.ProductId,
+                        BatchNumber = batchNumber,
+                        OnHand = 0,
+                        Reserved = 0
+                    };
+                    _db.ProductBatches.Add(batch);
+                    // No need to SaveChanges here, it will be saved with the transaction and other entities
+                }
 
-                // Get product cost for financial tracking
-                decimal? unitCost = null; // Cost should come from batch or manual input (future improvement)
+                // 4. Validation
+                if (req.Type == InventoryTransactionType.Issue)
+                {
+                    if (batch.OnHand + quantityDelta < 0)
+                        throw new ValidationException($"Insufficient stock in batch '{batchNumber}'. Available: {batch.OnHand}, Requested: {req.Quantity}");
+                }
 
-                // Create inventory transaction
+                // 5. Create transaction
                 var inventoryTransaction = new InventoryTransaction
                 {
                     ProductId = req.ProductId,
                     QuantityDelta = quantityDelta,
-                    UnitCost = unitCost,
+                    UnitCost = null, // Derived from batch logic elsewhere or added later
                     Type = req.Type,
-                    BatchNumber = req.BatchNumber,
+                    BatchNumber = batchNumber,
+                    ProductBatchId = batch.Id,
+                    Note = req.Note,
                     TimestampUtc = DateTimeOffset.UtcNow,
                     UserId = user.UserId,
                     UserDisplayName = user.UserDisplayName,
-                    clientId = req.CustomerId ?? 0,
-                    ProductBatchId = req.ProductBatchId,
-                    Note = req.Note
+                    clientId = req.CustomerId ?? 0
                 };
 
-                // Update ProductBatch OnHand if applicable
-                if (req.ProductBatchId.HasValue && req.ProductBatchId.Value > 0)
-                {
-                    var batch = await _db.ProductBatches.FindAsync(new object[] { req.ProductBatchId.Value }, ct);
-                    if (batch != null)
-                    {
-                        batch.OnHand += quantityDelta;
-                    }
-                }
+                // Update batch OnHand
+                batch.OnHand += quantityDelta;
 
                 _db.InventoryTransactions.Add(inventoryTransaction);
-                await _db.SaveChangesAsync(ct); // Save to get the ID
+                await _db.SaveChangesAsync(ct); 
 
-                await _db.SaveChangesAsync(ct);
-
-                // AUDIT LOG: Record the transaction creation
                 await _auditWriter.LogCreateAsync<InventoryTransaction>(
                     inventoryTransaction.Id,
                     user,

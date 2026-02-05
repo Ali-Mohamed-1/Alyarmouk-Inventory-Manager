@@ -7,6 +7,8 @@ public sealed record ProductBatchResponseDto
     public bool IsUnbatched { get; init; }
 
     public decimal OnHand { get; init; }
+    public decimal Reserved { get; init; }
+    public decimal Available { get; init; }
     public decimal? UnitCost { get; init; }
     public decimal? UnitPrice { get; init; }
 

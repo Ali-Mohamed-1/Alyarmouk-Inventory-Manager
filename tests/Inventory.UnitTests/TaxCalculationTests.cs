@@ -1,6 +1,7 @@
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading;
     using System.Threading.Tasks;
     using Inventory.Application.DTOs;
     using Inventory.Application.DTOs.PurchaseOrder;
@@ -461,6 +462,8 @@
             public Task ReverseSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
             public Task RefundSalesOrderStockAsync(long salesOrderId, List<RefundLineItem> lines, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
             public Task RefundPurchaseOrderStockAsync(long purchaseOrderId, List<RefundPurchaseLineItem> lines, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task ReserveSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+            public Task ReleaseSalesOrderReservationAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
         }
 
         public class MockFinancialServices : IFinancialServices
