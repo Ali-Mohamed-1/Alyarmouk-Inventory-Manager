@@ -72,10 +72,11 @@
         }
 
         function viewOrder(type, id) {
+            const returnUrl = encodeURIComponent(window.location.pathname);
             if (type === 'Sales') {
-                window.location.href = `/SalesOrders/Details/${id}`;
+                window.location.href = `/SalesOrders/Details/${id}?returnUrl=${returnUrl}`;
             } else {
-                window.location.href = `/PurchaseOrders/Details/${id}`;
+                window.location.href = `/PurchaseOrders/Details/${id}?returnUrl=${returnUrl}`;
             }
         }
 

@@ -1,6 +1,7 @@
 @model Inventory.Application.DTOs.PurchaseOrderResponse
 @{
     ViewData["Title"] = $"PO {Model.OrderNumber}";
+    var returnUrl = Context.Request.Query["returnUrl"].ToString();
 }
 
 <style>
@@ -37,7 +38,14 @@
             <p class="fw-bold text-danger mb-0">DEADLINE: @(Model.PaymentDeadline.HasValue ? Model.PaymentDeadline.Value.ToLocalTime().ToString("f").ToUpper() : "N/A")</p>
         </div>
         <div class="d-flex gap-2">
-            <a asp-controller="PurchaseOrders" asp-action="Index" class="neo-btn">BACK TO LOG</a>
+            @if (!string.IsNullOrEmpty(returnUrl))
+            {
+                <a href="@returnUrl" class="neo-btn">Back</a>
+            }
+            else
+            {
+                <a asp-controller="PurchaseOrders" asp-action="Index" class="neo-btn">Back</a>
+            }
             <button class="neo-btn neo-btn-primary" onclick="window.print()">PRINT HARDCOPY</button>
         </div>
     </div>

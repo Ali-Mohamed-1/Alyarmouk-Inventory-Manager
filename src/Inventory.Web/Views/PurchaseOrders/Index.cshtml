@@ -32,7 +32,7 @@
                             <td class="small fw-bold">@item.CreatedUtc.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
                             <td class="text-end fw-black text-primary">@item.TotalAmount.ToString("C2")</td>
                             <td class="text-end pe-4">
-                                <a asp-controller="Suppliers" asp-action="Index" class="neo-btn btn-sm">VIEW VIA SUPPLIER</a>
+                                <a asp-action="Details" asp-route-id="@item.Id" class="neo-btn btn-sm">VIEW</a>
                             </td>
                         </tr>
                     }
