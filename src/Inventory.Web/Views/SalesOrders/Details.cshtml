@@ -266,6 +266,26 @@
                                  <button class="neo-btn neo-btn-success w-100 py-2 no-print" disabled>FULLY PAID</button>
                              }
                         </div>
+                        @{
+                            var canRefundMoney = Model.Status != Inventory.Domain.Entities.SalesOrderStatus.Cancelled && 
+                                (Model.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.Paid || Model.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.PartiallyPaid) && 
+                                (Model.PaidAmount - Model.RefundedAmount) > 0;
+                            var canRefundStock = Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done && Model.Lines.Any(l => l.Quantity - l.RefundedQuantity > 0);
+                            var showRefundButton = canRefundMoney || canRefundStock;
+                            var refundTooltip = !showRefundButton
+                                ? "You must fully refund stock and money before cancelling this order."
+                                : (canRefundMoney && canRefundStock)
+                                    ? "Refund money and/or return products to stock."
+                                    : canRefundMoney
+                                        ? "Refund money to customer."
+                                        : "Return products to stock.";
+                        }
+                        @if (showRefundButton)
+                        {
+                            <div class="col-12 mt-2">
+                                <button class="neo-btn neo-btn-danger w-100 py-2 no-print" onclick="openRefundModal()" title="@refundTooltip">REFUND</button>
+                            </div>
+                        }
                         
                         <div class="col-12 mt-1">
                              <div class="d-flex justify-content-between small opacity-75">
@@ -363,6 +383,75 @@
     </div>
 </div>
 
+<!-- Refund Modal -->
+<div class="modal fade" id="refundOrderModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-black text-uppercase">Refund Sales Order</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="refundOrderId" value="@Model.Id" />
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        <label class="form-label fw-black text-uppercase small">Order Ref</label>
+                        <input type="text" class="form-control fw-bold bg-light" id="refundOrderNumber" value="@Model.OrderNumber" readonly />
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label fw-black text-uppercase small">Total</label>
+                        <input type="text" class="form-control fw-bold" id="refundOrderTotal" value="@Model.TotalAmount.ToString("N2")" readonly />
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label fw-black text-uppercase small text-success">Recovered</label>
+                        <input type="text" class="form-control fw-bold" id="refundOrderAlreadyRefunded" value="@Model.RefundedAmount.ToString("N2")" readonly />
+                    </div>
+                </div>
+
+                <div class="mb-4" id="refundStockSection">
+                    <h6 class="fw-black text-uppercase small mb-2 border-bottom border-2 pb-1">Product Returns (Stock Restoration)</h6>
+                    <div class="table-responsive neo-card p-0 mb-2" style="max-height: 250px; overflow-y: auto;">
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead class="table-dark text-white sticky-top">
+                                <tr>
+                                    <th>PRODUCT</th>
+                                    <th class="text-center">SOLD</th>
+                                    <th class="text-center">PREV. RET.</th>
+                                    <th class="text-center" style="width: 120px;">RETURN QTY</th>
+                                </tr>
+                            </thead>
+                            <tbody id="refund-lines-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="small fw-bold text-muted text-end"><i class="bi bi-info-circle me-1"></i> ENTER QUANTITIES TO RETURN TO STOCK.</div>
+                </div>
+
+                <div class="mb-4 pt-3 border-top border-2" id="refundMoneySection">
+                    <h6 class="fw-black text-uppercase small mb-2">Financial Reversal</h6>
+                    <div class="row align-items-end">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-muted">CASH AMOUNT TO REFUND</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-black text-white">$</span>
+                                <input type="number" class="form-control fw-black" id="refundAmount" step="0.01" value="0" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Reason Context</label>
+                    <textarea class="form-control" id="refundReason" rows="2" placeholder="Required for audit trail..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-danger" id="btn-execute-refund" onclick="processRefund()">EXECUTE REFUND</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Edit Due Date Modal -->
 <div class="modal fade" id="editDueDateModal" tabindex="-1">
     <div class="modal-dialog modal-sm">
@@ -418,7 +507,7 @@
                         <select class="form-select fw-black" id="paymentMethod">
                             @foreach (var method in Enum.GetValues<Inventory.Domain.Entities.PaymentMethod>())
                             {
-                                <option value="@method" selected="@(method == Model.PaymentMethod)">@method.ToString().ToUpper()</option>
+                                <option value="@((int)method)" selected="@(method == Model.PaymentMethod)">@method.ToString().ToUpper()</option>
                             }
                         </select>
                     </div>
@@ -533,6 +622,109 @@
         function openEditPaymentInfoModal() {
             toggleEditPaymentFields();
             new bootstrap.Modal(document.getElementById('editPaymentInfoModal')).show();
+        }
+
+        function escapeHtml(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        function openRefundModal() {
+            const id = @Model.Id;
+            document.getElementById('refundOrderId').value = id;
+            document.getElementById('refundOrderNumber').value = '@Model.OrderNumber';
+            document.getElementById('refundOrderTotal').value = '@Model.TotalAmount.ToString("N2")';
+            document.getElementById('refundOrderAlreadyRefunded').value = '@Model.RefundedAmount.ToString("N2")';
+            document.getElementById('refundAmount').value = '';
+            document.getElementById('refundReason').value = '';
+
+            const tbody = document.getElementById('refund-lines-body');
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></td></tr>';
+            new bootstrap.Modal(document.getElementById('refundOrderModal')).show();
+
+            fetch(`/api/sales-orders/${id}`)
+                .then(r => r.ok ? r.json() : Promise.reject())
+                .then(o => {
+                    const canRefundStock = (o.status === 1 || o.status === "Done");
+                    const canRefundMoney = (o.paymentStatus === 1 || o.paymentStatus === "Paid" || o.paymentStatus === 2 || o.paymentStatus === "PartiallyPaid");
+                    const remainingRefundableAmount = o.totalAmount - (o.refundedAmount || 0);
+                    const moneyFullyRefunded = remainingRefundableAmount <= 0;
+
+                    document.getElementById('refundMoneySection').style.display = (!canRefundMoney || moneyFullyRefunded) ? 'none' : 'block';
+                    document.getElementById('refundStockSection').style.display = !canRefundStock ? 'none' : 'block';
+
+                    const amountInput = document.getElementById('refundAmount');
+                    if (!canRefundMoney || moneyFullyRefunded) {
+                        amountInput.disabled = true;
+                        amountInput.placeholder = moneyFullyRefunded ? 'Fully refunded' : 'Payment not received';
+                    } else {
+                        amountInput.disabled = false;
+                        amountInput.placeholder = 'Max: ' + new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(remainingRefundableAmount);
+                        amountInput.max = remainingRefundableAmount;
+                    }
+
+                    tbody.innerHTML = (o.lines || []).map(l => {
+                        const remaining = l.quantity - (l.refundedQuantity || 0);
+                        const lineFullyRefunded = remaining <= 0;
+                        const disabled = (!canRefundStock || lineFullyRefunded) ? 'disabled' : '';
+                        const hint = lineFullyRefunded ? 'Fully returned' : (!canRefundStock ? 'Order not complete' : '');
+                        return `<tr>
+                            <td><div class="fw-black small text-uppercase">${escapeHtml(l.productName)}</div><div class="small text-muted">${l.batchNumber ? '<code>' + escapeHtml(l.batchNumber) + '</code>' : 'NO BATCH'}</div></td>
+                            <td class="text-center fw-bold">${l.quantity}</td>
+                            <td class="text-center text-muted">${l.refundedQuantity || 0}</td>
+                            <td class="text-center"><input type="number" class="form-control form-control-sm fw-black text-center refund-line-qty" data-line-id="${l.id}" data-batch-id="${l.productBatchId || ''}" data-batch-number="${l.batchNumber || ''}" min="0" max="${remaining}" value="" ${disabled} placeholder="${hint}" title="${hint}" style="border: 2px solid #000;"></td>
+                        </tr>`;
+                    }).join('');
+
+                    document.querySelectorAll('.refund-line-qty').forEach(input => { input.oninput = validateRefundForm; });
+                    document.getElementById('refundAmount').oninput = validateRefundForm;
+                    validateRefundForm();
+                })
+                .catch(() => { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger fw-bold">FAILED TO LOAD LINES</td></tr>'; });
+        }
+
+        function validateRefundForm() {
+            let amt = parseFloat(document.getElementById('refundAmount').value) || 0;
+            let hasLines = false;
+            document.querySelectorAll('.refund-line-qty').forEach(input => { if ((parseFloat(input.value) || 0) > 0) hasLines = true; });
+            const btn = document.getElementById('btn-execute-refund');
+            if (btn) btn.disabled = !(amt > 0 || hasLines);
+        }
+
+        async function processRefund() {
+            const id = parseInt(document.getElementById('refundOrderId').value);
+            const amt = parseFloat(document.getElementById('refundAmount').value) || 0;
+            const rsn = document.getElementById('refundReason').value;
+
+            const lines = [];
+            document.querySelectorAll('.refund-line-qty').forEach(input => {
+                const qty = parseFloat(input.value) || 0;
+                if (qty > 0) {
+                    const item = { salesOrderLineId: parseInt(input.dataset.lineId), quantity: qty };
+                    if (input.dataset.batchId) item.productBatchId = parseInt(input.dataset.batchId);
+                    if (input.dataset.batchNumber) item.batchNumber = input.dataset.batchNumber;
+                    lines.push(item);
+                }
+            });
+
+            if (amt <= 0 && lines.length === 0) { alert('Please specify a refund amount, returned products, or both.'); return; }
+
+            const payload = { orderId: id };
+            if (amt > 0) payload.amount = amt;
+            if (lines.length > 0) payload.lineItems = lines;
+            if (rsn && rsn.trim()) payload.reason = rsn.trim();
+
+            try {
+                const r = await fetch(`/api/sales-orders/${id}/refund`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value },
+                    body: JSON.stringify(payload)
+                });
+                if (!r.ok) {
+                    const errText = await r.text();
+                    try { const j = JSON.parse(errText); throw new Error(j.detail || j.title || errText); } catch (e) { if (e.message) throw e; throw new Error(errText); }
+                }
+                bootstrap.Modal.getInstance(document.getElementById('refundOrderModal')).hide();
+                alert('REFUND PROCESSED SUCCESSFULLY.');
+                location.reload();
+            } catch (e) { alert(e.message); }
         }
 
         function toggleEditPaymentFields() {

@@ -69,7 +69,7 @@ public sealed class SalesOrdersController : Controller
         }
 
         var user = GetUserContext();
-        await _orders.UpdateStatusAsync(id, model, user, cancellationToken);
+        await _orders.UpdateStatusAsync(id, model, user, ct: cancellationToken);
         return RedirectToAction(nameof(Details), new { id });
     }
 

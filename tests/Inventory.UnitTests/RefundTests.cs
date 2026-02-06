@@ -156,6 +156,87 @@ namespace Inventory.UnitTests
         }
 
         [Fact]
+        public async Task RefundMoney_WhenPaymentStatusNotPaid_Throws()
+        {
+            // Arrange: Order is Done but unpaid (no payment recorded)
+            var createReq = new CreateSalesOrderRequest
+            {
+                CustomerId = 1,
+                DueDate = DateTimeOffset.UtcNow.AddDays(1),
+                PaymentMethod = PaymentMethod.Cash,
+                PaymentStatus = PaymentStatus.Pending,
+                IsTaxInclusive = false,
+                ApplyVat = false,
+                ApplyManufacturingTax = false,
+                Lines = new List<CreateSalesOrderLineRequest> { new() { ProductId = 1, Quantity = 1, UnitPrice = 100 } }
+            };
+            var orderId = await _salesServices.CreateAsync(createReq, _user);
+            await _salesServices.UpdateStatusAsync(orderId, new UpdateSalesOrderStatusRequest { OrderId = orderId, Status = SalesOrderStatus.Done }, _user);
+            _db.ChangeTracker.Clear();
+
+            var req = new RefundSalesOrderRequest { OrderId = orderId, Amount = 50 };
+
+            var ex = await Assert.ThrowsAsync<ValidationException>(() => _salesServices.RefundAsync(req, _user));
+            Assert.Contains("payment", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task RefundStock_WhenSalesOrderNotDone_Throws()
+        {
+            // Arrange: Order is Pending (not Done), Paid
+            var createReq = new CreateSalesOrderRequest
+            {
+                CustomerId = 1,
+                DueDate = DateTimeOffset.UtcNow.AddDays(1),
+                PaymentMethod = PaymentMethod.Cash,
+                PaymentStatus = PaymentStatus.Paid,
+                IsTaxInclusive = false,
+                ApplyVat = false,
+                ApplyManufacturingTax = false,
+                Lines = new List<CreateSalesOrderLineRequest> { new() { ProductId = 1, Quantity = 1, UnitPrice = 100 } }
+            };
+            var orderId = await _salesServices.CreateAsync(createReq, _user);
+            // Do NOT call UpdateStatusAsync to Done - order stays Pending
+            var lineId = _db.SalesOrderLines.First(l => l.SalesOrderId == orderId).Id;
+
+            var req = new RefundSalesOrderRequest
+            {
+                OrderId = orderId,
+                Amount = 0,
+                LineItems = new List<RefundLineItem> { new() { SalesOrderLineId = lineId, Quantity = 1 } }
+            };
+
+            var ex = await Assert.ThrowsAsync<ValidationException>(() => _salesServices.RefundAsync(req, _user));
+            Assert.Contains("stock", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task RefundStock_WhenPurchaseOrderNotReceived_Throws()
+        {
+            // Arrange: PO is Pending (not Received)
+            var createReq = new CreatePurchaseOrderRequest
+            {
+                SupplierId = 1,
+                IsTaxInclusive = false,
+                ApplyVat = false,
+                ApplyManufacturingTax = false,
+                Lines = new List<CreatePurchaseOrderLineRequest> { new() { ProductId = 1, Quantity = 1, UnitPrice = 100 } }
+            };
+            var orderId = await _purchaseServices.CreateAsync(createReq, _user);
+            var lineId = _db.PurchaseOrderLines.First(l => l.PurchaseOrderId == orderId).Id;
+
+            var req = new RefundPurchaseOrderRequest
+            {
+                OrderId = orderId,
+                Amount = 0,
+                LineItems = new List<RefundPurchaseLineItem> { new() { PurchaseOrderLineId = lineId, Quantity = 1 } }
+            };
+
+            var ex = await Assert.ThrowsAsync<ValidationException>(() => _purchaseServices.RefundAsync(req, _user));
+            Assert.Contains("stock", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
         public async Task RefundSalesOrder_OverRefund_ThrowsException()
         {
             var orderId = await CreateAndCompleteSalesOrderAsync();
@@ -438,9 +519,9 @@ namespace Inventory.UnitTests
         public Task<long> CreateTransactionAsync(CreateInventoryTransactionRequest req, UserContext user, CancellationToken ct = default) => Task.FromResult(0L);
         public Task<IReadOnlyList<InventoryTransactionResponseDto>> GetRecentTransactionsAsync(int take = 50, CancellationToken ct = default) => Task.FromResult((IReadOnlyList<InventoryTransactionResponseDto>)new List<InventoryTransactionResponseDto>());
         public Task<IReadOnlyList<InventoryTransactionResponseDto>> GetProductTransactionsAsync(int productId, CancellationToken ct = default) => Task.FromResult((IReadOnlyList<InventoryTransactionResponseDto>)new List<InventoryTransactionResponseDto>());
-        public Task ProcessPurchaseOrderStockAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ProcessPurchaseOrderStockAsync(long purchaseOrderId, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default) => Task.CompletedTask;
         public Task ReversePurchaseOrderStockAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
-        public Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default) => Task.CompletedTask;
         public Task ReverseSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
         public Task ReserveSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;
         public Task ReleaseSalesOrderReservationAsync(long salesOrderId, UserContext user, CancellationToken ct = default) => Task.CompletedTask;

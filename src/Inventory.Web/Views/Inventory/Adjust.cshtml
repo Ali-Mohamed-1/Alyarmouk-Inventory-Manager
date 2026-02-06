@@ -1,0 +1,125 @@
+@model Inventory.Application.DTOs.StockSnapshot.UpdateStockRequest
+@{
+    ViewData["Title"] = "Adjust Stock";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="neo-card p-0 overflow-hidden">
+                <div class="p-4 bg-black text-white d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0 fw-black text-uppercase">Stock Take Adjustment</h3>
+                    <a asp-controller="Dashboard" asp-action="Index" class="neo-btn neo-btn-danger btn-sm text-uppercase">CANCEL</a>
+                </div>
+                <div class="p-5" style="background: white;">
+                    <form asp-action="Adjust" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="RowVersion" value="First" /> <!-- Simplified for now -->
+                        
+                        <div class="row g-4">
+                            <!-- Product Search (Dropdown) -->
+                            <div class="col-12">
+                                <label asp-for="ProductId" class="form-label fw-black text-uppercase small">Product</label>
+                                <select asp-for="ProductId" class="form-select fw-bold" id="productIdInput" onchange="loadBatches()">
+                                    <option value="">-- SELECT PRODUCT --</option>
+                                    @if (ViewBag.Products != null)
+                                    {
+                                        foreach (var p in ViewBag.Products)
+                                        {
+                                            <option value="@p.ProductId">@p.ProductName (@p.Sku)</option>
+                                        }
+                                    }
+                                </select>
+                                <span asp-validation-for="ProductId" class="text-danger small fw-bold"></span>
+                            </div>
+
+                            <div class="col-12">
+                                <label asp-for="BatchNumber" class="form-label fw-black text-uppercase small">Select Batch</label>
+                                <select asp-for="BatchNumber" class="form-select fw-bold" id="batchSelect" disabled required>
+                                    <option value="">-- SELECT PRODUCT FIRST --</option>
+                                </select>
+                                <span asp-validation-for="BatchNumber" class="text-danger small fw-bold"></span>
+                                <input type="hidden" asp-for="ProductBatchId" id="batchIdInput" />
+                            </div>
+
+                             <div class="col-md-6">
+                                <label class="form-label fw-black text-uppercase small">Current Quantity</label>
+                                <input type="text" class="form-control" id="currentQty" disabled value="-" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label asp-for="NewQuantity" class="form-label fw-black text-uppercase small">New Quantity (Actual)</label>
+                                <input asp-for="NewQuantity" class="form-control fw-bold" type="number" step="0.01" min="0" required />
+                                <span asp-validation-for="NewQuantity" class="text-danger small fw-bold"></span>
+                            </div>
+
+                            <div class="col-12">
+                                <label asp-for="Note" class="form-label fw-black text-uppercase small">Reason / Note</label>
+                                <textarea asp-for="Note" class="form-control" rows="3"></textarea>
+                            </div>
+                            
+                            <div class="col-12 mt-5 pt-4 border-top border-2">
+                                <button type="submit" class="neo-btn neo-btn-warning w-100">UPDATE STOCK LEVEL</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        async function loadBatches() {
+            const productSelect = document.getElementById('productIdInput');
+            const batchSelect = document.getElementById('batchSelect');
+            const productId = productSelect.value;
+            
+            // Reset fields
+            batchSelect.innerHTML = '<option value="">LOADING...</option>';
+            batchSelect.disabled = true;
+            document.getElementById('currentQty').value = '-';
+            document.getElementById('batchIdInput').value = '';
+
+            if (!productId) {
+                batchSelect.innerHTML = '<option value="">-- SELECT PRODUCT FIRST --</option>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/products/${productId}/batches`);
+                if (!response.ok) throw new Error("Product not found");
+                const batches = await response.json();
+                
+                batchSelect.innerHTML = '<option value="">-- SELECT BATCH --</option>';
+                if (batches.length > 0) {
+                    batches.forEach(b => {
+                        const option = document.createElement('option');
+                        option.value = b.batchNumber;
+                        option.dataset.id = b.id;
+                        option.dataset.qty = b.onHand;
+                        option.textContent = `${b.batchNumber} (Current: ${b.onHand})`;
+                        batchSelect.appendChild(option);
+                    });
+                    batchSelect.disabled = false;
+                } else {
+                    // Even if no batches, allow creation? No, Adjust is for existing stock usually.
+                    // But if we found no batches, maybe we should let them adjust 'new' stock?
+                    // For now, strict: No batches = No adjust.
+                    batchSelect.innerHTML = '<option value="">NO BATCHES FOUND</option>';
+                }
+            } catch (error) {
+                console.error('Error fetching batches:', error);
+                batchSelect.innerHTML = '<option value="">ERROR / NOT FOUND</option>';
+            }
+        }
+        
+        document.getElementById('batchSelect').addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            document.getElementById('batchIdInput').value = selectedOption.dataset.id || '';
+            document.getElementById('currentQty').value = selectedOption.dataset.qty || '-';
+        });
+    </script>
+}

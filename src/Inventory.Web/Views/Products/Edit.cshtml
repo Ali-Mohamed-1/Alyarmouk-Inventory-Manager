@@ -28,13 +28,7 @@
                                 <input asp-for="Name" class="form-control fw-black" required />
                                 <span asp-validation-for="Name" class="text-danger small fw-bold"></span>
                             </div>
-                            <div class="col-md-6">
-                                <label asp-for="CategoryId" class="form-label fw-black text-uppercase small">System Category</label>
-                                <select asp-for="CategoryId" class="form-select fw-bold" asp-items="@(new SelectList(ViewBag.Categories, "Id", "Name"))" required>
-                                    <option value="">-- SELECT CATEGORY --</option>
-                                </select>
-                                <span asp-validation-for="CategoryId" class="text-danger small fw-bold"></span>
-                            </div>
+
                             <div class="col-md-6">
                                 <label asp-for="Unit" class="form-label fw-black text-uppercase small">Measurement Unit</label>
                                 <input asp-for="Unit" class="form-control fw-bold" required placeholder="e.g. KG, PCS, BOX" />

@@ -628,9 +628,9 @@ namespace Inventory.Infrastructure.Services
                 .ToListAsync(ct);
         }
 
-        public async Task CompleteOrderAsync(long orderId, UserContext user, CancellationToken ct = default)
+        public async Task CompleteOrderAsync(long orderId, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default)
         {
-            await UpdateStatusAsync(orderId, new UpdateSalesOrderStatusRequest { OrderId = orderId, Status = SalesOrderStatus.Done }, user, ct);
+            await UpdateStatusAsync(orderId, new UpdateSalesOrderStatusRequest { OrderId = orderId, Status = SalesOrderStatus.Done }, user, timestamp, ct);
         }
 
         public async Task CancelAsync(long orderId, UserContext user, CancellationToken ct = default)
@@ -699,7 +699,7 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
-        public async Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default)
+        public async Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default)
         {
             ValidateUser(user);
 
@@ -752,7 +752,7 @@ namespace Inventory.Infrastructure.Services
                 // 3. Transitioning INTO Done -> Apply effects
                 if (req.Status == SalesOrderStatus.Done)
                 {
-                    await _inventoryServices.ProcessSalesOrderStockAsync(salesOrder.Id, user, ct);
+                    await _inventoryServices.ProcessSalesOrderStockAsync(salesOrder.Id, user, timestamp, ct);
                 }
 
                 await _db.SaveChangesAsync(ct);
@@ -1016,13 +1016,15 @@ namespace Inventory.Infrastructure.Services
             // Stock refund requires order to be Done
             if (hasLines && order.Status != SalesOrderStatus.Done)
                 throw new ValidationException("Cannot refund stock before order is completed.");
-            
-            // Money refund requires payment to be Paid
-            if (hasAmount && order.PaymentStatus != PaymentStatus.Paid)
-                throw new ValidationException("Cannot refund money before payment is completed.");
 
-            // Validate Amount Cap
-            decimal remainingRefundableAmount = order.TotalAmount - order.RefundedAmount;
+            // Money refund: allowed when net paid > 0 (ledger-based). PaymentStatus is descriptive, not a gate.
+            // Block only when there is nothing to refund.
+            decimal netPaid = order.GetPaidAmount();
+            if (hasAmount && netPaid <= 0)
+                throw new ValidationException("Cannot refund money when net paid payment amount is zero.");
+
+            // Cap: cannot refund more than we have (net paid). Multiple partial refunds allowed until net paid reaches zero.
+            decimal remainingRefundableAmount = netPaid;
             if (hasAmount && req.Amount > remainingRefundableAmount)
                 throw new ValidationException($"Refund amount exceeds remaining refundable amount. Max refundable: {remainingRefundableAmount:C}");
 

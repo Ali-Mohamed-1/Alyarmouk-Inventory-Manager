@@ -99,6 +99,12 @@ namespace Inventory.Infrastructure.Services
                 
                 if (batch == null)
                 {
+                    // Check Local first for unsaved batches (e.g. added by InventoryServices but not saved yet)
+                    batch = _db.ProductBatches.Local.FirstOrDefault(b => b.ProductId == req.ProductId && b.BatchNumber == batchNumber);
+                }
+
+                if (batch == null)
+                {
                     batch = await _db.ProductBatches.FirstOrDefaultAsync(b => b.ProductId == req.ProductId && b.BatchNumber == batchNumber, ct);
                 }
 
@@ -131,12 +137,19 @@ namespace Inventory.Infrastructure.Services
                     Type = req.Type,
                     BatchNumber = batchNumber,
                     ProductBatchId = batch.Id,
-                    Note = req.Note,
-                    TimestampUtc = DateTimeOffset.UtcNow,
-                    UserId = user.UserId,
+                    ProductBatch = batch, // Important: Link nav prop for tracking dirty/new entities
                     UserDisplayName = user.UserDisplayName,
                     clientId = req.CustomerId ?? 0
                 };
+                
+                if (req.TimestampUtc.HasValue)
+                {
+                    inventoryTransaction.TimestampUtc = req.TimestampUtc.Value;
+                }
+                else
+                {
+                    inventoryTransaction.TimestampUtc = DateTimeOffset.UtcNow;
+                }
 
                 // Update batch OnHand
                 batch.OnHand += quantityDelta;

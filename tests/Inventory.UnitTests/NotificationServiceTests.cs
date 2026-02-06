@@ -194,6 +194,122 @@ namespace Inventory.UnitTests
         }
 
         [Fact]
+        public async Task SalesOrder_Overdue_Unpaid_IsReturned()
+        {
+            // Arrange: Overdue order (DueDate in the past), unpaid
+            var now = DateTimeOffset.UtcNow;
+            var so = new SalesOrder
+            {
+                OrderNumber = "SO-OVERDUE",
+                CustomerId = 1,
+                CustomerNameSnapshot = "Customer A",
+                Status = SalesOrderStatus.Pending,
+                OrderDate = now.AddDays(-10),
+                DueDate = now.AddDays(-2),
+                PaymentMethod = PaymentMethod.Cash,
+                CreatedUtc = now,
+                CreatedByUserId = "test-user",
+                CreatedByUserDisplayName = "Test User",
+                TotalAmount = 150m
+            };
+            _db.SalesOrders.Add(so);
+            await _db.SaveChangesAsync();
+
+            // Act
+            var notifications = (await _service.GetActiveNotificationsAsync(CancellationToken.None)).ToList();
+
+            // Assert
+            var notif = Assert.Single(notifications, n => n.Type == "Sales" && n.OrderNumber == "SO-OVERDUE");
+            Assert.Equal(150m, notif.RemainingAmount);
+            Assert.True(notif.DaysUntilDue < 0, "Overdue orders must have negative DaysUntilDue");
+        }
+
+        [Fact]
+        public async Task SalesOrder_Overdue_ButPaid_IsNotReturned()
+        {
+            var now = DateTimeOffset.UtcNow;
+            var so = new SalesOrder
+            {
+                OrderNumber = "SO-OVERDUE-PAID",
+                CustomerId = 1,
+                CustomerNameSnapshot = "Customer A",
+                Status = SalesOrderStatus.Pending,
+                OrderDate = now.AddDays(-10),
+                DueDate = now.AddDays(-1),
+                PaymentMethod = PaymentMethod.Cash,
+                CreatedUtc = now,
+                CreatedByUserId = "test-user",
+                CreatedByUserDisplayName = "Test User",
+                TotalAmount = 200m
+            };
+            _db.SalesOrders.Add(so);
+            await _db.SaveChangesAsync();
+            _db.PaymentRecords.Add(new PaymentRecord
+            {
+                OrderType = OrderType.SalesOrder,
+                SalesOrderId = so.Id,
+                Amount = 200m,
+                PaymentDate = now,
+                PaymentMethod = PaymentMethod.Cash,
+                PaymentType = PaymentRecordType.Payment
+            });
+            await _db.SaveChangesAsync();
+
+            var notifications = await _service.GetActiveNotificationsAsync(CancellationToken.None);
+            Assert.DoesNotContain(notifications, n => n.OrderNumber == "SO-OVERDUE-PAID");
+        }
+
+        [Fact]
+        public async Task SalesOrder_Overdue_ButCancelled_IsNotReturned()
+        {
+            var now = DateTimeOffset.UtcNow;
+            var so = new SalesOrder
+            {
+                OrderNumber = "SO-OVERDUE-CANCELLED",
+                CustomerId = 1,
+                CustomerNameSnapshot = "Customer A",
+                Status = SalesOrderStatus.Cancelled,
+                OrderDate = now.AddDays(-10),
+                DueDate = now.AddDays(-3),
+                PaymentMethod = PaymentMethod.Cash,
+                CreatedUtc = now,
+                CreatedByUserId = "test-user",
+                CreatedByUserDisplayName = "Test User",
+                TotalAmount = 100m
+            };
+            _db.SalesOrders.Add(so);
+            await _db.SaveChangesAsync();
+
+            var notifications = await _service.GetActiveNotificationsAsync(CancellationToken.None);
+            Assert.DoesNotContain(notifications, n => n.OrderNumber == "SO-OVERDUE-CANCELLED");
+        }
+
+        [Fact]
+        public async Task PurchaseOrder_Overdue_Unpaid_IsReturned()
+        {
+            var now = DateTimeOffset.UtcNow;
+            var po = new PurchaseOrder
+            {
+                OrderNumber = "PO-OVERDUE",
+                SupplierId = 1,
+                SupplierNameSnapshot = "Supplier A",
+                Status = PurchaseOrderStatus.Pending,
+                PaymentMethod = PaymentMethod.Cash,
+                CreatedUtc = now,
+                CreatedByUserId = "test-user",
+                CreatedByUserDisplayName = "Test User",
+                PaymentDeadline = now.AddDays(-1),
+                TotalAmount = 300m
+            };
+            _db.PurchaseOrders.Add(po);
+            await _db.SaveChangesAsync();
+
+            var notifications = (await _service.GetActiveNotificationsAsync(CancellationToken.None)).ToList();
+            var notif = Assert.Single(notifications, n => n.Type == "Purchase" && n.OrderNumber == "PO-OVERDUE");
+            Assert.True(notif.DaysUntilDue < 0);
+        }
+
+        [Fact]
         public async Task Orders_OutsideSevenDayWindow_AreNotReturned()
         {
             // Arrange

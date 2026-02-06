@@ -45,7 +45,7 @@ public class PurchaseOrdersApiController : ControllerBase
     public async Task<IActionResult> UpdateStatus(long id, [FromBody] PurchaseOrderStatus status, CancellationToken ct)
     {
         var user = GetUserContext();
-        await _purchaseOrderServices.UpdateStatusAsync(id, status, user, ct);
+        await _purchaseOrderServices.UpdateStatusAsync(id, status, user, ct: ct);
         return Ok();
     }
 

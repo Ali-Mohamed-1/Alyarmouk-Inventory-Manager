@@ -10,6 +10,9 @@
         </div>
         <div class="d-flex gap-2">
             <a asp-controller="Dashboard" asp-action="Index" class="neo-btn">BACK TO DASHBOARD</a>
+            <a asp-action="AddBatch" asp-route-id="@Model.Id" class="neo-btn neo-btn-success">
+                <i class="bi bi-plus-lg me-1"></i> ADD BATCH
+            </a>
             <a asp-action="Edit" asp-route-id="@Model.Id" class="neo-btn neo-btn-primary">
                 <i class="bi bi-pencil me-1"></i> MODIFY RECORD
             </a>

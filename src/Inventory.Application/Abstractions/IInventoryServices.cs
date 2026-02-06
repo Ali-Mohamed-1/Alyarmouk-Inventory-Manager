@@ -56,7 +56,7 @@ namespace Inventory.Application.Abstractions
         /// <summary>
         /// Processes stock receipt for a Purchase Order (PurchaseOrder.Status = Received)
         /// </summary>
-        Task ProcessPurchaseOrderStockAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default);
+        Task ProcessPurchaseOrderStockAsync(long purchaseOrderId, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default);
 
         /// <summary>
         /// Reverses stock receipt for a Purchase Order (e.g. Received -> Cancelled)
@@ -82,7 +82,7 @@ namespace Inventory.Application.Abstractions
         /// Processes stock issue for a Sales Order (SalesOrder.Status = Done)
         /// Also releases any existing reservations for this order.
         /// </summary>
-        Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default);
+        Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default);
 
         /// <summary>
         /// Reverses stock issue for a Sales Order (e.g. Done -> Pending)

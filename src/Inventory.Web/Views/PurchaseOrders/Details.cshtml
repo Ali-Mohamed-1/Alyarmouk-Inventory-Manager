@@ -263,6 +263,26 @@
                                  <button class="neo-btn neo-btn-success w-100 py-2 no-print" disabled>FULLY PAID</button>
                              }
                         </div>
+                        @{
+                            var canRefundMoneyPo = Model.Status != Inventory.Domain.Entities.PurchaseOrderStatus.Cancelled && 
+                                (Model.PaymentStatus == Inventory.Domain.Entities.PurchasePaymentStatus.Paid || Model.PaymentStatus == Inventory.Domain.Entities.PurchasePaymentStatus.PartiallyPaid) && 
+                                (Model.PaidAmount - Model.RefundedAmount) > 0;
+                            var canRefundStockPo = Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received && Model.Lines.Any(l => l.Quantity - l.RefundedQuantity > 0);
+                            var showRefundButtonPo = canRefundMoneyPo || canRefundStockPo;
+                            var refundTooltipPo = !showRefundButtonPo
+                                ? "You must fully refund stock and money before cancelling this order."
+                                : (canRefundMoneyPo && canRefundStockPo)
+                                    ? "Refund money and/or return products to supplier."
+                                    : canRefundMoneyPo
+                                        ? "Refund money to supplier."
+                                        : "Return products to supplier.";
+                        }
+                        @if (showRefundButtonPo)
+                        {
+                            <div class="col-12 mt-2">
+                                <button class="neo-btn neo-btn-danger w-100 py-2 no-print" onclick="openPoRefundModal()" title="@refundTooltipPo">REFUND</button>
+                            </div>
+                        }
                         
                         <div class="col-12 mt-1">
                              <div class="d-flex justify-content-between small opacity-75">
@@ -361,6 +381,75 @@
     </div>
 </div>
 
+<!-- Refund Modal -->
+<div class="modal fade" id="poRefundOrderModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-black text-uppercase">Refund Purchase Order</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="poRefundOrderId" value="@Model.Id" />
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        <label class="form-label fw-black text-uppercase small">Order Ref</label>
+                        <input type="text" class="form-control fw-bold bg-light" id="poRefundOrderNumber" value="@Model.OrderNumber" readonly />
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label fw-black text-uppercase small">Total</label>
+                        <input type="text" class="form-control fw-bold" id="poRefundOrderTotal" value="@Model.TotalAmount.ToString("N2")" readonly />
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label fw-black text-uppercase small text-success">Recovered</label>
+                        <input type="text" class="form-control fw-bold" id="poRefundOrderAlreadyRefunded" value="@Model.RefundedAmount.ToString("N2")" readonly />
+                    </div>
+                </div>
+
+                <div class="mb-4" id="poRefundStockSection">
+                    <h6 class="fw-black text-uppercase small mb-2 border-bottom border-2 pb-1">Product Returns (Return to Supplier)</h6>
+                    <div class="table-responsive neo-card p-0 mb-2" style="max-height: 250px; overflow-y: auto;">
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead class="table-dark text-white sticky-top">
+                                <tr>
+                                    <th>PRODUCT</th>
+                                    <th class="text-center">RECEIVED</th>
+                                    <th class="text-center">PREV. RET.</th>
+                                    <th class="text-center" style="width: 120px;">RETURN QTY</th>
+                                </tr>
+                            </thead>
+                            <tbody id="po-refund-lines-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="small fw-bold text-muted text-end"><i class="bi bi-info-circle me-1"></i> ENTER QUANTITIES TO RETURN TO SUPPLIER.</div>
+                </div>
+
+                <div class="mb-4 pt-3 border-top border-2" id="poRefundMoneySection">
+                    <h6 class="fw-black text-uppercase small mb-2">Financial Reversal</h6>
+                    <div class="row align-items-end">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-muted">AMOUNT TO REFUND</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-black text-white">$</span>
+                                <input type="number" class="form-control fw-black" id="poRefundAmount" step="0.01" value="0" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Reason Context</label>
+                    <textarea class="form-control" id="poRefundReason" rows="2" placeholder="Required for audit trail..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-danger" id="btn-execute-po-refund" onclick="processPoRefund()">EXECUTE REFUND</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Record Payment Modal -->
 <div class="modal fade" id="recordPaymentModal" tabindex="-1">
     <div class="modal-dialog">
@@ -394,7 +483,7 @@
                         <select class="form-select fw-black" id="paymentMethod">
                             @foreach (var method in Enum.GetValues<Inventory.Domain.Entities.PaymentMethod>())
                             {
-                                <option value="@method">@method.ToString().ToUpper()</option>
+                                <option value="@((int)method)">@method.ToString().ToUpper()</option>
                             }
                         </select>
                     </div>
@@ -509,6 +598,108 @@
 
 @section Scripts {
     <script>
+        function escapeHtmlPo(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        function openPoRefundModal() {
+            const id = @Model.Id;
+            document.getElementById('poRefundOrderId').value = id;
+            document.getElementById('poRefundOrderNumber').value = '@Model.OrderNumber';
+            document.getElementById('poRefundOrderTotal').value = '@Model.TotalAmount.ToString("N2")';
+            document.getElementById('poRefundOrderAlreadyRefunded').value = '@Model.RefundedAmount.ToString("N2")';
+            document.getElementById('poRefundAmount').value = '';
+            document.getElementById('poRefundReason').value = '';
+
+            const tbody = document.getElementById('po-refund-lines-body');
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></td></tr>';
+            new bootstrap.Modal(document.getElementById('poRefundOrderModal')).show();
+
+            fetch(`/api/purchase-orders/${id}`)
+                .then(r => r.ok ? r.json() : Promise.reject())
+                .then(o => {
+                    const canRefundStock = (o.status === 1 || o.status === "Received");
+                    const canRefundMoney = (o.paymentStatus === 1 || o.paymentStatus === "Paid" || o.paymentStatus === 2 || o.paymentStatus === "PartiallyPaid");
+                    const remainingRefundableAmount = o.totalAmount - (o.refundedAmount || 0);
+                    const moneyFullyRefunded = remainingRefundableAmount <= 0;
+
+                    document.getElementById('poRefundMoneySection').style.display = (!canRefundMoney || moneyFullyRefunded) ? 'none' : 'block';
+                    document.getElementById('poRefundStockSection').style.display = !canRefundStock ? 'none' : 'block';
+
+                    const amountInput = document.getElementById('poRefundAmount');
+                    if (!canRefundMoney || moneyFullyRefunded) {
+                        amountInput.disabled = true;
+                        amountInput.placeholder = moneyFullyRefunded ? 'Fully refunded' : 'Payment not completed';
+                    } else {
+                        amountInput.disabled = false;
+                        amountInput.placeholder = 'Max: ' + new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(remainingRefundableAmount);
+                        amountInput.max = remainingRefundableAmount;
+                    }
+
+                    tbody.innerHTML = (o.lines || []).map(l => {
+                        const remaining = l.quantity - (l.refundedQuantity || 0);
+                        const lineFullyRefunded = remaining <= 0;
+                        const disabled = (!canRefundStock || lineFullyRefunded) ? 'disabled' : '';
+                        const hint = lineFullyRefunded ? 'Fully returned' : (!canRefundStock ? 'Order not received' : '');
+                        return `<tr>
+                            <td><div class="fw-black small text-uppercase">${escapeHtmlPo(l.productName)}</div><div class="small text-muted">${l.batchNumber ? '<code>' + escapeHtmlPo(l.batchNumber) + '</code>' : 'NO BATCH'}</div></td>
+                            <td class="text-center fw-bold">${l.quantity}</td>
+                            <td class="text-center text-muted">${l.refundedQuantity || 0}</td>
+                            <td class="text-center"><input type="number" class="form-control form-control-sm fw-black text-center po-refund-line-qty" data-line-id="${l.id}" data-batch-number="${l.batchNumber || ''}" min="0" max="${remaining}" value="" ${disabled} placeholder="${hint}" title="${hint}" style="border: 2px solid #000;"></td>
+                        </tr>`;
+                    }).join('');
+
+                    document.querySelectorAll('.po-refund-line-qty').forEach(input => { input.oninput = validatePoRefundForm; });
+                    document.getElementById('poRefundAmount').oninput = validatePoRefundForm;
+                    validatePoRefundForm();
+                })
+                .catch(() => { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger fw-bold">FAILED TO LOAD LINES</td></tr>'; });
+        }
+
+        function validatePoRefundForm() {
+            let amt = parseFloat(document.getElementById('poRefundAmount').value) || 0;
+            let hasLines = false;
+            document.querySelectorAll('.po-refund-line-qty').forEach(input => { if ((parseFloat(input.value) || 0) > 0) hasLines = true; });
+            const btn = document.getElementById('btn-execute-po-refund');
+            if (btn) btn.disabled = !(amt > 0 || hasLines);
+        }
+
+        async function processPoRefund() {
+            const id = parseInt(document.getElementById('poRefundOrderId').value);
+            const amt = parseFloat(document.getElementById('poRefundAmount').value) || 0;
+            const rsn = document.getElementById('poRefundReason').value;
+
+            const lines = [];
+            document.querySelectorAll('.po-refund-line-qty').forEach(input => {
+                const qty = parseFloat(input.value) || 0;
+                if (qty > 0) {
+                    const item = { purchaseOrderLineId: parseInt(input.dataset.lineId), quantity: qty };
+                    if (input.dataset.batchNumber) item.batchNumber = input.dataset.batchNumber;
+                    lines.push(item);
+                }
+            });
+
+            if (amt <= 0 && lines.length === 0) { alert('Please specify a refund amount, returned products, or both.'); return; }
+
+            const payload = { orderId: id };
+            if (amt > 0) payload.amount = amt;
+            if (lines.length > 0) payload.lineItems = lines;
+            if (rsn && rsn.trim()) payload.reason = rsn.trim();
+
+            try {
+                const r = await fetch(`/api/purchase-orders/${id}/refund`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value },
+                    body: JSON.stringify(payload)
+                });
+                if (!r.ok) {
+                    const errText = await r.text();
+                    try { const j = JSON.parse(errText); throw new Error(j.detail || j.title || errText); } catch (e) { if (e.message) throw e; throw new Error(errText); }
+                }
+                bootstrap.Modal.getInstance(document.getElementById('poRefundOrderModal')).hide();
+                alert('REFUND PROCESSED SUCCESSFULLY.');
+                location.reload();
+            } catch (e) { alert(e.message); }
+        }
+
         function openEditPaymentDeadlineModal() {
             new bootstrap.Modal(document.getElementById('editPaymentDeadlineModal')).show();
         }

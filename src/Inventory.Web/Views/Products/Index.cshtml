@@ -49,6 +49,7 @@
                             </td>
                             <td class="text-end pe-4">
                                 <div class="d-flex gap-2 justify-content-end">
+                                    <a asp-action="AddBatch" asp-route-productId="@item.Id" class="neo-btn neo-btn-success btn-sm">ADD BATCH</a>
                                     <a asp-action="Details" asp-route-id="@item.Id" class="neo-btn neo-btn-info btn-sm">VIEW</a>
                                     <a asp-action="Edit" asp-route-id="@item.Id" class="neo-btn neo-btn-warning btn-sm">EDIT</a>
                                 </div>

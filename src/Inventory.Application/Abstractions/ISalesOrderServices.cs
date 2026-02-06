@@ -29,7 +29,7 @@ namespace Inventory.Application.Abstractions
         /// <summary>
         /// Completes a sales order and records revenue
         /// </summary>
-        Task CompleteOrderAsync(long orderId, UserContext user, CancellationToken ct = default);
+        Task CompleteOrderAsync(long orderId, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default);
 
         /// <summary>
         /// Cancels a sales order.
@@ -41,7 +41,7 @@ namespace Inventory.Application.Abstractions
         /// <summary>
         /// Updates the status of a sales order
         /// </summary>
-        Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, CancellationToken ct = default);
+        Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default);
         Task UpdateDueDateAsync(long orderId, DateTimeOffset newDate, UserContext user, CancellationToken ct = default);
 
         /// <summary>

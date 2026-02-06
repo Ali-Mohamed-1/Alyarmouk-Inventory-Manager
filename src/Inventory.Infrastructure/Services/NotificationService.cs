@@ -31,12 +31,11 @@ namespace Inventory.Infrastructure.Services
             // Criteria:
             // - Not Cancelled
             // - RemainingAmount > 0 (money still owed)
-            // - DueDate within next 7 days and not in the past
+            // - DueDate within 7 days (past or future) – includes overdue orders
             var salesOrders = await _db.SalesOrders
                 .AsNoTracking()
                 .Include(o => o.Payments)
                 .Where(o => o.Status != SalesOrderStatus.Cancelled &&
-                            o.DueDate >= now &&
                             o.DueDate <= upcomingWindow)
                 .ToListAsync(ct);
 
@@ -59,9 +58,10 @@ namespace Inventory.Infrastructure.Services
                 }
 
                 var daysUntil = (so.DueDate - now).Days;
-                // Ensure at least 0 if it's due today but technically "future" by time
-                if (daysUntil < 0) daysUntil = 0; 
-                
+                var message = daysUntil < 0
+                    ? $"Overdue by {Math.Abs(daysUntil)} days for Sales Order #{so.OrderNumber} from {so.CustomerNameSnapshot}"
+                    : $"Payment due in {daysUntil} days for Sales Order #{so.OrderNumber} from {so.CustomerNameSnapshot}";
+
                 notifications.Add(new PaymentNotificationDto
                 {
                     NotificationId = $"SO-{so.Id}",
@@ -73,7 +73,7 @@ namespace Inventory.Infrastructure.Services
                     PaymentDeadline = so.DueDate,
                     RemainingAmount = remainingAmount,
                     DaysUntilDue = daysUntil,
-                    Message = $"Payment due in {daysUntil} days for Sales Order #{so.OrderNumber} from {so.CustomerNameSnapshot}"
+                    Message = message
                 });
             }
 
@@ -81,13 +81,12 @@ namespace Inventory.Infrastructure.Services
             // Criteria:
             // - Not Cancelled
             // - RemainingAmount > 0 (money still owed)
-            // - PaymentDeadline exists and is within the next 7 days
+            // - PaymentDeadline exists and is within 7 days (past or future) – includes overdue
             var purchaseOrders = await _db.PurchaseOrders
                 .AsNoTracking()
                 .Include(o => o.Payments)
                 .Where(o => o.Status != PurchaseOrderStatus.Cancelled &&
                             o.PaymentDeadline.HasValue &&
-                            o.PaymentDeadline.Value >= now &&
                             o.PaymentDeadline.Value <= upcomingWindow)
                 .ToListAsync(ct);
 
@@ -111,7 +110,9 @@ namespace Inventory.Infrastructure.Services
 
                 var paymentDeadline = po.PaymentDeadline!.Value;
                 var daysUntil = (paymentDeadline - now).Days;
-                 if (daysUntil < 0) daysUntil = 0;
+                var message = daysUntil < 0
+                    ? $"Overdue by {Math.Abs(daysUntil)} days for Purchase Order #{po.OrderNumber} to {po.SupplierNameSnapshot}"
+                    : $"Payment due in {daysUntil} days for Purchase Order #{po.OrderNumber} to {po.SupplierNameSnapshot}";
 
                 notifications.Add(new PaymentNotificationDto
                 {
@@ -124,7 +125,7 @@ namespace Inventory.Infrastructure.Services
                     PaymentDeadline = paymentDeadline,
                     RemainingAmount = remainingAmount,
                     DaysUntilDue = daysUntil,
-                    Message = $"Payment due in {daysUntil} days for Purchase Order #{po.OrderNumber} to {po.SupplierNameSnapshot}"
+                    Message = message
                 });
             }
 

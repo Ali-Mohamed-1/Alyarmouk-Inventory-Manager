@@ -80,8 +80,9 @@ public sealed class InventoryController : Controller
     }
 
     [HttpGet]
-    public IActionResult Adjust()
+    public async Task<IActionResult> Adjust(CancellationToken cancellationToken)
     {
+        ViewBag.Products = await _inventory.GetAllStockAsync(cancellationToken);
         return View(new UpdateStockRequest());
     }
 
@@ -91,6 +92,7 @@ public sealed class InventoryController : Controller
     {
         if (!ModelState.IsValid)
         {
+            ViewBag.Products = await _inventory.GetAllStockAsync(cancellationToken);
             return View(model);
         }
 

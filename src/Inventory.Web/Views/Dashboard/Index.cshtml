@@ -51,14 +51,14 @@
                 </button>
             </div>
             <div class="col-3">
-                <button type="button" class="neo-btn neo-btn-warning w-100" id="btn-issue-stock">
+                <a asp-controller="Inventory" asp-action="Issue" class="neo-btn neo-btn-warning w-100" id="btn-issue-stock">
                     <i class="bi bi-box-arrow-up"></i> ISSUE
-                </button>
+                </a>
             </div>
             <div class="col-3">
-                <button type="button" class="neo-btn neo-btn-info w-100" id="btn-adjust-stock">
+                <a asp-controller="Inventory" asp-action="Adjust" class="neo-btn neo-btn-info w-100" id="btn-adjust-stock">
                     <i class="bi bi-sliders"></i> ADJUST
-                </button>
+                </a>
             </div>
         </div>
     </div>
@@ -325,20 +325,7 @@
                             <label for="addUnit" class="form-label fw-black text-uppercase small">Unit</label>
                             <input type="text" id="addUnit" name="Unit" class="form-control" required />
                         </div>
-                        <div class="col-md-6">
-                            <label for="addPrice" class="form-label fw-black text-uppercase small">Price</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-black text-white">$</span>
-                                <input type="number" id="addPrice" name="Price" class="form-control" step="0.01" min="0" required />
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="addCost" class="form-label fw-black text-uppercase small">Cost</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-black text-white">$</span>
-                                <input type="number" id="addCost" name="Cost" class="form-control" step="0.01" min="0" required />
-                            </div>
-                        </div>
+
                         <div class="col-md-6">
                             <label for="addReorderPoint" class="form-label fw-black text-uppercase small">Reorder Point</label>
                             <input type="number" id="addReorderPoint" name="ReorderPoint" class="form-control" step="0.01" min="0" required />
@@ -513,6 +500,7 @@
                     detailsRow.innerHTML = `<td colspan="9" class="p-4 bg-light border-start border-end">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div class="fw-black text-uppercase">Batch Track Records</div>
+                            <a href="/Products/AddBatch/${productId}" class="neo-btn neo-btn-sm neo-btn-success"><i class="bi bi-plus-lg"></i> ADD BATCH</a>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-sm table-hover align-middle mb-0">
@@ -594,8 +582,7 @@
             loadCategories();
 
             document.getElementById('btn-receive-stock').addEventListener('click', () => { new bootstrap.Modal(document.getElementById('receiveStockModal')).show(); });
-            document.getElementById('btn-issue-stock').addEventListener('click', () => { new bootstrap.Modal(document.getElementById('issueStockModal')).show(); });
-            document.getElementById('btn-adjust-stock').addEventListener('click', () => { new bootstrap.Modal(document.getElementById('adjustStockModal')).show(); });
+            // Issue/Adjust now use direct links, no modal listeners needed
             document.getElementById('btn-add-product').addEventListener('click', () => { new bootstrap.Modal(document.getElementById('addProductModal')).show(); });
 
             document.getElementById('adjustProductId').addEventListener('change', function() {

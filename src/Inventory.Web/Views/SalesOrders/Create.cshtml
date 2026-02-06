@@ -85,7 +85,6 @@
                             <select asp-for="PaymentStatus" class="form-select fw-black text-center">
                                 <option value="0">PENDING</option>
                                 <option value="1">PAID UPON ISSUANCE</option>
-                                <option value="2">OVERDUE</option>
                             </select>
                         </div>
 
@@ -334,7 +333,6 @@
                 if (batches.length > 0) {
                     bInput.disabled = false;
                     bInput.placeholder = "SELECT BATCH...";
-                    bInput.focus();
                     
                     setupDropdown(bInput, bList, batches, (batch) => {
                         // On Batch Select

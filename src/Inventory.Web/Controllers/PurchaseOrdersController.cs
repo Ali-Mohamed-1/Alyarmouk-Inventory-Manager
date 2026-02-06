@@ -72,7 +72,7 @@ public sealed class PurchaseOrdersController : Controller
     public async Task<IActionResult> UpdateStatus(long id, PurchaseOrderStatus status, CancellationToken cancellationToken)
     {
         var user = GetUserContext();
-        await _orders.UpdateStatusAsync(id, status, user, cancellationToken);
+        await _orders.UpdateStatusAsync(id, status, user, ct: cancellationToken);
         return RedirectToAction(nameof(Details), new { id });
     }
 

@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using Inventory.Application.Abstractions;
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.Product;
+using Inventory.Application.DTOs.Transaction;
+using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,11 +20,13 @@ namespace Inventory.Infrastructure.Services
         private const int MaxUnitLength = 32;
         private readonly AppDbContext _db;
         private readonly IAuditLogWriter _auditWriter;
+        private readonly IInventoryTransactionServices _inventoryTransactions;
 
-        public ProductServices(AppDbContext db, IAuditLogWriter auditWriter)
+        public ProductServices(AppDbContext db, IAuditLogWriter auditWriter, IInventoryTransactionServices inventoryTransactions)
         {
             _db = db;
             _auditWriter = auditWriter;
+            _inventoryTransactions = inventoryTransactions;
         }
 
         public async Task<IReadOnlyList<ProductResponseDto>> GetAllAsync(CancellationToken ct = default)
@@ -289,6 +293,83 @@ namespace Inventory.Infrastructure.Services
                 await transaction.RollbackAsync(ct);
                 throw new ConflictException("Could not update product status due to a database conflict.", ex);
             }
+        }
+
+        public async Task<long> AddBatchAsync(CreateBatchRequest req, UserContext user, CancellationToken ct = default)
+        {
+            if (req is null) throw new ArgumentNullException(nameof(req));
+            ValidateUser(user);
+
+            if (req.ProductId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(req.ProductId), "Product ID must be positive.");
+
+            var batchNumber = (req.BatchNumber ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(batchNumber))
+                throw new ValidationException("Batch Number is required.");
+
+            var productExists = await _db.Products.AsNoTracking().AnyAsync(p => p.Id == req.ProductId, ct);
+            if (!productExists)
+                throw new NotFoundException($"Product id {req.ProductId} was not found.");
+
+            var batchExists = await _db.ProductBatches
+                .AsNoTracking()
+                .AnyAsync(b => b.ProductId == req.ProductId && b.BatchNumber == batchNumber, ct);
+            
+            if (batchExists)
+                throw new ConflictException($"Batch number '{batchNumber}' already exists for this product.");
+
+            var batch = new Inventory.Domain.Entities.ProductBatch
+            {
+                ProductId = req.ProductId,
+                BatchNumber = batchNumber,
+                UnitCost = req.UnitCost,
+                UnitPrice = req.UnitPrice,
+                OnHand = 0, // Will be updated by transaction if needed
+                Reserved = 0,
+                Notes = req.Notes
+            };
+
+            _db.ProductBatches.Add(batch);
+
+            // Use strategy to ensure transaction and logic are wrapped
+            var strategy = _db.Database.CreateExecutionStrategy();
+            
+            return await strategy.ExecuteAsync(async () => 
+            {
+                await using var trans = await _db.Database.BeginTransactionAsync(ct);
+                try
+                {
+                    await _db.SaveChangesAsync(ct); // Save to get Batch Id
+
+                    // If initial quantity provided, create a transaction
+                    if (req.InitialQuantity > 0)
+                    {
+                        var transactionReq = new CreateInventoryTransactionRequest
+                        {
+                            ProductId = req.ProductId,
+                            Type = Inventory.Domain.Entities.InventoryTransactionType.Receive, // Initial stock is a Receive
+                            Quantity = req.InitialQuantity,
+                            ProductBatchId = batch.Id,
+                            BatchNumber = batch.BatchNumber,
+                            Note = "Initial Batch Stock"
+                        };
+
+                        // This service call handles updating OnHand and logging its own audit/transaction
+                        // We pass the same user context.
+                        // Ideally, we should enlist in the same transaction, but InventoryTransactionServices checks for existing transaction.
+                        await _inventoryTransactions.CreateAsync(transactionReq, user, ct);
+                    }
+
+                    await _db.SaveChangesAsync(ct); // Ensure batch updates from transaction are saved if any
+                    await trans.CommitAsync(ct);
+                    return batch.Id;
+                }
+                catch (Exception)
+                {
+                    await trans.RollbackAsync(ct);
+                    throw;
+                }
+            });
         }
 
         #region Helper Methods

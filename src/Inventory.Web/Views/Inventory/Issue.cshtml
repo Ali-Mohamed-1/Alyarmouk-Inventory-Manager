@@ -1,0 +1,124 @@
+@model Inventory.Application.DTOs.StockIssueRequest
+@{
+    ViewData["Title"] = "Issue Stock";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="neo-card p-0 overflow-hidden">
+                <div class="p-4 bg-black text-white d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0 fw-black text-uppercase">Issue Stock Out</h3>
+                    <a asp-controller="Dashboard" asp-action="Index" class="neo-btn neo-btn-danger btn-sm text-uppercase">CANCEL</a>
+                </div>
+                <div class="p-5" style="background: white;">
+                    <form asp-action="Issue" method="post">
+                        @Html.AntiForgeryToken()
+                        
+                        <div class="row g-4">
+                            <div class="col-12">
+                                <label asp-for="ProductId" class="form-label fw-black text-uppercase small">Product</label>
+                                <!-- Using a simple select for now, ideally searchable -->
+                                <select asp-for="ProductId" class="form-select fw-bold" id="productSelect" onchange="loadBatches()">
+                                    <option value="">-- SELECT PRODUCT --</option>
+                                    @if (ViewBag.Products != null)
+                                    {
+                                        foreach (var p in ViewBag.Products)
+                                        {
+                                            <option value="@p.ProductId">@p.ProductName (@p.Sku)</option>
+                                        }
+                                    }
+                                </select>
+                                <span asp-validation-for="ProductId" class="text-danger small fw-bold"></span>
+                            </div>
+
+                            <div class="col-12">
+                                <label asp-for="BatchNumber" class="form-label fw-black text-uppercase small">Select Batch</label>
+                                <select asp-for="BatchNumber" class="form-select fw-bold" id="batchSelect" disabled required>
+                                    <option value="">-- SELECT PRODUCT FIRST --</option>
+                                </select>
+                                <span asp-validation-for="BatchNumber" class="text-danger small fw-bold"></span>
+                                <input type="hidden" asp-for="ProductBatchId" id="batchIdInput" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label asp-for="Quantity" class="form-label fw-black text-uppercase small">Quantity to Issue</label>
+                                <input asp-for="Quantity" class="form-control fw-bold" type="number" step="0.01" min="0.01" required />
+                                <span asp-validation-for="Quantity" class="text-danger small fw-bold"></span>
+                            </div>
+
+                            <div class="col-12">
+                                <label asp-for="Note" class="form-label fw-black text-uppercase small">Reason / Note</label>
+                                <textarea asp-for="Note" class="form-control" rows="3"></textarea>
+                            </div>
+                            
+                            <div class="col-12 mt-5 pt-4 border-top border-2">
+                                <button type="submit" class="neo-btn neo-btn-primary w-100">CONFIRM ISSUE</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        async function loadBatches() {
+            const productSelect = document.getElementById('productSelect');
+            const batchSelect = document.getElementById('batchSelect');
+            const productId = productSelect.value;
+            
+            batchSelect.innerHTML = '<option value="">LOADING...</option>';
+            batchSelect.disabled = true;
+
+            if (!productId) {
+                batchSelect.innerHTML = '<option value="">-- SELECT PRODUCT FIRST --</option>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/products/${productId}/batches`);
+                const batches = await response.json();
+                
+                batchSelect.innerHTML = '<option value="">-- SELECT BATCH --</option>';
+                if (batches.length > 0) {
+                    batches.forEach(b => {
+                        // Filter out empty batches or show them disabled? Better to show only available stock for ISSUE
+                        if (b.onHand > 0) {
+                            const option = document.createElement('option');
+                            option.value = b.batchNumber;
+                            option.dataset.id = b.id;
+                            option.textContent = `${b.batchNumber} (Qty: ${b.onHand})`;
+                            batchSelect.appendChild(option);
+                        }
+                    });
+                    
+                    if (batchSelect.options.length === 1) { // Only default option
+                         const option = document.createElement('option');
+                         option.disabled = true;
+                         option.textContent = "NO STOCK AVAILABLE";
+                         batchSelect.appendChild(option);
+                    } else {
+                        batchSelect.disabled = false;
+                    }
+                } else {
+                    const option = document.createElement('option');
+                    option.disabled = true;
+                    option.textContent = "NO BATCHES FOUND";
+                    batchSelect.appendChild(option);
+                }
+            } catch (error) {
+                console.error('Error fetching batches:', error);
+                batchSelect.innerHTML = '<option value="">ERROR LOADING BATCHES</option>';
+            }
+        }
+        
+        document.getElementById('batchSelect').addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            document.getElementById('batchIdInput').value = selectedOption.dataset.id || '';
+        });
+    </script>
+}

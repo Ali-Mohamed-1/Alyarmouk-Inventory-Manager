@@ -113,6 +113,52 @@ public sealed class ProductsController : Controller
         return RedirectToAction("Index", "Dashboard");
     }
 
+    [HttpGet]
+    public async Task<IActionResult> AddBatch(int id, CancellationToken cancellationToken)
+    {
+        var product = await _products.GetByIdAsync(id, cancellationToken);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        var model = new CreateBatchRequest
+        {
+            ProductId = id
+        };
+
+        ViewBag.ProductName = product.Name;
+        ViewBag.ProductSku = product.Sku;
+        
+        return View(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddBatch(int id, CreateBatchRequest model, CancellationToken cancellationToken)
+    {
+        if (id != model.ProductId)
+        {
+            return BadRequest();
+        }
+
+        if (!ModelState.IsValid)
+        {
+            var product = await _products.GetByIdAsync(id, cancellationToken);
+            if (product != null) 
+            {
+                ViewBag.ProductName = product.Name;
+                ViewBag.ProductSku = product.Sku;
+            }
+            return View(model);
+        }
+
+        var user = GetUserContext();
+        await _products.AddBatchAsync(model, user, cancellationToken);
+        
+        return RedirectToAction("Index", "Dashboard");
+    }
+
     private UserContext GetUserContext()
     {
         var userId = User?.Identity?.Name ?? "system";

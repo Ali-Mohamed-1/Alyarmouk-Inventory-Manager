@@ -29,5 +29,7 @@ namespace Inventory.Application.DTOs.Transaction
 
         [StringLength(500)]
         public string? Note { get; init; }
+
+        public DateTimeOffset? TimestampUtc { get; init; }
     }
 }

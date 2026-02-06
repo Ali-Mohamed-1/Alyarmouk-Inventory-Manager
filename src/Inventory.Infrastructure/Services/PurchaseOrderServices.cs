@@ -378,7 +378,7 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
-        public async Task UpdateStatusAsync(long id, PurchaseOrderStatus status, UserContext user, CancellationToken ct = default)
+        public async Task UpdateStatusAsync(long id, PurchaseOrderStatus status, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default)
         {
             var order = await _db.PurchaseOrders.FindAsync(new object[] { id }, ct);
             if (order == null) throw new NotFoundException($"Purchase order {id} not found.");
@@ -408,7 +408,7 @@ namespace Inventory.Infrastructure.Services
                 // 3. Transitioning INTO Received -> Apply Effects
                 if (status == PurchaseOrderStatus.Received)
                 {
-                    await _inventoryServices.ProcessPurchaseOrderStockAsync(order.Id, user, ct);
+                    await _inventoryServices.ProcessPurchaseOrderStockAsync(order.Id, user, timestamp, ct);
                 }
 
                 await _db.SaveChangesAsync(ct);
@@ -540,13 +540,14 @@ namespace Inventory.Infrastructure.Services
             // Stock refund requires order to be Received
             if (hasLines && order.Status != PurchaseOrderStatus.Received)
                 throw new ValidationException("Cannot refund stock before order is received.");
-            
-            // Money refund requires payment to be Paid
-            if (hasAmount && order.PaymentStatus != PurchasePaymentStatus.Paid)
-                throw new ValidationException("Cannot refund money before payment is completed.");
 
-            // Validate Amount Cap
-            decimal remainingRefundableAmount = order.TotalAmount - order.RefundedAmount;
+            // Money refund: allowed when net paid > 0 (ledger-based). PaymentStatus is descriptive, not a gate.
+            decimal netPaid = order.GetPaidAmount();
+            if (hasAmount && netPaid <= 0)
+                throw new ValidationException("Cannot refund money when net paid amount is zero.");
+
+            // Cap: cannot refund more than we have (net paid). Multiple partial refunds allowed until net paid reaches zero.
+            decimal remainingRefundableAmount = netPaid;
             if (hasAmount && req.Amount > remainingRefundableAmount)
                 throw new ValidationException($"Refund amount exceeds remaining refundable amount. Max refundable: {remainingRefundableAmount:C}");
 

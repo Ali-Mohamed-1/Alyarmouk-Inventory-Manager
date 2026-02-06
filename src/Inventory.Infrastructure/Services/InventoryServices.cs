@@ -134,7 +134,7 @@ namespace Inventory.Infrastructure.Services
             return await _transactionServices.GetByProductAsync(productId, ct);
         }
 
-        public async Task ProcessPurchaseOrderStockAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default)
+        public async Task ProcessPurchaseOrderStockAsync(long purchaseOrderId, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default)
         {
             var order = await _db.PurchaseOrders
                 .Include(o => o.Lines)
@@ -180,7 +180,8 @@ namespace Inventory.Infrastructure.Services
                     Type = InventoryTransactionType.Receive,
                     BatchNumber = line.BatchNumber,
                     CustomerId = null, // Not applicable for PO
-                    Note = $"Purchase Order {order.OrderNumber}"
+                    Note = $"Purchase Order {order.OrderNumber}",
+                    TimestampUtc = timestamp
                 };
 
                 await _transactionServices.CreateAsync(txReq, user, ct);
@@ -278,7 +279,7 @@ namespace Inventory.Infrastructure.Services
             await _db.SaveChangesAsync(ct);
         }
 
-        public async Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default)
+        public async Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default)
         {
             var order = await _db.SalesOrders
                 .Include(o => o.Lines)
@@ -306,7 +307,8 @@ namespace Inventory.Infrastructure.Services
                     BatchNumber = line.BatchNumber,
                     ProductBatchId = line.ProductBatchId,
                     CustomerId = order.CustomerId,
-                    Note = $"Sales Order {order.OrderNumber}"
+                    Note = $"Sales Order {order.OrderNumber}",
+                    TimestampUtc = timestamp
                 };
 
                 await _transactionServices.CreateAsync(txReq, user, ct);
