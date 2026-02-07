@@ -1,0 +1,462 @@
+@{
+    ViewData["Title"] = "Financial Analysis";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <h1 class="display-3 fw-black text-uppercase mb-0">Financial Analysis</h1>
+    </div>
+
+    <!-- Period Selection -->
+    <div class="neo-card mb-5 p-4 bg-black text-white">
+        <h5 class="fw-black text-uppercase mb-4">SELECT PERIOD</h5>
+        <div class="row g-3">
+            <div class="col-md-8">
+                <div class="btn-group" role="group" id="period-selector">
+                    <input type="radio" class="btn-check" name="periodType" id="period-today" value="0">
+                    <label class="btn btn-outline-light" for="period-today">TODAY</label>
+
+                    <input type="radio" class="btn-check" name="periodType" id="period-week" value="1">
+                    <label class="btn btn-outline-light" for="period-week">THIS WEEK</label>
+
+                    <input type="radio" class="btn-check" name="periodType" id="period-month" value="2" checked>
+                    <label class="btn btn-outline-light" for="period-month">THIS MONTH</label>
+
+                    <input type="radio" class="btn-check" name="periodType" id="period-quarter" value="3">
+                    <label class="btn btn-outline-light" for="period-quarter">THIS QUARTER</label>
+
+                    <input type="radio" class="btn-check" name="periodType" id="period-year" value="4">
+                    <label class="btn btn-outline-light" for="period-year">THIS YEAR</label>
+
+                    <input type="radio" class="btn-check" name="periodType" id="period-custom" value="5">
+                    <label class="btn btn-outline-light" for="period-custom">CUSTOM</label>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <button type="button" class="neo-btn neo-btn-success" id="btn-apply-period">
+                    <i class="bi bi-arrow-clockwise me-2"></i>APPLY
+                </button>
+            </div>
+        </div>
+
+        <!-- Custom Date Range -->
+        <div id="custom-range-picker" class="row g-3 mt-3" style="display: none;">
+            <div class="col-md-5">
+                <label class="form-label text-uppercase small">FROM DATE</label>
+                <input type="date" id="date-from" class="form-control">
+            </div>
+            <div class="col-md-5">
+                <label class="form-label text-uppercase small">TO DATE</label>
+                <input type="date" id="date-to" class="form-control">
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Summary Card -->
+    <div class="neo-card mb-5 p-5 bg-black text-white">
+        <h4 class="mb-4 fw-black text-uppercase">FINANCIAL SUMMARY</h4>
+        <div id="summary-content">
+            <div class="text-center py-5">
+                <div class="spinner-border" role="status"></div>
+                <p class="mt-3">LOADING FINANCIAL DATA...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Internal Expenses Section -->
+    <div class="row g-4 mb-5">
+        <!-- Add Expense Form -->
+        <div class="col-lg-4">
+            <div class="neo-card p-4 h-100">
+                <h5 class="fw-black text-uppercase mb-4">ADD INTERNAL EXPENSE</h5>
+                <form id="expense-form">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-uppercase small">AMOUNT</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-black text-white">$</span>
+                            <input type="number" id="expense-amount" class="form-control" step="0.01" min="0.01" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-uppercase small">DATE</label>
+                        <input type="date" id="expense-date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-uppercase small">CATEGORY</label>
+                        <select id="expense-category" class="form-select" required>
+                            <option value="1">Rental</option>
+                            <option value="2">Salaries</option>
+                            <option value="3">Labor</option>
+                            <option value="4">Commission</option>
+                            <option value="5">Zakat</option>
+                            <option value="6">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-uppercase small">DESCRIPTION</label>
+                        <textarea id="expense-description" class="form-control" rows="2" required></textarea>
+                    </div>
+                    <button type="submit" class="neo-btn neo-btn-primary w-100">
+                        <i class="bi bi-plus-circle me-2"></i>ADD EXPENSE
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Expenses History -->
+        <div class="col-lg-8">
+            <div class="neo-card p-0 h-100 overflow-hidden">
+                <div class="p-4 bg-black text-white">
+                    <h5 class="mb-0 fw-black text-uppercase">EXPENSES HISTORY</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>DATE</th>
+                                <th>CATEGORY</th>
+                                <th>DESCRIPTION</th>
+                                <th class="text-end">AMOUNT</th>
+                                <th>CREATED BY</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenses-table-body">
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="spinner-border spinner-border-sm me-2"></div>
+                                    LOADING EXPENSES...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        console.log('Financial Analysis Script Loaded');
+
+        let currentFilter = { 
+            DateRangeType: 2, // This Month
+            FromUtc: null,
+            ToUtc: null,
+            TimezoneOffsetMinutes: new Date().getTimezoneOffset()
+        };
+        let isRefreshing = false;
+
+        // formatMoney helper
+        function formatMoney(num) {
+            if (num === null || num === undefined) return "0.00";
+            return parseFloat(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // formatDate helper
+        function formatDate(iso) {
+            if (!iso) return "N/A";
+            try {
+                return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            } catch (e) {
+                return String(iso);
+            }
+        }
+
+        // escapeHtml helper
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function loadFinancialSummary() {
+            const container = document.getElementById('summary-content');
+            if (!container) return;
+            
+            console.log('Fetching financial summary with filter:', currentFilter);
+            container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-light"></div><p class="mt-2 opacity-50">Fetching Summary...</p></div>';
+
+            try {
+                const response = await fetch('/api/financial/summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentFilter)
+                });
+
+                if (!response.ok) throw new Error('Summary fetch failed: ' + response.status);
+                const data = await response.json();
+                console.log('Summary data received:', data);
+
+                let profitClass = 'text-muted';
+                if (data.netProfit > 0) profitClass = 'text-success';
+                else if (data.netProfit < 0) profitClass = 'text-danger';
+                
+                const margin = (typeof data.profitMargin === 'number') ? data.profitMargin.toFixed(2) : '0.00';
+
+                container.innerHTML = `
+                    <!-- Row 1: Key Metrics -->
+                    <div class="row g-4 mb-5">
+                        <div class="col-md-2">
+                            <div class="p-4 border border-white border-opacity-10 rounded h-100" style="background: rgba(255, 255, 255, 0.05);">
+                                <div class="small text-uppercase opacity-50 mb-2">NET SALES REVENUE</div>
+                                <div class="h3 fw-bold mb-0 text-white">$${formatMoney(data.salesProfit)}</div>
+                                <small class="opacity-50" style="font-size: 0.7rem;">(Post-Refunds)</small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <div class="p-4 border border-white border-opacity-10 rounded h-100" style="background: rgba(255, 255, 255, 0.05);">
+                                <div class="small text-uppercase opacity-50 mb-2">Gross Profit</div>
+                                <div class="h3 fw-bold mb-0 text-white">$${formatMoney(data.grossProfit)}</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-2">
+                            <div class="p-4 border border-white border-opacity-10 rounded h-100" style="background: rgba(255, 255, 255, 0.05);">
+                                <div class="small text-uppercase opacity-50 mb-2">Profit Margin</div>
+                                <div class="h3 fw-bold mb-0 text-white">${margin}%</div>
+                            </div>
+                        </div>
+
+                        <!-- Highlighted: NET PROFIT -->
+                        <div class="col-md-3">
+                            <div class="p-4 border border-success border-2 rounded h-100 shadow-sm" style="background: rgba(25, 135, 84, 0.15);">
+                                <div class="text-uppercase fw-black text-success small mb-2">NET PROFIT</div>
+                                <div class="h2 fw-black ${profitClass} mb-0">$${formatMoney(data.netProfit)}</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <div class="p-4 border border-primary border-2 rounded h-100 shadow-sm" style="background: rgba(13, 110, 253, 0.15);">
+                                <div class="text-uppercase fw-black text-primary small mb-2">BANK BALANCE</div>
+                                <div class="h2 fw-black text-white mb-0">$${formatMoney(data.bankBalance)}</div>
+                                <small class="opacity-50" style="font-size: 0.65rem;">Base: $100</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-white opacity-10 my-5">
+
+                    <!-- Row 2: Detailed Breakdown & Taxes -->
+                    <div class="row g-5">
+                        <!-- Left: Expenses Breakdown -->
+                        <div class="col-lg-6">
+                            <h6 class="text-uppercase fw-black mb-4 opacity-50 small letter-spacing-1">PROFIT BREAKDOWN</h6>
+                            <div class="row g-4">
+                                <div class="col-4">
+                                    <div class="p-3 border-start border-3 border-white border-opacity-10">
+                                        <div class="small text-uppercase opacity-50 mb-1">Cost of Goods (COGS)</div>
+                                        <div class="h4 fw-bold text-white mb-0">$${formatMoney(data.costOfGoods)}</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="p-3 border-start border-3 border-white border-opacity-10">
+                                        <div class="small text-uppercase opacity-50 mb-1">Internal Expenses</div>
+                                        <div class="h4 fw-bold text-white mb-0">$${formatMoney(data.internalExpenses)}</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="p-3 border-start border-3 border-warning border-opacity-50">
+                                        <div class="small text-uppercase text-warning mb-1">Purchase Payments</div>
+                                        <div class="h4 fw-bold text-white mb-0">$${formatMoney(data.purchasePayments)}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Tax & Compliance Visualization -->
+                        <div class="col-lg-6">
+                            <h6 class="text-uppercase fw-black mb-4 opacity-50 small letter-spacing-1">TAX & COMPLIANCE</h6>
+                            <div class="row g-4">
+                                <div class="col-6">
+                                    <div class="p-3 border border-white border-opacity-10 rounded" style="background: rgba(255, 255, 255, 0.05);">
+                                        <div class="small text-uppercase opacity-50 mb-1">NET VAT (14%)</div>
+                                        <div class="h4 fw-bold text-white mb-0">$${formatMoney(data.totalVat)}</div>
+                                        <small class="text-muted" style="font-size: 0.65rem;">Collected - Paid</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-3 border border-white border-opacity-10 rounded" style="background: rgba(255, 255, 255, 0.05);">
+                                        <div class="small text-uppercase opacity-50 mb-1">NET MAN-TAX (1%)</div>
+                                        <div class="h4 fw-bold text-white mb-0">$${formatMoney(data.totalManufacturingTax)}</div>
+                                        <small class="text-muted" style="font-size: 0.65rem;">Sales - Purchases</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-3 d-flex align-items-center text-muted small fst-italic">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <span>Taxes are legal obligations and do not affect Gross Profit.</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Summary load error:', error);
+                if (container) container.innerHTML = '<div class="alert alert-danger">Error loading summary: ' + error.message + '</div>';
+            }
+        }
+
+        async function loadExpenses() {
+            const tbody = document.getElementById('expenses-table-body');
+            if (!tbody) return;
+
+            console.log('Fetching expenses history...');
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5"><div class="spinner-border spinner-border-sm text-light"></div></td></tr>';
+
+            try {
+                const response = await fetch('/api/financial/expenses', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentFilter)
+                });
+
+                if (!response.ok) throw new Error('Expenses fetch failed');
+                const expenses = await response.json();
+
+                if (!expenses || expenses.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">No expenses in this period</td></tr>';
+                    return;
+                }
+
+                const categoryNames = ['', 'Rental', 'Salaries', 'Labor', 'Commission', 'Zakat', 'Other'];
+                tbody.innerHTML = expenses.map(e => `
+                    <tr>
+                        <td>${formatDate(e.timestampUtc)}</td>
+                        <td><span class="badge bg-secondary">${categoryNames[e.internalExpenseType] || 'Other'}</span></td>
+                        <td>${escapeHtml(e.description)}</td>
+                        <td class="text-end fw-bold">$${formatMoney(e.amount)}</td>
+                        <td>${escapeHtml(e.createdByUserDisplayName)}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Expenses load error:', error);
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-danger">Error loading expenses</td></tr>';
+            }
+        }
+
+        async function refreshFinancialData() {
+            if (isRefreshing) return;
+            isRefreshing = true;
+            try {
+                await Promise.all([loadFinancialSummary(), loadExpenses()]);
+            } finally {
+                isRefreshing = false;
+            }
+        }
+
+        // Initialize everything on window load
+        window.addEventListener('load', function() {
+            console.log('Window Load Event - Initializing UI...');
+
+            // Form default date
+            const expDateInput = document.getElementById('expense-date');
+            if (expDateInput) expDateInput.value = new Date().toISOString().split('T')[0];
+
+            // Setup period radios
+            document.querySelectorAll('input[name="periodType"]').forEach(radio => {
+                radio.addEventListener('change', function () {
+                    const isCustom = this.value === "5";
+                    const customPicker = document.getElementById('custom-range-picker');
+                    const applyBtn = document.getElementById('btn-apply-period');
+                    
+                    if (customPicker) customPicker.style.display = isCustom ? 'flex' : 'none';
+                    if (applyBtn) applyBtn.style.display = isCustom ? 'inline-block' : 'none';
+
+                    if (!isCustom) {
+                        currentFilter = { 
+                            DateRangeType: parseInt(this.value),
+                            FromUtc: null,
+                            ToUtc: null,
+                            TimezoneOffsetMinutes: new Date().getTimezoneOffset()
+                        };
+                        refreshFinancialData();
+                    }
+                });
+            });
+
+            // Initial UI State check
+            const checkedRadio = document.querySelector('input[name="periodType"]:checked');
+            if (checkedRadio) {
+                const isCustom = checkedRadio.value === "5";
+                const applyBtn = document.getElementById('btn-apply-period');
+                if (applyBtn) applyBtn.style.display = isCustom ? 'inline-block' : 'none';
+                
+                currentFilter.DateRangeType = parseInt(checkedRadio.value);
+            }
+
+            // Apply Button Logic
+            const applyPeriodBtn = document.getElementById('btn-apply-period');
+            if (applyPeriodBtn) {
+                applyPeriodBtn.addEventListener('click', function () {
+                    const checked = document.querySelector('input[name="periodType"]:checked');
+                    if (!checked) return;
+
+                    const val = parseInt(checked.value);
+                    if (val === 5) { // Custom
+                        const from = document.getElementById('date-from').value;
+                        const to = document.getElementById('date-to').value;
+                        if (!from || !to) { if (window.appMessages) window.appMessages.showError('Select both dates'); return; }
+                        
+                        currentFilter = {
+                            DateRangeType: 5,
+                            FromUtc: new Date(from).toISOString(),
+                            ToUtc: new Date(to + 'T23:59:59').toISOString(),
+                            TimezoneOffsetMinutes: new Date().getTimezoneOffset()
+                        };
+                    } else {
+                        currentFilter = { 
+                            DateRangeType: val, 
+                            FromUtc: null, 
+                            ToUtc: null,
+                            TimezoneOffsetMinutes: new Date().getTimezoneOffset()
+                        };
+                    }
+                    refreshFinancialData();
+                });
+            }
+
+            // Expense Form Submission
+            const expForm = document.getElementById('expense-form');
+            if (expForm) {
+                expForm.addEventListener('submit', async function (e) {
+                    e.preventDefault();
+                    const btn = expForm.querySelector('button[type="submit"]');
+                    if (btn) btn.disabled = true;
+
+                    const payload = {
+                        internalExpenseType: parseInt(document.getElementById('expense-category').value),
+                        description: document.getElementById('expense-description').value.trim(),
+                        amount: parseFloat(document.getElementById('expense-amount').value),
+                        timestampUtc: new Date(document.getElementById('expense-date').value).toISOString()
+                    };
+
+                    try {
+                        const res = await fetch('/api/financial/expenses/create', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!res.ok) {
+                            const errText = await res.text();
+                            const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(res, errText) : errText;
+                            throw new Error(msg);
+                        }
+                        expForm.reset();
+                        expDateInput.value = new Date().toISOString().split('T')[0];
+                        await refreshFinancialData();
+                        if (window.appMessages) window.appMessages.showSuccess('Expense added!');
+                    } catch (err) {
+                        if (window.appMessages) window.appMessages.showError(err.message || 'Failed to add expense');
+                    } finally {
+                        if (btn) btn.disabled = false;
+                    }
+                });
+            }
+
+            // Run initial load
+            refreshFinancialData();
+        });
+    </script>
+}

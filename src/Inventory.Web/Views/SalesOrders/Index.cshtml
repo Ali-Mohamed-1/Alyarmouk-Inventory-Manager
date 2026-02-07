@@ -1,0 +1,72 @@
+@model IEnumerable<Inventory.Application.DTOs.SalesOrder.SalesOrderResponseDto>
+@{
+    ViewData["Title"] = "Sales Orders";
+}
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Sales Log</h1>
+        <a asp-action="Create" class="neo-btn neo-btn-primary">
+            <i class="bi bi-plus-circle"></i> NEW SALES ORDER
+        </a>
+    </div>
+
+    <div class="neo-card p-0 overflow-hidden">
+        <div class="p-4 bg-black text-white">
+            <h5 class="mb-0 fw-black text-uppercase">Commercial Transaction Ledger</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">ORDER REF</th>
+                        <th>CUSTOMER</th>
+                        <th>TIMESTAMP</th>
+                        <th class="text-end">NET TOTAL</th>
+                        <th class="text-center">FINANCE</th>
+                        <th class="text-center">STATE</th>
+                        <th class="text-end pe-4">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td class="ps-4"><code class="fw-black fs-6 text-black">@item.OrderNumber</code></td>
+                            <td class="fw-black text-uppercase">@item.CustomerName</td>
+                            <td class="small fw-bold">@item.CreatedUtc.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
+                            <td class="text-end fw-black text-success">@item.TotalAmount.ToString("C2")</td>
+                            <td class="text-center">
+                                @if (item.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.Paid)
+                                {
+                                    <span class="badge neo-btn-success w-100">PAID</span>
+                                }
+                                else
+                                {
+                                    <span class="badge neo-btn-warning w-100">@item.PaymentStatus.ToString().ToUpper()</span>
+                                }
+                            </td>
+                            <td class="text-center">
+                                @{
+                                    var statusCls = "neo-btn-info";
+                                    if(item.Status == Inventory.Domain.Entities.SalesOrderStatus.Done) statusCls = "neo-btn-success";
+                                    if(item.Status == Inventory.Domain.Entities.SalesOrderStatus.Cancelled) statusCls = "neo-btn-danger text-white";
+                                }
+                                <span class="badge @statusCls w-100">@item.Status.ToString().ToUpper()</span>
+                            </td>
+                            <td class="text-end pe-4">
+                                <a asp-action="Details" asp-route-id="@item.Id" class="neo-btn btn-sm">VIEW</a>
+                            </td>
+                        </tr>
+                    }
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-5 fw-bold">NO SALES TRANSACTIONS FOUND.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

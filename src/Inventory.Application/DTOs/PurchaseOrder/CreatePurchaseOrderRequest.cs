@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
+using Inventory.Domain.Entities; // for PurchasePaymentStatus
+
 namespace Inventory.Application.DTOs.PurchaseOrder
 {
     public class CreatePurchaseOrderRequest
@@ -11,10 +13,14 @@ namespace Inventory.Application.DTOs.PurchaseOrder
 
         public string? Note { get; set; }
 
+        public DateTimeOffset? DueDate { get; set; }
         public bool ConnectToReceiveStock { get; set; } = true;
 
+        public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.Cash; // Default to Cash
+        public PurchasePaymentStatus PaymentStatus { get; set; } = PurchasePaymentStatus.Unpaid; // Default to Unpaid
+
         // Tax Configuration
-        public bool IsTaxInclusive { get; set; } = true;
+        public bool IsTaxInclusive { get; set; } = false;
         public bool ApplyVat { get; set; } = true;
         public bool ApplyManufacturingTax { get; set; } = true;
 

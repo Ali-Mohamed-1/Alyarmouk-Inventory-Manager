@@ -12,8 +12,15 @@ namespace Inventory.Application.DTOs.StockSnapshot
         [Required]
         public int ProductId { get; init; }
 
-        [Required]
         public decimal NewQuantity { get; init; }
+
+        public decimal Adjustment { get; init; }
+
+        public string? BatchNumber { get; init; }
+
+        public long? ProductBatchId { get; init; }
+
+        public string? Note { get; init; }
 
         // To prevent overwriting another person's update
         [Required]

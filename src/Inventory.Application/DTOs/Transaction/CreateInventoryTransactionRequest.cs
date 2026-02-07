@@ -22,7 +22,14 @@ namespace Inventory.Application.DTOs.Transaction
         [Required]
         public InventoryTransactionType Type { get; init; }
 
+        [StringLength(100)]
+        public string? BatchNumber { get; init; }
+
+        public long? ProductBatchId { get; init; }
+
         [StringLength(500)]
         public string? Note { get; init; }
+
+        public DateTimeOffset? TimestampUtc { get; init; }
     }
 }

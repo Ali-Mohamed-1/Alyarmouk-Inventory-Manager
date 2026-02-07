@@ -27,6 +27,9 @@ public sealed class InventoryTransaction
     /// </summary>
     public string? BatchNumber { get; set; }
 
+    public long? ProductBatchId { get; set; }
+    public ProductBatch? ProductBatch { get; set; }
+
     public DateTimeOffset TimestampUtc { get; set; }
     public string UserId { get; set; } = "";
     public int clientId { get; set; }

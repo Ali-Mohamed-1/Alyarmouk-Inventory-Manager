@@ -41,7 +41,7 @@ namespace Inventory.Application.DTOs.SalesOrder
         /// For check payments: whether we received the check.
         /// Ignored for cash payments.
         /// </summary>
-        public bool? CheckReceived { get; init; }
+        public bool CheckReceived { get; init; } = false;
 
         /// <summary>
         /// For check payments: date when the check was received.
@@ -51,15 +51,20 @@ namespace Inventory.Application.DTOs.SalesOrder
         /// <summary>
         /// For check payments: whether the check has been cashed.
         /// </summary>
-        public bool? CheckCashed { get; init; }
+        public bool CheckCashed { get; init; } = false;
 
         /// <summary>
         /// For check payments: date when the check was cashed.
         /// </summary>
         public DateTimeOffset? CheckCashedDate { get; init; }
+        
+        /// <summary>
+        /// For bank transfer payments: unique transfer identifier.
+        /// </summary>
+        public string? TransferId { get; init; }
 
         // Tax Configuration
-        public bool IsTaxInclusive { get; init; } = true;
+        public bool IsTaxInclusive { get; init; } = false;
         public bool ApplyVat { get; init; } = true;
         public bool ApplyManufacturingTax { get; init; } = true;
 

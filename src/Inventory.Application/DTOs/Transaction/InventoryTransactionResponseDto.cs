@@ -12,6 +12,8 @@
 
         public decimal QuantityDelta { get; init; }
         public string Type { get; init; } = string.Empty;
+        public long? ProductBatchId { get; init; }
+        public string? BatchNumber { get; init; }
 
         public DateTimeOffset TimestampUtc { get; init; }
         public string UserDisplayName { get; init; } = string.Empty;

@@ -1,8 +1,65 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "Control Center";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="container-fluid py-5">
+    <div class="row min-vh-75 align-items-center">
+        <div class="col-lg-7">
+            <h1 class="display-1 fw-black text-uppercase lh-1 mb-4" style="letter-spacing: -4px;">
+                Operational<br><span class="text-primary">Superiority</span>
+            </h1>
+            <p class="fs-4 fw-bold text-muted mb-5" style="max-width: 600px;">
+                Precision inventory tracking, procurement management, and commercial sales logistics for the modern enterprise.
+            </p>
+            <div class="d-flex gap-3">
+                <a asp-controller="Dashboard" asp-action="Index" class="neo-btn neo-btn-primary px-5 py-3 fs-5">LAUNCH DASHBOARD</a>
+                <a asp-controller="Products" asp-action="Index" class="neo-btn px-5 py-3 fs-5">CATALOG</a>
+            </div>
+        </div>
+        <div class="col-lg-5 d-none d-lg-block">
+            <div class="neo-card p-5" style="background: var(--neo-yellow); transform: rotate(2deg);">
+                <div class="d-flex flex-column gap-4">
+                    <div class="neo-card bg-white p-3 mb-0 border-2">
+                        <h6 class="fw-black text-uppercase small mb-1">System Health</h6>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="spinner-grow spinner-grow-sm text-success" role="status"></div>
+                            <span class="fw-bold">ONLINE & SYNCED</span>
+                        </div>
+                    </div>
+                    <div class="neo-card bg-white p-3 mb-0 border-2">
+                        <h6 class="fw-black text-uppercase small mb-1">Node identifier</h6>
+                        <span class="fw-bold">ALYARMOUK-HQ-PRD</span>
+                    </div>
+                    <div class="neo-card bg-white p-3 mb-0 border-2" style="background: var(--neo-aqua) !important;">
+                        <h6 class="fw-black text-uppercase small mb-1">Active Session</h6>
+                        <span class="fw-bold">AUTHORIZED OPERATOR</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mt-5">
+        <div class="col-md-4">
+            <div class="neo-card h-100 p-4" style="background: white;">
+                <i class="bi bi-box-seam fs-1 mb-3"></i>
+                <h4 class="fw-black text-uppercase">Inventory</h4>
+                <p class="fw-bold text-muted">Real-time stock level monitoring with automated reorder alerts.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="neo-card h-100 p-4" style="background: white;">
+                <i class="bi bi-person-lines-fill fs-1 mb-3"></i>
+                <h4 class="fw-black text-uppercase">Partners</h4>
+                <p class="fw-bold text-muted">Comprehensive customer and supplier relationship management.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="neo-card h-100 p-4" style="background: white;">
+                <i class="bi bi-graph-up-arrow fs-1 mb-3"></i>
+                <h4 class="fw-black text-uppercase">Analytics</h4>
+                <p class="fw-bold text-muted">Deep dive into sales trends and procurement costs.</p>
+            </div>
+        </div>
+    </div>
 </div>

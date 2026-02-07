@@ -29,5 +29,10 @@ namespace Inventory.Application.Abstractions
         /// Toggles whether a product is active
         /// </summary>
         Task SetActiveAsync(int id, bool isActive, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Adds a new batch to a product
+        /// </summary>
+        Task<long> AddBatchAsync(CreateBatchRequest req, UserContext user, CancellationToken ct = default);
     }
 }

@@ -1,0 +1,49 @@
+@model IEnumerable<Inventory.Application.DTOs.PurchaseOrderResponse>
+@{
+    ViewData["Title"] = "Purchase Orders";
+}
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Procurement Log</h1>
+    </div>
+
+    <div class="neo-card p-0 overflow-hidden">
+        <div class="p-4 bg-black text-white">
+            <h5 class="mb-0 fw-black text-uppercase">Supplier Acquisition Ledger</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">ORDER REF</th>
+                        <th>SUPPLIER</th>
+                        <th>ACQUISITION DATE</th>
+                        <th class="text-end">TOTAL OUTLAY</th>
+                        <th class="text-end pe-4">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td class="ps-4"><code class="fw-black fs-6 text-black">@item.OrderNumber</code></td>
+                            <td class="fw-black text-uppercase">@item.SupplierName</td>
+                            <td class="small fw-bold">@item.CreatedUtc.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
+                            <td class="text-end fw-black text-primary">@item.TotalAmount.ToString("C2")</td>
+                            <td class="text-end pe-4">
+                                <a asp-action="Details" asp-route-id="@item.Id" class="neo-btn btn-sm">VIEW</a>
+                            </td>
+                        </tr>
+                    }
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-5 fw-bold">NO PROCUREMENT HISTORY DETECTED.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

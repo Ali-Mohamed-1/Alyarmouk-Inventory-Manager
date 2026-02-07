@@ -1,0 +1,251 @@
+@page
+@model Inventory.Web.Areas.Identity.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Login";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - AlYarmouk</title>
+    <!-- Use CDN for robustness in Identity Area -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --neo-charcoal: #1A1A1A;
+            --neo-offwhite: #F9FAFB;
+            --neo-white: #FFFFFF;
+            --neo-bg: #F3F4F6;
+            --neo-primary: #1E40AF;
+            --neo-border-width: 2px;
+            --neo-border: var(--neo-border-width) solid var(--neo-charcoal);
+            --neo-shadow: 8px 8px 0px 0px var(--neo-charcoal);
+            --neo-shadow-sm: 4px 4px 0px 0px var(--neo-charcoal);
+            --neo-transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        body {
+            font-family: 'Public Sans', sans-serif;
+            background-color: var(--neo-bg);
+            background-image: radial-gradient(var(--neo-charcoal) 1px, transparent 1px);
+            background-size: 40px 40px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .login-wrapper {
+            width: 100%;
+            max-width: 440px;
+        }
+
+        .login-container {
+            background: var(--neo-white);
+            border: var(--neo-border);
+            box-shadow: var(--neo-shadow);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .brand-stripe {
+            height: 10px;
+            background: var(--neo-primary);
+            width: 100%;
+        }
+
+        .login-header {
+            background: var(--neo-charcoal);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+            border-bottom: var(--neo-border);
+        }
+
+        .login-header h1 {
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            margin: 0;
+            font-size: 2.5rem;
+            line-height: 1;
+            color: white !important;
+        }
+
+        .login-body {
+            padding: 3rem 2.5rem;
+        }
+
+        .form-label {
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+            color: #64748b;
+        }
+
+        .form-control {
+            border: var(--neo-border);
+            border-radius: 0;
+            padding: 0.75rem 1rem;
+            font-weight: 700;
+            background: var(--neo-white);
+            transition: var(--neo-transition);
+        }
+
+        .form-control:focus {
+            box-shadow: var(--neo-shadow-sm);
+            border-color: var(--neo-charcoal);
+            outline: none;
+        }
+
+        .neo-btn {
+            background: var(--neo-primary);
+            color: white;
+            border: var(--neo-border);
+            border-radius: 0;
+            padding: 1.25rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 1.1rem;
+            letter-spacing: 0.1em;
+            width: 100%;
+            transition: var(--neo-transition);
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .neo-btn:hover {
+            transform: translate(-3px, -3px);
+            box-shadow: var(--neo-shadow);
+            background: #1e3a8a;
+            color: white;
+        }
+
+        /* Custom Checkbox */
+        .form-check {
+            padding-left: 2rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .form-check-input {
+            width: 1.25rem;
+            height: 1.25rem;
+            margin-left: -2rem;
+            border: var(--neo-border);
+            border-radius: 0 !important;
+            background-color: white;
+            cursor: pointer;
+        }
+
+        .form-check-input:checked {
+            background-color: var(--neo-charcoal);
+            border-color: var(--neo-charcoal);
+        }
+
+        .form-check-label {
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.02em;
+            padding-left: 0.5rem;
+            cursor: pointer;
+        }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 2rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            color: #94a3b8;
+            letter-spacing: 0.15em;
+        }
+
+        .alert-danger {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 2px solid #991b1b;
+            border-radius: 0;
+            font-weight: 700;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-container">
+            <div class="brand-stripe"></div>
+            <div class="login-header">
+                <h1>System Login</h1>
+            </div>
+            <div class="login-body">
+                <form id="account" method="post">
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="alert alert-danger mb-4">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> INVALID CREDENTIALS
+                        </div>
+                    }
+
+                    <div class="mb-4">
+                        <label asp-for="Input.UserName" class="form-label">Username</label>
+                        <input asp-for="Input.UserName" class="form-control" placeholder="ENTER USER ID" autocomplete="username" />
+                        <span asp-validation-for="Input.UserName" class="text-danger fw-bold small mt-1 d-block"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="Input.Password" class="form-label">Password</label>
+                        <input asp-for="Input.Password" id="passwordField" type="password" class="form-control" placeholder="••••••••" autocomplete="current-password" />
+                        <span asp-validation-for="Input.Password" class="text-danger fw-bold small mt-1 d-block"></span>
+                    </div>
+
+                    <div class="mb-5 d-flex flex-column gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" id="showPassword" type="checkbox" />
+                            <label class="form-check-label" for="showPassword">Show password</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" asp-for="Input.RememberMe" />
+                            <label class="form-check-label" asp-for="Input.RememberMe">Remember me</label>
+                        </div>
+                    </div>
+
+                    <button id="login-submit" type="submit" class="neo-btn">
+                        Login
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div class="login-footer">
+            &copy; @DateTime.Now.Year ALYARMOUK INVENTORY MANAGER
+        </div>
+    </div>
+
+    <script>
+        const passField = document.getElementById('passwordField');
+        const showPassCheckbox = document.getElementById('showPassword');
+
+        if (showPassCheckbox) {
+            showPassCheckbox.addEventListener('change', function() {
+                passField.type = this.checked ? 'text' : 'password';
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,6 +1,8 @@
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.StockSnapshot;
 using Inventory.Application.DTOs.Transaction;
+using Inventory.Application.DTOs.SalesOrder;
+using Inventory.Application.DTOs.PurchaseOrder;
 
 namespace Inventory.Application.Abstractions
 {
@@ -27,6 +29,11 @@ namespace Inventory.Application.Abstractions
         Task ReceiveAsync(StockReceiveRequest req, UserContext user, CancellationToken ct = default);
 
         /// <summary>
+        /// Records outgoing stock and attributes it to the requesting user
+        /// </summary>
+        Task IssueAsync(StockIssueRequest req, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
         /// Adjusts stock counts for a product, capturing who made the change
         /// </summary>
         Task UpdateStockAsync(UpdateStockRequest req, UserContext user, CancellationToken ct = default);
@@ -45,5 +52,47 @@ namespace Inventory.Application.Abstractions
         /// Retrieves all transactions associated with a specific product
         /// </summary>
         Task<IReadOnlyList<InventoryTransactionResponseDto>> GetProductTransactionsAsync(int productId, CancellationToken ct = default);
+
+        /// <summary>
+        /// Processes stock receipt for a Purchase Order (PurchaseOrder.Status = Received)
+        /// </summary>
+        Task ProcessPurchaseOrderStockAsync(long purchaseOrderId, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default);
+
+        /// <summary>
+        /// Reverses stock receipt for a Purchase Order (e.g. Received -> Cancelled)
+        /// </summary>
+        Task ReversePurchaseOrderStockAsync(long purchaseOrderId, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Refunds stock for a Purchase Order (e.g. partial refund)
+        /// </summary>
+        Task RefundPurchaseOrderStockAsync(long purchaseOrderId, List<RefundPurchaseLineItem> lines, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Reserves stock for a Sales Order (e.g. Status = Pending)
+        /// </summary>
+        Task ReserveSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Releases reserved stock for a Sales Order (e.g. Status = Cancelled)
+        /// </summary>
+        Task ReleaseSalesOrderReservationAsync(long salesOrderId, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Processes stock issue for a Sales Order (SalesOrder.Status = Done)
+        /// Also releases any existing reservations for this order.
+        /// </summary>
+        Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default);
+
+        /// <summary>
+        /// Reverses stock issue for a Sales Order (e.g. Done -> Pending)
+        /// Also re-reserves the stock if transitioning back to Pending.
+        /// </summary>
+        Task ReverseSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Refunds stock for a Sales Order (e.g. partial refund)
+        /// </summary>
+        Task RefundSalesOrderStockAsync(long salesOrderId, List<RefundLineItem> lines, UserContext user, CancellationToken ct = default);
     }
 }

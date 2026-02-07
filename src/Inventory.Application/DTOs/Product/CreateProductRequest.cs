@@ -15,15 +15,13 @@ namespace Inventory.Application.DTOs.Product
         [Required]
         public int CategoryId { get; init; }
 
-        [Range(0, 100000)]
-        [Required]
-        public decimal Price { get; init; }
+
+
 
         public string Unit { get; init; } = "pcs";
 
         [Range(0, 1000000)]
         public decimal ReorderPoint { get; init; }
-        public bool isActive { get; init; }
-        public string RowVersion { get; init; } = string.Empty;
+        public bool IsActive { get; init; } = true;
     }
 }

@@ -706,18 +706,18 @@ function submitRefund() {
     const refundNote = document.getElementById('refundNote').value;
 
     if (!orderId || !refundAmount || refundAmount <= 0) {
-        alert('Please enter a valid refund amount.');
+        if (window.appMessages) window.appMessages.showError('Please enter a valid refund amount.');
         return;
     }
 
     const order = demoData.orders.find(o => o.id === orderId);
     if (!order) {
-        alert('Order not found.');
+        if (window.appMessages) window.appMessages.showError('Order not found.');
         return;
     }
 
     if (refundAmount > order.totalAmount) {
-        alert(`Refund amount cannot exceed order total of ${formatCurrency(order.totalAmount)}.`);
+        if (window.appMessages) window.appMessages.showError(`Refund amount cannot exceed order total of ${formatCurrency(order.totalAmount)}.`);
         return;
     }
 
@@ -730,7 +730,7 @@ function submitRefund() {
     order.refundAmount = refundAmount;
 
     // In a real application, this would make an API call to process the refund
-    alert(`Refund of ${formatCurrency(refundAmount)} processed successfully for order ${order.orderNumber}.`);
+    if (window.appMessages) window.appMessages.showSuccess(`Refund of ${formatCurrency(refundAmount)} processed successfully for order ${order.orderNumber}.`);
 
     closeRefundModal();
 
@@ -810,7 +810,7 @@ function closeCreateCategoryModal() {
 
 function submitCategory() {
     // In a real app, this would make an API call
-    alert('Category creation would be submitted to the API. This is a demo.');
+    if (window.appMessages) window.appMessages.showError('Category creation would be submitted to the API. This is a demo.');
     closeCreateCategoryModal();
 }
 
@@ -819,7 +819,7 @@ function editCategory(categoryId) {
     if (!category) return;
 
     // In a real app, this would open an edit modal
-    alert(`Edit category: ${category.name} (ID: ${categoryId})`);
+    if (window.appMessages) window.appMessages.showError(`Edit category: ${category.name} (ID: ${categoryId})`);
 }
 
 // Audit Logs Functions
@@ -983,7 +983,7 @@ function submitOrder() {
     const customerId = parseInt(document.getElementById('orderCustomerId').value, 10);
     const customer = demoData.customers.find(c => c.id === customerId);
     if (!customer) {
-        alert('Please select a customer.');
+        if (window.appMessages) window.appMessages.showError('Please select a customer.');
         return;
     }
 
@@ -1048,7 +1048,7 @@ function submitOrder() {
 
 function submitCustomer() {
     // In a real app, this would make an API call
-    alert('Customer creation would be submitted to the API. This is a demo.');
+    if (window.appMessages) window.appMessages.showError('Customer creation would be submitted to the API. This is a demo.');
     closeCreateCustomerModal();
 }
 
@@ -1145,7 +1145,7 @@ function showSupplierHistory(supplierId) {
 function showPurchaseOrderDetails(orderNumber) {
     const order = (demoData.purchaseOrders || []).find(po => po.orderNumber === orderNumber);
     if (!order) {
-        alert('Purchase order not found');
+        if (window.appMessages) window.appMessages.showError('Purchase order not found');
         return;
     }
 
@@ -1189,7 +1189,7 @@ function showPurchaseOrderDetails(orderNumber) {
         </div>
     `;
 
-    alert(`Purchase Order Details:\n\n${order.orderNumber}\nSupplier: ${order.supplierName}\nTotal: ${formatCurrency(order.totalAmount || 0)}`);
+    if (window.appMessages) window.appMessages.showSuccess(`Purchase Order: ${order.orderNumber} | Supplier: ${order.supplierName} | Total: ${formatCurrency(order.totalAmount || 0)}`);
 }
 
 function showCreateSupplierModal() {
@@ -1265,7 +1265,7 @@ function submitReceiveStock() {
     const note = document.getElementById('receiveNote').value;
 
     if (!supplierId || !productId || !quantity || quantity <= 0 || unitCost < 0) {
-        alert('Please fill in all required fields with valid values.');
+        if (window.appMessages) window.appMessages.showError('Please fill in all required fields with valid values.');
         return;
     }
 
@@ -1321,7 +1321,7 @@ function submitReceiveStock() {
         }
     }
 
-    alert(`Successfully received ${quantity} units of ${product?.productName || 'product'}`);
+    if (window.appMessages) window.appMessages.showSuccess(`Successfully received ${quantity} units of ${product?.productName || 'product'}`);
     closeReceiveStockModal();
 }
 
@@ -1356,18 +1356,18 @@ function submitIssueStock() {
     const note = document.getElementById('issueNote').value;
 
     if (!productId || !quantity || quantity <= 0 || !reason) {
-        alert('Please fill in all required fields with valid values.');
+        if (window.appMessages) window.appMessages.showError('Please fill in all required fields with valid values.');
         return;
     }
 
     const product = demoData.products.find(p => p.productId == productId);
     if (!product) {
-        alert('Product not found.');
+        if (window.appMessages) window.appMessages.showError('Product not found.');
         return;
     }
 
     if (product.available < quantity) {
-        alert(`Insufficient stock. Available: ${product.available}, Requested: ${quantity}`);
+        if (window.appMessages) window.appMessages.showError(`Insufficient stock. Available: ${product.available}, Requested: ${quantity}`);
         return;
     }
 
@@ -1395,7 +1395,7 @@ function submitIssueStock() {
         renderTransactions();
     }
 
-    alert(`Successfully issued ${quantity} units of ${product.productName} (Reason: ${reason})`);
+    if (window.appMessages) window.appMessages.showSuccess(`Successfully issued ${quantity} units of ${product.productName} (Reason: ${reason})`);
     closeIssueStockModal();
 }
 
@@ -1449,13 +1449,13 @@ function submitAdjustStock() {
     const note = document.getElementById('adjustNote').value;
 
     if (!productId || newQuantity < 0 || !reason) {
-        alert('Please fill in all required fields with valid values.');
+        if (window.appMessages) window.appMessages.showError('Please fill in all required fields with valid values.');
         return;
     }
 
     const product = demoData.products.find(p => p.productId == productId);
     if (!product) {
-        alert('Product not found.');
+        if (window.appMessages) window.appMessages.showError('Product not found.');
         return;
     }
 
@@ -1486,7 +1486,7 @@ function submitAdjustStock() {
         renderTransactions();
     }
 
-    alert(`Successfully adjusted stock for ${product.productName} from ${oldQuantity} to ${newQuantity} (Reason: ${reason})`);
+    if (window.appMessages) window.appMessages.showSuccess(`Successfully adjusted stock for ${product.productName} from ${oldQuantity} to ${newQuantity} (Reason: ${reason})`);
     closeAdjustStockModal();
 }
 

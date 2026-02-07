@@ -1,4 +1,4 @@
-﻿using Inventory.Application.Abstractions;
+using Inventory.Application.Abstractions;
 using Inventory.Application.DTOs;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;

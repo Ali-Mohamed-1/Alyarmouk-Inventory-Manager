@@ -1,0 +1,70 @@
+@model Inventory.Application.DTOs.Product.CreateProductRequest
+@{
+    ViewData["Title"] = "Add Product";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-8">
+            <div class="neo-card p-0 overflow-hidden">
+                <div class="p-4 bg-black text-white d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0 fw-black text-uppercase">Enroll New Product</h3>
+                    <a asp-controller="Dashboard" asp-action="Index" class="neo-btn neo-btn-danger btn-sm text-uppercase">ABORT COMMAND</a>
+                </div>
+                <div class="p-5" style="background: white;">
+                    <form asp-action="Create" method="post">
+                        @Html.AntiForgeryToken()
+                        
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label asp-for="Sku" class="form-label fw-black text-uppercase small">Stock Keeping Unit (SKU)</label>
+                                <input asp-for="Sku" class="form-control fw-black" required placeholder="SYSTEM-GENERATED OR MANUAL" />
+                                <span asp-validation-for="Sku" class="text-danger small fw-bold"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="Name" class="form-label fw-black text-uppercase small">Identification Name</label>
+                                <input asp-for="Name" class="form-control fw-black" required placeholder="PRODUCT DESCRIPTIVE NAME" />
+                                <span asp-validation-for="Name" class="text-danger small fw-bold"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="CategoryId" class="form-label fw-black text-uppercase small">System Category</label>
+                                <select asp-for="CategoryId" class="form-select fw-bold" asp-items="@(new SelectList(ViewBag.Categories, "Id", "Name"))" required>
+                                    <option value="">-- SELECT CATEGORY --</option>
+                                </select>
+                                <span asp-validation-for="CategoryId" class="text-danger small fw-bold"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="Unit" class="form-label fw-black text-uppercase small">Measurement Unit</label>
+                                <input asp-for="Unit" class="form-control fw-bold" required placeholder="e.g. KG, PCS, BOX" />
+                                <span asp-validation-for="Unit" class="text-danger small fw-bold"></span>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label asp-for="ReorderPoint" class="form-label fw-black text-uppercase small">Low stock Level Trigger</label>
+                                <input asp-for="ReorderPoint" class="form-control fw-bold" type="number" step="0.01" required />
+                                <span asp-validation-for="ReorderPoint" class="text-danger small fw-bold"></span>
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" asp-for="IsActive" checked>
+                                    <label class="form-check-label" asp-for="IsActive">Product is Globally Active</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12 mt-5 pt-4 border-top border-2">
+                                <div class="d-flex gap-3">
+                                    <button type="submit" class="neo-btn neo-btn-primary px-5">INITIALIZE RECORD</button>
+                                    <a asp-controller="Dashboard" asp-action="Index" class="neo-btn">CANCEL</a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

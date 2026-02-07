@@ -9,4 +9,6 @@ public class Supplier
     public string? Address { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
+
+    public ICollection<Product> Products { get; set; } = new List<Product>();
 }

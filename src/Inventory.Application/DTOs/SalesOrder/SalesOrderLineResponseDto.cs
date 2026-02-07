@@ -8,6 +8,16 @@
         public decimal Quantity { get; init; }
         public string Unit { get; init; } = string.Empty; // Mapped from UnitSnapshot
         public decimal UnitPrice { get; init; }
-        public decimal LineTotal => Quantity * UnitPrice;
+        public string? BatchNumber { get; init; }
+        public long? ProductBatchId { get; init; }
+        public decimal LineSubtotal { get; init; }
+        public decimal LineVatAmount { get; init; }
+        public decimal LineManufacturingTaxAmount { get; init; }
+        public decimal LineTotal { get; init; }
+        
+        /// <summary>
+        /// Total quantity of this line that has been refunded (Prev. Ret.).
+        /// </summary>
+        public decimal RefundedQuantity { get; init; }
     }
 }

@@ -67,80 +67,96 @@ namespace Inventory.Infrastructure.Services
             };
 
             // Use transaction to ensure stock snapshot and transaction record are updated atomically
-            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            // Check if we already have an active transaction (e.g. from SalesOrderServices.RefundAsync)
+            var existingTransaction = _db.Database.CurrentTransaction;
+            var transaction = existingTransaction == null ? await _db.Database.BeginTransactionAsync(ct) : null;
+            
             try
             {
-                // Load or create stock snapshot
+                // 1. Ensure Product exists (already checked above, but keeping for consistency with provided snippet structure)
+                // var productExists = await _db.Products.AnyAsync(p => p.Id == req.ProductId, ct);
+                // if (!productExists)
+                //     throw new NotFoundException($"Product id {req.ProductId} was not found.");
+
+                // 2. Load or create StockSnapshot (mostly for RowVersion/existence)
                 var snapshot = await _db.StockSnapshots
                     .FirstOrDefaultAsync(s => s.ProductId == req.ProductId, ct);
 
                 if (snapshot is null)
                 {
-                    snapshot = new StockSnapshot
-                    {
-                        ProductId = req.ProductId,
-                        OnHand = 0
-                    };
+                    snapshot = new StockSnapshot { ProductId = req.ProductId, OnHand = 0 }; // Initialize OnHand
                     _db.StockSnapshots.Add(snapshot);
                 }
 
-                // For Issue transactions, ensure we have enough stock
-                if (req.Type == InventoryTransactionType.Issue)
+                // 3. Ensure ProductBatch exists
+                var batchNumber = (req.BatchNumber ?? "").Trim();
+                ProductBatch? batch = null;
+
+                if (req.ProductBatchId.HasValue && req.ProductBatchId.Value > 0)
                 {
-                    if (snapshot.OnHand + quantityDelta < 0)
-                        throw new ValidationException($"Insufficient stock. Available: {snapshot.OnHand}, Requested: {req.Quantity}");
+                    batch = await _db.ProductBatches.FindAsync(new object[] { req.ProductBatchId.Value }, ct);
+                }
+                
+                if (batch == null)
+                {
+                    // Check Local first for unsaved batches (e.g. added by InventoryServices but not saved yet)
+                    batch = _db.ProductBatches.Local.FirstOrDefault(b => b.ProductId == req.ProductId && b.BatchNumber == batchNumber);
                 }
 
-                // Update stock snapshot
-                snapshot.OnHand += quantityDelta;
+                if (batch == null)
+                {
+                    batch = await _db.ProductBatches.FirstOrDefaultAsync(b => b.ProductId == req.ProductId && b.BatchNumber == batchNumber, ct);
+                }
 
-                // Get product cost for financial tracking
-                var unitCost = product.Cost;
-                var totalCost = unitCost * req.Quantity;
+                if (batch == null)
+                {
+                    batch = new ProductBatch
+                    {
+                        ProductId = req.ProductId,
+                        BatchNumber = batchNumber,
+                        OnHand = 0,
+                        Reserved = 0
+                    };
+                    _db.ProductBatches.Add(batch);
+                    // No need to SaveChanges here, it will be saved with the transaction and other entities
+                }
 
-                // Create inventory transaction
+                // 4. Validation
+                if (req.Type == InventoryTransactionType.Issue)
+                {
+                    if (batch.OnHand + quantityDelta < 0)
+                        throw new ValidationException($"Insufficient stock in batch '{batchNumber}'. Available: {batch.OnHand}, Requested: {req.Quantity}");
+                }
+
+                // 5. Create transaction
                 var inventoryTransaction = new InventoryTransaction
                 {
                     ProductId = req.ProductId,
                     QuantityDelta = quantityDelta,
-                    UnitCost = unitCost,
+                    UnitCost = null, // Derived from batch logic elsewhere or added later
                     Type = req.Type,
-                    TimestampUtc = DateTimeOffset.UtcNow,
-                    UserId = user.UserId,
+                    BatchNumber = batchNumber,
+                    ProductBatchId = batch.Id,
+                    ProductBatch = batch, // Important: Link nav prop for tracking dirty/new entities
                     UserDisplayName = user.UserDisplayName,
-                    clientId = req.CustomerId ?? 0,
-                    Note = req.Note
+                    clientId = req.CustomerId ?? 0
                 };
-
-                _db.InventoryTransactions.Add(inventoryTransaction);
-                await _db.SaveChangesAsync(ct); // Save to get the ID
-
-                // Create financial transaction for money flow
-                // Receive: Expense (money going out to buy stock)
-                // Issue: Expense (cost of goods sold)
-                if (req.Type == InventoryTransactionType.Receive || req.Type == InventoryTransactionType.Issue)
+                
+                if (req.TimestampUtc.HasValue)
                 {
-                    var financialTransaction = new FinancialTransaction
-                    {
-                        Type = FinancialTransactionType.Expense, // Money going out
-                        Amount = totalCost,
-                        InventoryTransactionId = inventoryTransaction.Id,
-                        ProductId = req.ProductId,
-                        CustomerId = req.CustomerId,
-                        TimestampUtc = DateTimeOffset.UtcNow,
-                        UserId = user.UserId,
-                        UserDisplayName = user.UserDisplayName,
-                        Note = req.Type == InventoryTransactionType.Receive 
-                            ? $"Stock received: {product.Name}" 
-                            : $"Stock issued (COGS): {product.Name}"
-                    };
-
-                    _db.FinancialTransactions.Add(financialTransaction);
+                    inventoryTransaction.TimestampUtc = req.TimestampUtc.Value;
+                }
+                else
+                {
+                    inventoryTransaction.TimestampUtc = DateTimeOffset.UtcNow;
                 }
 
-                await _db.SaveChangesAsync(ct);
+                // Update batch OnHand
+                batch.OnHand += quantityDelta;
 
-                // AUDIT LOG: Record the transaction creation
+                _db.InventoryTransactions.Add(inventoryTransaction);
+                await _db.SaveChangesAsync(ct); 
+
                 await _auditWriter.LogCreateAsync<InventoryTransaction>(
                     inventoryTransaction.Id,
                     user,
@@ -155,14 +171,28 @@ namespace Inventory.Infrastructure.Services
                     ct);
 
                 await _db.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
+
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync(ct);
+                }
 
                 return inventoryTransaction.Id;
             }
-            catch (DbUpdateException ex)
+            catch (Exception)
             {
-                await transaction.RollbackAsync(ct);
-                throw new ConflictException("Could not create inventory transaction due to a database conflict.", ex);
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync(ct);
+                }
+                throw;
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
             }
         }
 
@@ -187,6 +217,8 @@ namespace Inventory.Infrastructure.Services
                     Type = t.Type.ToString(),
                     TimestampUtc = t.TimestampUtc,
                     UserDisplayName = t.UserDisplayName,
+                    ProductBatchId = t.ProductBatchId,
+                    BatchNumber = t.BatchNumber,
                     Note = t.Note
                 })
                 .ToListAsync(ct);
@@ -213,6 +245,8 @@ namespace Inventory.Infrastructure.Services
                     Type = t.Type.ToString(),
                     TimestampUtc = t.TimestampUtc,
                     UserDisplayName = t.UserDisplayName,
+                    ProductBatchId = t.ProductBatchId,
+                    BatchNumber = t.BatchNumber,
                     Note = t.Note
                 })
                 .ToListAsync(ct);
@@ -241,6 +275,8 @@ namespace Inventory.Infrastructure.Services
                     Type = t.Type.ToString(),
                     TimestampUtc = t.TimestampUtc,
                     UserDisplayName = t.UserDisplayName,
+                    ProductBatchId = t.ProductBatchId,
+                    BatchNumber = t.BatchNumber,
                     Note = t.Note
                 })
                 .ToListAsync(ct);

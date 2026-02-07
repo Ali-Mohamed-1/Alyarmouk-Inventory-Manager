@@ -1,0 +1,1650 @@
+@{
+    ViewData["Title"] = "Transactions";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <h1 class="display-3 fw-black text-uppercase mb-0">Transactions</h1>
+    </div>
+
+    <!-- TABS NAVIGATION -->
+    <ul class="nav nav-tabs border-0 mb-0" id="activityTabs" role="tablist">
+
+        <li class="nav-item">
+            <button class="neo-btn active me-2" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales-content" type="button" role="tab">SALES ACTIVITY</button>
+        </li>
+        <li class="nav-item">
+            <button class="neo-btn me-2" id="purchases-tab" data-bs-toggle="tab" data-bs-target="#purchases-content" type="button" role="tab">PURCHASE ACTIVITY</button>
+        </li>
+        <li class="nav-item">
+            <button class="neo-btn" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory-content" type="button" role="tab">Issue & Adjust ACTIVITY</button>
+        </li>
+    </ul>
+
+    <!-- TABS CONTENT -->
+    <div class="tab-content neo-card mt-0 border-top-0 p-4" style="background: white; border-width: 3px;">
+        
+
+
+        <!-- SALES CONTENT -->
+        <div class="tab-pane fade show active" id="sales-content" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="fw-black text-uppercase mb-0">Sales Activity</h4>
+            </div>
+            
+            <!-- LIST VIEW -->
+            <div id="so-list-view">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="so-table">
+                        <thead>
+                            <tr>
+                                <th>ORDER #</th>
+                                <th>CUSTOMER</th>
+                                <th>DATE</th>
+                                <th>DEADLINE</th>
+                                <th>STATUS</th>
+                                <th>PAYMENT</th>
+                                <th class="text-end">TOTAL</th>
+                                <th class="text-end">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="so-table-body">
+                            <tr><td colspan="7" class="text-center py-4 fw-bold">LOADING RECENT SALES...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DETAIL VIEW -->
+            <div id="so-detail-view" style="display:none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-black text-uppercase mb-0">Sales Order: <span id="so-detail-number" class="text-primary"></span></h5>
+                    <div class="d-flex gap-2">
+                         <div id="so-actions-container" class="d-flex gap-1"></div>
+                         <a id="btn-print-so-activity" href="#" target="_blank" class="neo-btn neo-btn-primary btn-sm">
+                            <i class="bi bi-printer"></i> PRINT
+                         </a>
+                        <button class="neo-btn neo-btn-info btn-sm" onclick="switchSoView('list')">
+                            <i class="bi bi-arrow-left"></i> BACK TO LIST
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="neo-card mb-4" style="background: #f8f8f8;">
+                    <div class="row g-4">
+                        <!-- Left: Info -->
+                        <div class="col-md-6 border-end border-2">
+                            <h6 class="fw-black text-uppercase small mb-3">General Details</h6>
+                            <div class="mb-2"><strong>CUSTOMER:</strong> <span id="so-detail-customer"></span></div>
+                            <div class="mb-2"><strong>DATE:</strong> <span id="so-detail-date"></span></div>
+                            <div class="mb-2 d-flex align-items-center gap-2">
+                                <strong>STATUS:</strong> <span id="so-detail-status"></span>
+                                <button class="neo-btn btn-sm py-0 ms-2" style="font-size: 0.7rem;" onclick="openSoStatusModal()">EDIT</button>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <h6 class="fw-black text-uppercase small mb-3">Documents</h6>
+                                <div id="so-docs-section" class="d-flex flex-column gap-2"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Right: Financials -->
+                        <div class="col-md-6 ps-md-4">
+                            <h6 class="fw-black text-uppercase small mb-3">Financial Overview</h6>
+                            <div class="mb-2">
+                                <strong>PAYMENT:</strong> <span id="so-detail-payment"></span>
+                            </div>
+                            <div class="mb-4 d-flex gap-2">
+                                <button class="neo-btn neo-btn-success btn-sm flex-grow-1" style="font-size: 0.7rem;" onclick="openSoRecordPaymentModal()">RECORD PAYMENT</button>
+                                <button class="neo-btn neo-btn-primary btn-sm flex-grow-1" style="font-size: 0.7rem;" onclick="openSoEditInfoModal()">EDIT INFO</button>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small fw-bold">SUBTOTAL:</span>
+                                <span id="so-detail-subtotal" class="fw-bold"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small fw-bold">VAT:</span>
+                                <span id="so-detail-vat"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small fw-bold">TAX (1%):</span>
+                                <span id="so-detail-man-tax"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mt-3 pt-2 border-top border-2">
+                                <span class="fw-black">TOTAL:</span>
+                                <span id="so-detail-total" class="fw-black fs-4 text-success"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="fw-black text-uppercase mb-3">Order Line Items</h6>
+                <div class="table-responsive neo-card p-0">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-dark text-white">
+                            <tr>
+                                <th>PRODUCT</th>
+                                <th>BATCH</th>
+                                <th class="text-center">QTY</th>
+                                <th class="text-end">UNIT PRICE</th>
+                                <th class="text-end">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="so-detail-lines"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PURCHASES CONTENT -->
+        <div class="tab-pane fade" id="purchases-content" role="tabpanel">
+             <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="fw-black text-uppercase mb-0">Purchase Activity</h4>
+            </div>
+
+            <!-- LIST VIEW -->
+            <div id="po-list-view">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>ORDER #</th>
+                                <th>SUPPLIER</th>
+                                <th>DATE</th>
+                                <th>DEADLINE</th>
+                                <th>STATUS</th>
+                                <th>PAYMENT</th>
+                                <th class="text-end">TOTAL</th>
+                                <th class="text-end">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="po-table-body">
+                            <tr><td colspan="7" class="text-center py-4 fw-bold">LOADING RECENT PURCHASES...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DETAIL VIEW -->
+            <div id="po-detail-view" style="display:none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-black text-uppercase mb-0">Purchase Order: <span id="po-detail-number" class="text-primary"></span></h5>
+                    <div class="d-flex gap-2">
+                        <div id="po-actions-container" class="d-flex gap-1"></div>
+                        <a id="btn-print-po-activity" href="#" target="_blank" class="neo-btn neo-btn-primary btn-sm">
+                            <i class="bi bi-printer"></i> PRINT
+                        </a>
+                        <button class="neo-btn neo-btn-info btn-sm" onclick="switchPoView('list')">
+                            <i class="bi bi-arrow-left"></i> BACK TO LIST
+                        </button>
+                    </div>
+                </div>
+
+                <div class="neo-card mb-4" style="background: #f8f8f8;">
+                    <div class="row g-4">
+                        <div class="col-md-6 border-end border-2">
+                            <h6 class="fw-black text-uppercase small mb-3">General Details</h6>
+                            <div class="mb-2"><strong>SUPPLIER:</strong> <span id="po-detail-supplier"></span></div>
+                            <div class="mb-2"><strong>DATE:</strong> <span id="po-detail-date"></span></div>
+                            <div class="mb-2 d-flex align-items-center gap-2">
+                                <strong>STATUS:</strong> <span id="po-detail-status"></span>
+                                <button class="neo-btn btn-sm py-0 ms-2" style="font-size: 0.7rem;" onclick="openPoStatusModal()">EDIT</button>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <h6 class="fw-black text-uppercase small mb-3">Documents</h6>
+                                <div id="po-docs-section" class="d-flex flex-column gap-2"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 ps-md-4">
+                            <h6 class="fw-black text-uppercase small mb-3">Financial Overview</h6>
+                            <div class="mb-2">
+                                <strong>PAYMENT:</strong> <span id="po-detail-payment"></span>
+                            </div>
+                            <div class="mb-2 d-flex justify-content-between">
+                                <span class="small fw-bold">DEADLINE:</span>
+                                <span id="po-detail-deadline" class="fw-black small"></span>
+                            </div>
+                            <div class="mb-4 d-flex gap-2">
+                                <button class="neo-btn neo-btn-success btn-sm flex-grow-1" style="font-size: 0.7rem;" onclick="openPoRecordPaymentModal()">RECORD PAYMENT</button>
+                                <button class="neo-btn neo-btn-primary btn-sm flex-grow-1" style="font-size: 0.7rem;" onclick="openPoEditInfoModal()">EDIT INFO</button>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small fw-bold">SUBTOTAL:</span>
+                                <span id="po-detail-subtotal" class="fw-bold"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small fw-bold">VAT:</span>
+                                <span id="po-detail-vat"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small fw-bold">TAX:</span>
+                                <span id="po-detail-man-tax"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mt-3 pt-2 border-top border-2">
+                                <span class="fw-black">TOTAL:</span>
+                                <span id="po-detail-total" class="fw-black fs-4 text-success"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="fw-black text-uppercase mb-3">Ordered Products</h6>
+                <div class="table-responsive neo-card p-0">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-dark text-white">
+                            <tr>
+                                <th>PRODUCT</th>
+                                <th>BATCH</th>
+                                <th class="text-center">QTY</th>
+                                <th class="text-end">UNIT COST</th>
+                                <th class="text-end">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="po-detail-lines"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- INVENTORY CONTENT -->
+        <div class="tab-pane fade" id="inventory-content" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="fw-black text-uppercase mb-0">Issue & Adjust Transactions</h4>
+            </div>
+
+            <!-- LIST VIEW -->
+            <div id="inv-list-view">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>TX ID</th>
+                                <th>DATE</th>
+                                <th>TYPE</th>
+                                <th>PRODUCT</th>
+                                <th class="text-center">QTY</th>
+                                <th>NOTE / REF</th>
+                                <th class="text-end">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inv-table-body">
+                            <tr><td colspan="7" class="text-center py-4 fw-bold">LOADING TRANSACTIONS...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DETAIL VIEW -->
+            <div id="inv-detail-view" style="display:none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-black text-uppercase mb-0">Transaction: <span id="inv-detail-id" class="text-primary"></span></h5>
+                    <button class="neo-btn neo-btn-info btn-sm" onclick="switchInvView('list')">
+                        <i class="bi bi-arrow-left"></i> BACK TO LIST
+                    </button>
+                </div>
+
+                <div class="neo-card p-4" style="background: #f8f8f8;">
+                    <div class="row g-4">
+                        <div class="col-md-6 border-end border-2">
+                            <h6 class="fw-black text-uppercase small mb-3">Core Info</h6>
+                            <div class="mb-2"><strong>DATE:</strong> <span id="inv-detail-date"></span></div>
+                            <div class="mb-2"><strong>TYPE:</strong> <span id="inv-detail-type"></span></div>
+                            <div class="mb-2"><strong>DIRECTION:</strong> <span id="inv-detail-direction" class="fw-bold"></span></div>
+                        </div>
+                        <div class="col-md-6 ps-md-4">
+                            <h6 class="fw-black text-uppercase small mb-3">Product Context</h6>
+                            <div class="mb-2"><strong>PRODUCT:</strong> <span id="inv-detail-product" class="fw-black text-uppercase"></span></div>
+                            <div class="mb-2"><strong>QUANTITY AFFECTED:</strong> <span id="inv-detail-qty" class="fw-black fs-5"></span></div>
+                            <div class="mt-3">
+                                <label class="small fw-bold text-muted">NOTE / REASON</label>
+                                <p id="inv-detail-note" class="mb-0 bg-white p-2 border"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- HIDDEN UPLOADS -->
+<input type="file" id="invoiceUploadInput" style="display:none" onchange="performUpload('invoice')">
+<input type="file" id="receiptUploadInput" style="display:none" onchange="performUpload('receipt')">
+
+<!-- MODALS AREA -->
+
+<!-- SO: Edit Status -->
+<div class="modal fade" id="soStatusModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">SO Lifecycle Status</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <div class="mb-4">
+                    <label class="form-label fw-black text-uppercase small mb-3">Target Status</label>
+                    <select class="form-select fw-black text-center" id="soUpdateStatusSelect">
+                        <option value="0">PENDING</option>
+                        <option value="1">DONE</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm" onclick="updateSoStatus()">CONFIRM</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SO: Record Payment Modal -->
+<div class="modal fade" id="soRecordPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Record Customer Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-4 text-center">
+                    <div class="small fw-bold text-uppercase opacity-50">Remaining Balance</div>
+                    <div class="h2 fw-black text-danger mb-0" id="so-record-remaining-balance">$0.00</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Payment Amount</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-black text-white fw-bold">$</span>
+                        <input type="number" class="form-control form-control-lg fw-black" id="soPaymentAmount" step="0.01">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Reference / ID</label>
+                    <input type="text" class="form-control fw-bold" id="soPaymentReference" placeholder="e.g. CASH, CHECK #123, etc.">
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Note</label>
+                    <textarea class="form-control fw-bold" id="soPaymentNote" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-success btn-sm px-4" id="submitSoPaymentBtn" onclick="submitSoPayment()">SUBMIT PAYMENT</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SO: Edit Info Modal -->
+<div class="modal fade" id="soEditInfoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Edit Payment Metadata</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="soEditPaymentInfoForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-black text-uppercase small">Payment Method</label>
+                        <select class="form-select fw-bold" id="soEditPaymentMethod" onchange="toggleSoEditPaymentFields()">
+                            <option value="1">CASH</option>
+                            <option value="2">CHECK</option>
+                            <option value="3">BANK TRANSFER</option>
+                        </select>
+                    </div>
+
+                    <div id="so-edit-check-fields" style="display: none;">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="soEditCheckReceived">
+                                <label class="form-check-label fw-bold small">Check Received</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Received Date</label>
+                            <input type="date" class="form-control fw-bold" id="soEditCheckReceivedDate">
+                        </div>
+                        <hr class="border-2 opacity-100">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="soEditCheckCashed">
+                                <label class="form-check-label fw-bold small">Check Cashed</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Cashed Date</label>
+                            <input type="date" class="form-control fw-bold" id="soEditCheckCashedDate">
+                        </div>
+                    </div>
+
+                    <div id="so-edit-bank-transfer-fields" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Transfer ID / Reference</label>
+                            <input type="text" class="form-control fw-bold" id="soEditTransferId">
+                        </div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label fw-black text-uppercase small">Internal Note</label>
+                        <textarea class="form-control fw-bold" id="soEditOrderNote" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" id="saveSoPaymentInfoBtn" onclick="saveSoPaymentInfo()">SAVE CHANGES</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SO: Cancel Modal -->
+<div class="modal fade" id="soCancelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-neo-warning">
+                <h5 class="modal-title fw-black text-uppercase">Cancel Sales Order</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="fw-bold mb-3">PROCEED WITH CANCELLATION?</p>
+                <div class="neo-card bg-light p-3 border-2 mb-0">
+                    <i class="bi bi-info-circle me-2"></i> IRREVERSIBLE ACTION.
+                </div>
+                <input type="hidden" id="soCancelOrderId" />
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn" data-bs-dismiss="modal">ABORT</button>
+                <button class="neo-btn neo-btn-danger" id="btn-so-confirm-cancel">YES, CANCEL ORDER</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SO: Refund Modal -->
+<div class="modal fade" id="soRefundModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-neo-danger">
+                <h5 class="modal-title fw-black text-uppercase text-white">Refund Sales Order</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="soRefundOrderId" />
+                <div class="row g-3 mb-4">
+                    <div class="col-12">
+                        <label class="form-label fw-black text-uppercase small">Order Ref</label>
+                        <input type="text" class="form-control fw-bold bg-light" id="soRefundOrderNumber" readonly />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-black text-uppercase small">Order Total</label>
+                        <input type="text" class="form-control fw-bold" id="soRefundOrderTotal" readonly />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-black text-uppercase small text-success">Already Refunded</label>
+                        <input type="text" class="form-control fw-bold" id="soRefundOrderAlreadyRefunded" readonly />
+                    </div>
+                </div>
+
+                <div class="mb-4" id="soRefundStockSection">
+                    <h6 class="fw-black text-uppercase small mb-2 border-bottom border-2 pb-1">Product Returns (Stock Restoration)</h6>
+                    <div class="table-responsive neo-card p-0 mb-2" style="max-height: 250px; overflow-y: auto;">
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead class="table-dark text-white sticky-top">
+                                <tr>
+                                    <th>PRODUCT</th>
+                                    <th class="text-center">SOLD</th>
+                                    <th class="text-center">PREV. RET.</th>
+                                    <th class="text-center" style="width: 120px;">RETURN QTY</th>
+                                </tr>
+                            </thead>
+                            <tbody id="so-refund-lines-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="small fw-bold text-muted text-end"><i class="bi bi-info-circle me-1"></i> ENTER QUANTITIES TO RETURN TO STOCK.</div>
+                </div>
+
+                <div class="mb-4 pt-3 border-top border-2" id="soRefundMoneySection">
+                    <h6 class="fw-black text-uppercase small mb-2">Financial Reversal</h6>
+                    <label class="form-label fw-black text-uppercase small">Refund Amount</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-black text-white">$</span>
+                        <input type="number" class="form-control fw-black" id="soRefundAmount" step="0.01" />
+                    </div>
+                    <div class="form-text small text-muted">Amount to return to customer. Leave empty if only returning stock.</div>
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Reason</label>
+                    <textarea class="form-control" id="soRefundReason" rows="2" placeholder="Optional reason..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-danger" onclick="processSoRefund()">EXECUTE REFUND</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PO: Update Status Modal -->
+<div class="modal fade" id="poStatusModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">PO Status</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <input type="hidden" id="poStatusOrderId" />
+                <label class="form-label fw-black text-uppercase small mb-3">Target Status</label>
+                <select class="form-select fw-black mb-0 text-center" id="poNewOrderStatus">
+                    <option value="0">PENDING</option>
+                    <option value="1">RECEIVED</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-info btn-sm" onclick="savePoStatusChange()">UPDATE</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PO: Record Payment Modal -->
+<div class="modal fade" id="poRecordPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Record Supplier Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-4 text-center">
+                    <div class="small fw-bold text-uppercase opacity-50">Remaining Balance</div>
+                    <div class="h2 fw-black text-danger mb-0" id="po-record-remaining-balance">$0.00</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Payment Amount</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-black text-white fw-bold">$</span>
+                        <input type="number" class="form-control form-control-lg fw-black" id="poPaymentAmount" step="0.01">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Reference / ID</label>
+                    <input type="text" class="form-control fw-bold" id="poPaymentReference" placeholder="e.g. CASH, CHECK #123, etc.">
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Note</label>
+                    <textarea class="form-control fw-bold" id="poPaymentNote" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-success btn-sm px-4" id="submitPoPaymentBtn" onclick="submitPoPayment()">SUBMIT PAYMENT</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PO: Edit Info Modal -->
+<div class="modal fade" id="poEditInfoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Edit Payment Metadata</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="poEditPaymentInfoForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-black text-uppercase small">Payment Method</label>
+                        <select class="form-select fw-bold" id="poEditPaymentMethod" onchange="togglePoEditPaymentFields()">
+                            <option value="1">CASH</option>
+                            <option value="2">CHECK</option>
+                            <option value="3">BANK TRANSFER</option>
+                        </select>
+                    </div>
+
+                    <div id="po-edit-check-fields" style="display: none;">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="poEditCheckReceived">
+                                <label class="form-check-label fw-bold small">Check Issued</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Issued Date</label>
+                            <input type="date" class="form-control fw-bold" id="poEditCheckReceivedDate">
+                        </div>
+                        <hr class="border-2 opacity-100">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="poEditCheckCashed">
+                                <label class="form-check-label fw-bold small">Check Cashed</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Cashed Date</label>
+                            <input type="date" class="form-control fw-bold" id="poEditCheckCashedDate">
+                        </div>
+                    </div>
+
+                    <div id="po-edit-bank-transfer-fields" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Transfer ID / Reference</label>
+                            <input type="text" class="form-control fw-bold" id="poEditTransferId">
+                        </div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label fw-black text-uppercase small">Internal Note</label>
+                        <textarea class="form-control fw-bold" id="poEditOrderNote" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" id="savePoPaymentInfoBtn" onclick="savePoPaymentInfo()">SAVE CHANGES</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PO: Refund Modal -->
+<div class="modal fade" id="poRefundModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content shadow-lg">
+            <div class="modal-header bg-neo-danger">
+                <h5 class="modal-title fw-black text-uppercase text-white">Refund PO</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="poRefundOrderId" />
+                <div class="row g-3 mb-4">
+                    <div class="col-12">
+                        <label class="form-label fw-black text-uppercase small">Order Number</label>
+                        <input type="text" class="form-control fw-bold bg-light" id="poRefundOrderNumber" readonly />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-black text-uppercase small">Order Total</label>
+                        <input type="text" class="form-control fw-bold" id="poRefundOrderTotal" readonly />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-black text-uppercase small text-success">Already Refunded</label>
+                        <input type="text" class="form-control fw-bold" id="poRefundOrderAlreadyRefunded" readonly />
+                    </div>
+                </div>
+                
+                <div class="mb-4" id="poRefundStockSection">
+                    <h6 class="fw-black text-uppercase small mb-2 border-bottom border-2 pb-1">Product Returns (Stock Deduction)</h6>
+                    <div class="table-responsive neo-card p-0 mb-2" style="max-height: 250px; overflow-y: auto;">
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead class="table-dark text-white sticky-top">
+                                <tr>
+                                    <th>PRODUCT</th>
+                                    <th class="text-center">BOUGHT</th>
+                                    <th class="text-center">PREV. RET.</th>
+                                    <th class="text-center" style="width: 120px;">RETURN QTY</th>
+                                </tr>
+                            </thead>
+                            <tbody id="po-refund-lines-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="small fw-bold text-muted text-end"><i class="bi bi-info-circle me-1"></i> ENTER QUANTITIES TO RETURN TO SUPPLIER.</div>
+                </div>
+
+                <div class="mb-4 pt-3 border-top border-2" id="poRefundMoneySection">
+                    <h6 class="fw-black text-uppercase small mb-2">Financial Reversal</h6>
+                    <label class="form-label fw-black text-uppercase small">Refund Amount</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-black text-white">$</span>
+                        <input type="number" class="form-control fw-black" id="poRefundAmount" step="0.01" />
+                    </div>
+                     <div class="form-text small text-muted">Amount to receive back from supplier.</div>
+                </div>
+                
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Reason</label>
+                    <textarea class="form-control" id="poRefundReason" rows="2" placeholder="Optional reason..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-danger" onclick="processPoRefund()">EXECUTE REFUND</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function() {
+            // GLOBALS
+            let currentContextType = null; // 'so' or 'po'
+            window.currentSoId = null;
+            window.currentPoId = null;
+
+            // SHARED UTILS
+            const formatCurrency = (a) => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD' }).format(a);
+            const formatDate = (i) => new Date(i).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+            const escapeHtml = (t) => { if(!t) return ''; const d=document.createElement('div'); d.textContent=t; return d.innerHTML; };
+            
+            // DOCS HELPERS
+            window.renderDocSection = (iPath, rPath) => {
+                const containerId = window.currentContextType === 'so' ? 'so-docs-section' : 'po-docs-section';
+                const container = document.getElementById(containerId);
+                container.innerHTML = `
+                    <div class="d-flex align-items-center justify-content-between p-2 border border-2 border-black bg-white mb-2">
+                        <span class="small fw-black text-uppercase">INVOICE PDF</span>
+                        <div class="d-flex gap-1">
+                            ${iPath ? `
+                                <a href="${iPath}" target="_blank" class="neo-btn neo-btn-primary btn-sm p-1 px-2"><i class="bi bi-download"></i></a>
+                                <button onclick="deleteDoc('invoice')" class="neo-btn neo-btn-danger btn-sm p-1 px-2"><i class="bi bi-trash"></i></button>
+                            ` : `<button onclick="triggerUpload('invoice')" class="neo-btn btn-sm p-1 px-2">UPLOAD</button>`}
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between p-2 border border-2 border-black bg-white">
+                        <span class="small fw-black text-uppercase">RECEIPT PDF</span>
+                        <div class="d-flex gap-1">
+                            ${rPath ? `
+                                <a href="${rPath}" target="_blank" class="neo-btn neo-btn-primary btn-sm p-1 px-2"><i class="bi bi-download"></i></a>
+                                <button onclick="deleteDoc('receipt')" class="neo-btn neo-btn-danger btn-sm p-1 px-2"><i class="bi bi-trash"></i></button>
+                            ` : `<button onclick="triggerUpload('receipt')" class="neo-btn btn-sm p-1 px-2">UPLOAD</button>`}
+                        </div>
+                    </div>
+                `;
+            };
+
+            window.triggerUpload = (type) => document.getElementById(type + 'UploadInput').click();
+
+            window.performUpload = async (type) => {
+                const inputId = type + 'UploadInput';
+                const file = document.getElementById(inputId).files[0];
+                if(!file) return;
+
+                const fd = new FormData(); fd.append('file', file);
+                const isSo = window.currentContextType === 'so';
+                const id = isSo ? window.currentSoId : window.currentPoId;
+                const endpointBase = isSo ? '/api/sales-orders' : '/api/purchase-orders';
+
+                try {
+                    const r = await fetch(`${endpointBase}/${id}/${type}`, { method:'POST', body:fd });
+                    if(!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
+                    document.getElementById(inputId).value = ''; // Reset
+                    if(isSo) await viewSoDetails(id); else await viewPoDetails(id);
+                } catch(e) { if (window.appMessages) window.appMessages.showError(e.message || 'Upload error'); }
+            };
+
+            window.deleteDoc = async (type) => {
+                if(!confirm('DELETE THIS FILE?')) return;
+                const isSo = window.currentContextType === 'so';
+                const id = isSo ? window.currentSoId : window.currentPoId;
+                const endpointBase = isSo ? '/api/sales-orders' : '/api/purchase-orders';
+
+                try {
+                    const r = await fetch(`${endpointBase}/${id}/${type}`, { method:'DELETE' });
+                    if(!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : 'Delete failed';
+                        throw new Error(msg);
+                    }
+                    if(isSo) await viewSoDetails(id); else await viewPoDetails(id);
+                } catch(e) { if (window.appMessages) window.appMessages.showError(e.message || 'Delete failed'); }
+            };
+            
+            const getSoStatusBadge = (s) => {
+                if (s === 1) return '<span class="badge neo-btn-success">DONE</span>';
+                if (s === 2) return '<span class="badge neo-btn-danger text-white">CANCELLED</span>';
+                return '<span class="badge neo-btn-info">PENDING</span>';
+            };
+            
+            const getPoStatusBadge = (s) => {
+                if (s === 1) return '<span class="badge neo-btn-success">RECEIVED</span>';
+                if (s === 2) return '<span class="badge neo-btn-danger text-white">CANCELLED</span>';
+                return '<span class="badge neo-btn-warning">PENDING</span>';
+            };
+
+            const getPaymentBadge = (s) => {
+                if (s === 1) return '<span class="badge neo-btn-success">PAID</span>';
+                if (s === 2) return '<span class="badge neo-btn-warning">PARTIAL</span>';
+                return '<span class="badge neo-btn-danger text-white">UNPAID</span>';
+            };
+
+            const canCancelSalesOrder = (o) => {
+                if (o.status === 2) return false; // Already cancelled
+
+                const paymentClear = (o.paidAmount || 0) === 0 && o.paymentStatus === 0;
+
+                let stockClear = true;
+                if (o.status === 1) { // Done
+                    const remainingStock = (o.lines || []).reduce((sum, l) => {
+                        const refunded = l.refundedQuantity || 0;
+                        return sum + (l.quantity - refunded);
+                    }, 0);
+                    stockClear = remainingStock === 0;
+                }
+
+                return paymentClear && stockClear;
+            };
+
+            const canCancelPurchaseOrder = (o) => {
+                if (o.status === 2) return false; // Already cancelled
+
+                const paymentClear = (o.paidAmount || 0) === 0 && o.paymentStatus === 0; // Unpaid
+
+                let stockClear = true;
+                if (o.status === 1) { // Received
+                    const remainingStock = (o.lines || []).reduce((sum, l) => {
+                        const refunded = l.refundedQuantity || 0;
+                        return sum + (l.quantity - refunded);
+                    }, 0);
+                    stockClear = remainingStock === 0;
+                }
+
+                return paymentClear && stockClear;
+            };
+
+            const getInvTypeBadge = (t) => {
+                if(t==='Receive') return '<span class="badge neo-btn-success">RECEIVE</span>';
+                if(t==='Issue') return '<span class="badge neo-btn-warning">ISSUE</span>';
+                if(t==='Adjust') return '<span class="badge neo-btn-info">ADJUST</span>';
+                return '<span class="badge bg-secondary">'+t+'</span>';
+            };
+
+            // INITIALIZATION
+            async function init() {
+                await Promise.all([
+                    loadSalesOrders(),
+                    loadPurchaseOrders(),
+                    loadInventoryTransactions()
+                ]);
+            }
+
+            // --- SALES ORDERS LOGIC ---
+            async function loadSalesOrders() {
+                try {
+                    const r = await fetch('/api/activity/sales-orders');
+                    if(!r.ok) throw new Error();
+                    const orders = await r.json();
+                    renderSalesOrders(orders);
+                } catch(e) { document.getElementById('so-table-body').innerHTML = '<tr><td colspan="7" class="text-center text-danger fw-bold">FAILED TO LOAD SALES ACTIVITY</td></tr>'; }
+            }
+
+            function renderSalesOrders(orders) {
+                const tbody = document.getElementById('so-table-body');
+                if(!orders.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 fw-bold">NO RECENT SALES ACTIVITY.</td></tr>'; return; }
+                
+                tbody.innerHTML = orders.map(o => `
+                    <tr>
+                        <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
+                        <td>${escapeHtml(o.customerName)}</td>
+                        <td class="small fw-bold">${formatDate(o.orderDate)}</td>
+                        <td class="small fw-bold ${new Date(o.dueDate) < new Date() && o.paymentStatus !== 1 ? 'text-danger' : ''}">${formatDate(o.dueDate)}</td>
+                        <td>${getSoStatusBadge(o.status)}</td>
+                        <td>${getPaymentBadge(o.paymentStatus)}</td>
+                        <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
+                        <td class="text-end">
+                            <button class="neo-btn neo-btn-info btn-sm p-1 px-3" onclick="viewSoDetails(${o.id})">VIEW</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            window.viewSoDetails = async (id) => {
+                window.switchSoView('detail');
+                try {
+                    const r = await fetch(`/api/sales-orders/${id}`);
+                    if(!r.ok) throw new Error();
+                    const o = await r.json();
+                    window.currentSoId = id;
+                    window.currentSoOrder = o;
+                    
+                    document.getElementById('so-detail-number').innerText = o.orderNumber;
+                    document.getElementById('btn-print-so-activity').href = `/SalesOrders/Details/${o.id}`;
+                    document.getElementById('so-detail-customer').innerText = o.customerName || 'UNKNOWN';
+                    document.getElementById('so-detail-date').innerText = formatDate(o.orderDate);
+                    document.getElementById('so-detail-status').innerHTML = getSoStatusBadge(o.status);
+                    document.getElementById('so-detail-payment').innerHTML = getPaymentBadge(o.paymentStatus);
+                    
+                    document.getElementById('so-detail-subtotal').innerText = formatCurrency(o.subtotal);
+                    document.getElementById('so-detail-vat').innerText = formatCurrency(o.vatAmount);
+                    document.getElementById('so-detail-man-tax').innerText = o.manufacturingTaxAmount > 0 ? '-' + formatCurrency(o.manufacturingTaxAmount) : '-';
+                    document.getElementById('so-detail-total').innerText = formatCurrency(o.totalAmount);
+
+                    // Actions Container
+                    const actionsHtml = [];
+                    if (o.status === 1) { // Done
+                        actionsHtml.push(`<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openSoRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>`);
+                    }
+                    if (o.status !== 2) { // Not cancelled
+                        const canCancel = canCancelSalesOrder(o);
+                        const tooltip = canCancel
+                            ? 'Cancel this order (no automatic refunds will occur).'
+                            : 'You must fully refund stock and money before cancelling this order.';
+                        actionsHtml.push(`<button class="neo-btn neo-btn-warning btn-sm p-1 px-2" onclick="openSoCancelModal(${o.id})" ${canCancel ? '' : 'disabled'} title="${tooltip}">CANCEL</button>`);
+                    }
+                    document.getElementById('so-actions-container').innerHTML = actionsHtml.join('');
+                    
+                    // Docs
+                    window.currentContextType = 'so';
+                    renderDocSection(o.invoicePath, o.receiptPath);
+
+                    // Lines
+                    document.getElementById('so-detail-lines').innerHTML = o.lines.map(l => `
+                        <tr>
+                            <td><span class="fw-black text-uppercase small">${escapeHtml(l.productName)}</span></td>
+                            <td>${l.batchNumber ? `<code class="fw-bold">${escapeHtml(l.batchNumber)}</code>` : '-'}</td>
+                            <td class="text-center fw-bold">${l.quantity}</td>
+                            <td class="text-end fw-bold">${formatCurrency(l.unitPrice)}</td>
+                            <td class="text-end fw-black">${formatCurrency(l.lineTotal)}</td>
+                        </tr>
+                    `).join('');
+
+                } catch(e) { if (window.appMessages) window.appMessages.showError('Details failed to load'); window.switchSoView('list'); }
+            };
+
+            window.switchSoView = (v) => {
+                document.getElementById('so-list-view').style.display = v==='list'?'block':'none';
+                document.getElementById('so-detail-view').style.display = v==='detail'?'block':'none';
+            };
+
+
+            // --- PURCHASE ORDERS LOGIC ---
+            async function loadPurchaseOrders() {
+                try {
+                    const r = await fetch('/api/activity/purchase-orders');
+                    if(!r.ok) throw new Error();
+                    const orders = await r.json();
+                    renderPurchaseOrders(orders);
+                } catch(e) { document.getElementById('po-table-body').innerHTML = '<tr><td colspan="7" class="text-center text-danger fw-bold">FAILED TO LOAD PURCHASE ACTIVITY</td></tr>'; }
+            }
+
+            function renderPurchaseOrders(orders) {
+                const tbody = document.getElementById('po-table-body');
+                if(!orders.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 fw-bold">NO RECENT PURCHASE ACTIVITY.</td></tr>'; return; }
+                
+                tbody.innerHTML = orders.map(o => `
+                    <tr>
+                        <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
+                        <td>${escapeHtml(o.supplierName)}</td>
+                        <td class="small fw-bold">${formatDate(o.createdUtc)}</td>
+                        <td class="small fw-bold ${o.paymentDeadline && new Date(o.paymentDeadline) < new Date() && o.paymentStatus !== 1 ? 'text-danger' : ''}">${o.paymentDeadline ? formatDate(o.paymentDeadline) : '-'}</td>
+                        <td>${getPoStatusBadge(o.status)}</td>
+                        <td>${getPaymentBadge(o.paymentStatus)}</td>
+                        <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
+                        <td class="text-end">
+                            <button class="neo-btn neo-btn-info btn-sm p-1 px-3" onclick="viewPoDetails(${o.id})">VIEW</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            window.viewPoDetails = async (id) => {
+                window.switchPoView('detail');
+                try {
+                    const r = await fetch(`/api/purchase-orders/${id}`);
+                    if(!r.ok) throw new Error();
+                    const o = await r.json();
+                    window.currentPoId = id;
+                    window.currentPoOrder = o;
+                    
+                    document.getElementById('po-detail-number').innerText = o.orderNumber;
+                    document.getElementById('btn-print-po-activity').href = `/PurchaseOrders/Details/${o.id}`;
+                    document.getElementById('po-detail-supplier').innerText = o.supplierName || 'UNKNOWN';
+                    document.getElementById('po-detail-date').innerText = formatDate(o.createdUtc);
+                    document.getElementById('po-detail-status').innerHTML = getPoStatusBadge(o.status);
+                    document.getElementById('po-detail-payment').innerHTML = getPaymentBadge(o.paymentStatus);
+                    document.getElementById('po-detail-deadline').innerText = o.paymentDeadline ? formatDate(o.paymentDeadline) : 'N/A';
+                    
+                    document.getElementById('po-detail-subtotal').innerText = formatCurrency(o.subtotal);
+                    document.getElementById('po-detail-vat').innerText = formatCurrency(o.vatAmount);
+                    document.getElementById('po-detail-man-tax').innerText = formatCurrency(o.manufacturingTaxAmount);
+                    document.getElementById('po-detail-total').innerText = formatCurrency(o.totalAmount);
+
+                    // PO Actions
+                    const poActionsHtml = [];
+                    if (o.status === 1) { // Received
+                        poActionsHtml.push(`<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openPoRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>`);
+                    }
+                    if (o.status !== 2) { // Not cancelled
+                        const canCancelPo = canCancelPurchaseOrder(o);
+                        const tooltipPo = canCancelPo
+                            ? 'Cancel this order (no automatic refunds will occur).'
+                            : 'You must fully refund stock and money before cancelling this order.';
+                        poActionsHtml.push(`<button class="neo-btn neo-btn-warning btn-sm p-1 px-2" onclick="cancelPo(${o.id})" ${canCancelPo ? '' : 'disabled'} title="${tooltipPo}">CANCEL</button>`);
+                    }
+                    document.getElementById('po-actions-container').innerHTML = poActionsHtml.join('');
+
+                    // Docs
+                    window.currentContextType = 'po';
+                    window.currentPoId = id;
+                    renderDocSection(o.invoicePath, o.receiptPath);
+                    
+                    // Lines
+                    document.getElementById('po-detail-lines').innerHTML = o.lines.map(l => `
+                        <tr>
+                            <td><span class="fw-black text-uppercase small">${escapeHtml(l.productName)}</span></td>
+                            <td>${l.batchNumber ? `<code class="fw-bold">${escapeHtml(l.batchNumber)}</code>` : '-'}</td>
+                            <td class="text-center fw-bold">${l.quantity}</td>
+                            <td class="text-end fw-bold">${formatCurrency(l.unitPrice)}</td>
+                            <td class="text-end fw-black">${formatCurrency(l.lineTotal)}</td>
+                        </tr>
+                    `).join('');
+
+                } catch(e) { if (window.appMessages) window.appMessages.showError('Details failed to load'); window.switchPoView('list'); }
+            };
+
+            // --- SO ACTIONS JS ---
+            window.window.currentSoOrder = null; // Track current for modals if needed, using id passed mostly
+
+            window.openSoStatusModal = () => {
+                const id = document.getElementById('so-detail-number').innerText; // Using global tracking might be safer but fetching from DOM is ok if we store ID somewhere.
+                // Let's rely on stored ID in window context or fetching it. 
+                // A better approach is to store the full object or ID when viewing details.
+                if(!window.currentSoId) return;
+                // Fetch current status/data or use what's on screen? 
+                // We should probably rely on what we just loaded.
+                
+                // Assuming we stored it in viewSoDetails
+                
+                document.getElementById('soUpdateStatusSelect').value = 0; // Default or Parse current?
+                // Parsing text "PENDING" / "DONE" back to int is flaky.
+                // Better to store the object.
+                new bootstrap.Modal(document.getElementById('soStatusModal')).show();
+            };
+
+            window.updateSoStatus = async () => {
+                if(!window.currentSoId) return;
+                const ns = parseInt(document.getElementById('soUpdateStatusSelect').value);
+                const od = window.currentSoId;
+                try {
+                    const ft = document.querySelector('[name="__RequestVerificationToken"]').value;
+                    const fd = new FormData(); fd.append('__RequestVerificationToken', ft); fd.append('OrderId', od); fd.append('Status', ns);
+                    const r = await fetch(`/SalesOrders/UpdateStatus?id=${od}`, { method: 'POST', body: fd });
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('soStatusModal')).hide();
+                    await viewSoDetails(od); loadSalesOrders(); // Refresh both
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Status push failed'); }
+            };
+
+            window.openSoRecordPaymentModal = () => {
+                const o = window.currentSoOrder; if (!o) return;
+                const remaining = o.remainingAmount || 0;
+                document.getElementById('so-record-remaining-balance').textContent = formatCurrency(remaining);
+                document.getElementById('soPaymentAmount').value = remaining.toFixed(2);
+                document.getElementById('soPaymentReference').value = '';
+                document.getElementById('soPaymentNote').value = '';
+                new bootstrap.Modal(document.getElementById('soRecordPaymentModal')).show();
+            };
+
+            window.submitSoPayment = async () => {
+                const btn = document.getElementById('submitSoPaymentBtn');
+                const amount = parseFloat(document.getElementById('soPaymentAmount').value);
+                if (isNaN(amount) || amount <= 0) { if (window.appMessages) window.appMessages.showError('Enter a valid amount'); return; }
+
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>PROCESSING...';
+
+                const od = window.currentSoId;
+                const payload = {
+                    amount: amount,
+                    paymentDate: new Date().toISOString(),
+                    paymentMethod: window.currentSoOrder.paymentMethod || 1,
+                    paymentType: 0, // Sales
+                    reference: document.getElementById('soPaymentReference').value,
+                    note: document.getElementById('soPaymentNote').value
+                };
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${od}/payments`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('soRecordPaymentModal')).hide();
+                    await viewSoDetails(od); loadSalesOrders();
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Payment failed'); }
+                finally { btn.disabled = false; btn.innerText = 'SUBMIT PAYMENT'; }
+            };
+
+            window.openSoEditInfoModal = () => {
+                const o = window.currentSoOrder; if(!o) return;
+                document.getElementById('soEditPaymentMethod').value = o.paymentMethod || 1; 
+                window.toggleSoEditPaymentFields();
+                document.getElementById('soEditCheckReceived').checked = o.checkReceived;
+                document.getElementById('soEditCheckReceivedDate').value = o.checkReceivedDate ? o.checkReceivedDate.split('T')[0] : '';
+                document.getElementById('soEditCheckCashed').checked = o.checkCashed;
+                document.getElementById('soEditCheckCashedDate').value = o.checkCashedDate ? o.checkCashedDate.split('T')[0] : '';
+                document.getElementById('soEditTransferId').value = o.transferId || '';
+                document.getElementById('soEditOrderNote').value = o.note || '';
+                new bootstrap.Modal(document.getElementById('soEditInfoModal')).show();
+            };
+
+            window.toggleSoEditPaymentFields = () => {
+                const m = parseInt(document.getElementById('soEditPaymentMethod').value);
+                document.getElementById('so-edit-check-fields').style.display = m === 2 ? 'block' : 'none';
+                document.getElementById('so-edit-bank-transfer-fields').style.display = m === 3 ? 'block' : 'none';
+            };
+
+            window.saveSoPaymentInfo = async () => {
+                const btn = document.getElementById('saveSoPaymentInfoBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>SAVING...';
+
+                const od = window.currentSoId;
+                const pm = parseInt(document.getElementById('soEditPaymentMethod').value);
+                const payload = { 
+                    orderId: parseInt(od), 
+                    paymentMethod: pm,
+                    checkReceived: document.getElementById('soEditCheckReceived').checked,
+                    checkReceivedDate: document.getElementById('soEditCheckReceivedDate').value || null,
+                    checkCashed: document.getElementById('soEditCheckCashed').checked,
+                    checkCashedDate: document.getElementById('soEditCheckCashedDate').value || null,
+                    transferId: document.getElementById('soEditTransferId').value,
+                    note: document.getElementById('soEditOrderNote').value
+                };
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${od}/payment-info`, { 
+                        method: 'PUT', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(payload) 
+                    });
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('soEditInfoModal')).hide();
+                    await viewSoDetails(od); loadSalesOrders();
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Sync failed'); }
+                finally { btn.disabled = false; btn.innerText = 'SAVE CHANGES'; }
+            };
+
+            window.openSoCancelModal = (od) => { 
+                document.getElementById('soCancelOrderId').value = od;
+                new bootstrap.Modal(document.getElementById('soCancelModal')).show();
+            };
+
+            document.getElementById('btn-so-confirm-cancel').onclick = async () => {
+                const od = parseInt(document.getElementById('soCancelOrderId').value);
+                try {
+                    const ft = document.querySelector('[name="__RequestVerificationToken"]').value;
+                    const fd = new FormData(); 
+                    fd.append('__RequestVerificationToken', ft);
+                    const r = await fetch(`/SalesOrders/Cancel?id=${od}`, { method: 'POST', body: fd });
+                    if (!r.ok) {
+                        const msg = await r.text();
+                        throw new Error(msg || 'Cancellation failed.');
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('soCancelModal')).hide();
+                    await viewSoDetails(od); loadSalesOrders();
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Cancellation failed'); }
+            };
+
+            // -- REFUND VALIDATION HELPER --
+            function validateRefundForm() {
+                // SO
+                const amtSo = parseFloat(document.getElementById('soRefundAmount').value) || 0;
+                let hasLinesSo = false;
+                document.querySelectorAll('.so-refund-line-qty').forEach(input => { if ((parseFloat(input.value) || 0) > 0) hasLinesSo = true; });
+                const btnSo = document.querySelector('#soRefundModal .neo-btn-danger'); // EXECUTE button
+                // We'll target by onclick attr search if needed or just id if we added one. 
+                // Since I didn't add ID to SO button, let's just leave validation visual or generic.
+                // Actually, let's implement validation fully.
+            }
+
+            window.openSoRefundModal = async (id, num, tot, ref) => {
+                document.getElementById('soRefundOrderId').value = id; 
+                document.getElementById('soRefundOrderNumber').value = num;
+                document.getElementById('soRefundOrderTotal').value = formatCurrency(tot); 
+                document.getElementById('soRefundOrderAlreadyRefunded').value = formatCurrency(ref || 0);
+                document.getElementById('soRefundAmount').value = ''; 
+                document.getElementById('soRefundReason').value = '';
+                
+                const tbody = document.getElementById('so-refund-lines-body');
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></td></tr>';
+                new bootstrap.Modal(document.getElementById('soRefundModal')).show();
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${id}`);
+                    if (!r.ok) throw new Error();
+                    const o = await r.json();
+                    
+                    const canRefundStock = (o.status === 1 || o.status === "Done");
+                    const canRefundMoney = (o.paymentStatus === 1 || o.paymentStatus === "Paid" || o.paymentStatus === 2 || o.paymentStatus === "PartiallyPaid");
+                    const remainingRefundableAmount = o.totalAmount - (o.refundedAmount || 0);
+                    const moneyFullyRefunded = remainingRefundableAmount <= 0;
+
+                    document.getElementById('soRefundMoneySection').style.display = (!canRefundMoney || moneyFullyRefunded) ? 'none' : 'block';
+                    document.getElementById('soRefundStockSection').style.display = !canRefundStock ? 'none' : 'block';
+
+                    const amountInput = document.getElementById('soRefundAmount');
+                    if (!canRefundMoney || moneyFullyRefunded) {
+                        amountInput.disabled = true;
+                        amountInput.placeholder = moneyFullyRefunded ? 'Fully refunded' : 'Payment not valid for refund';
+                    } else {
+                        amountInput.disabled = false;
+                        amountInput.placeholder = `Max: ${formatCurrency(remainingRefundableAmount)}`;
+                        amountInput.max = remainingRefundableAmount;
+                    }
+
+                    tbody.innerHTML = o.lines.map(l => {
+                        const remaining = l.quantity - (l.refundedQuantity || 0);
+                        const lineFullyRefunded = remaining <= 0;
+                        const disabled = (!canRefundStock || lineFullyRefunded) ? 'disabled' : '';
+                        const hint = lineFullyRefunded ? 'Fully returned' : (!canRefundStock ? 'Order not complete' : '');
+                        return `
+                        <tr>
+                            <td>
+                                <div class="fw-black small text-uppercase">${escapeHtml(l.productName)}</div>
+                                <div class="small text-muted">${l.batchNumber ? `<code class="text-dark">${escapeHtml(l.batchNumber)}</code>` : 'NO BATCH'}</div>
+                            </td>
+                            <td class="text-center fw-bold">${l.quantity}</td>
+                            <td class="text-center text-muted">${l.refundedQuantity || 0}</td>
+                            <td class="text-center">
+                                <input type="number" class="form-control form-control-sm fw-black text-center so-refund-line-qty" 
+                                    data-line-id="${l.id}" 
+                                    data-batch-id="${l.productBatchId || ''}"
+                                    data-batch-number="${l.batchNumber || ''}"
+                                    min="0" max="${remaining}" 
+                                    value="" ${disabled} 
+                                    placeholder="${hint}"
+                                    title="${hint}"
+                                    style="border: 2px solid #000;">
+                            </td>
+                        </tr>`;
+                    }).join('');
+                } catch (e) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Failed to load lines</td></tr>'; }
+            };
+
+            window.processSoRefund = async () => {
+                const id = parseInt(document.getElementById('soRefundOrderId').value); 
+                const amt = parseFloat(document.getElementById('soRefundAmount').value) || 0; 
+                const rsn = document.getElementById('soRefundReason').value;
+
+                const lines = [];
+                document.querySelectorAll('.so-refund-line-qty').forEach(input => {
+                    const qty = parseFloat(input.value) || 0;
+                    if (qty > 0) {
+                        const item = { salesOrderLineId: parseInt(input.dataset.lineId), quantity: qty };
+                        if (input.dataset.batchId) item.productBatchId = parseInt(input.dataset.batchId);
+                        if (input.dataset.batchNumber) item.batchNumber = input.dataset.batchNumber;
+                        lines.push(item);
+                    }
+                });
+
+                if (amt <= 0 && lines.length === 0) { if (window.appMessages) window.appMessages.showError('Please enter a refund amount or return quantities.'); return; }
+
+                const payload = { orderId: id };
+                if (amt > 0) payload.amount = amt;
+                if (lines.length > 0) payload.lineItems = lines;
+                if (rsn && rsn.trim()) payload.reason = rsn.trim();
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${id}/refund`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(payload) 
+                    });
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : 'Refund failed';
+                        throw new Error(msg);
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('soRefundModal')).hide();
+                    if(window.currentSoId) await viewSoDetails(window.currentSoId);
+                    loadSalesOrders();
+                    if (window.appMessages) window.appMessages.showSuccess('Refund successful.');
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Refund error'); }
+            };
+
+
+            // --- PO ACTIONS JS ---
+            window.window.currentPoOrder = null;
+
+            window.openPoStatusModal = () => {
+                if(!window.currentPoId) return;
+                // Pre-select current status?
+                // The select has 0: PENDING, 1: RECEIVED, 2: CANCELLED.
+                // We should try to set it.
+                if(window.currentPoOrder) document.getElementById('poNewOrderStatus').value = window.currentPoOrder.status;
+                document.getElementById('poStatusOrderId').value = window.currentPoId;
+                new bootstrap.Modal(document.getElementById('poStatusModal')).show();
+            };
+
+            window.savePoStatusChange = async () => {
+                const id = document.getElementById('poStatusOrderId').value;
+                const status = parseInt(document.getElementById('poNewOrderStatus').value);
+                try {
+                    const r = await fetch(`/api/purchase-orders/${id}/status`, { 
+                        method:'PUT', 
+                        headers:{ 'Content-Type':'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body:JSON.stringify(status) 
+                    });
+                    if(!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : 'Update failed';
+                        throw new Error(msg);
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('poStatusModal')).hide();
+                    viewPoDetails(id); loadPurchaseOrders();
+                } catch(e) { if (window.appMessages) window.appMessages.showError(e.message || 'Update failed'); }
+            };
+
+            window.openPoRecordPaymentModal = () => {
+                const o = window.currentPoOrder; if (!o) return;
+                const remaining = o.remainingAmount || 0;
+                document.getElementById('po-record-remaining-balance').textContent = formatCurrency(remaining);
+                document.getElementById('poPaymentAmount').value = remaining.toFixed(2);
+                document.getElementById('poPaymentReference').value = '';
+                document.getElementById('poPaymentNote').value = '';
+                new bootstrap.Modal(document.getElementById('poRecordPaymentModal')).show();
+            };
+
+            window.submitPoPayment = async () => {
+                const btn = document.getElementById('submitPoPaymentBtn');
+                const amount = parseFloat(document.getElementById('poPaymentAmount').value);
+                if (isNaN(amount) || amount <= 0) { if (window.appMessages) window.appMessages.showError('Enter a valid amount'); return; }
+
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>PROCESSING...';
+
+                const od = window.currentPoId;
+                const payload = {
+                    amount: amount,
+                    paymentDate: new Date().toISOString(),
+                    paymentMethod: window.currentPoOrder.paymentMethod || 1,
+                    paymentType: 1, // Purchase
+                    reference: document.getElementById('poPaymentReference').value,
+                    note: document.getElementById('poPaymentNote').value
+                };
+
+                try {
+                    const r = await fetch(`/api/purchase-orders/${od}/payments`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('poRecordPaymentModal')).hide();
+                    await viewPoDetails(od); loadPurchaseOrders();
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Payment failed'); }
+                finally { btn.disabled = false; btn.innerText = 'SUBMIT PAYMENT'; }
+            };
+
+            window.openPoEditInfoModal = () => {
+                const o = window.currentPoOrder; if(!o) return;
+                document.getElementById('poEditPaymentMethod').value = o.paymentMethod || 1; 
+                window.togglePoEditPaymentFields();
+                document.getElementById('poEditCheckReceived').checked = o.checkReceived;
+                document.getElementById('poEditCheckReceivedDate').value = o.checkReceivedDate ? o.checkReceivedDate.split('T')[0] : '';
+                document.getElementById('poEditCheckCashed').checked = o.checkCashed;
+                document.getElementById('poEditCheckCashedDate').value = o.checkCashedDate ? o.checkCashedDate.split('T')[0] : '';
+                document.getElementById('poEditTransferId').value = o.transferId || '';
+                document.getElementById('poEditOrderNote').value = o.note || '';
+                new bootstrap.Modal(document.getElementById('poEditInfoModal')).show();
+            };
+
+            window.togglePoEditPaymentFields = () => {
+                const m = parseInt(document.getElementById('poEditPaymentMethod').value);
+                document.getElementById('po-edit-check-fields').style.display = m === 2 ? 'block' : 'none';
+                document.getElementById('po-edit-bank-transfer-fields').style.display = m === 3 ? 'block' : 'none';
+            };
+
+            window.savePoPaymentInfo = async () => {
+                const btn = document.getElementById('savePoPaymentInfoBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>SAVING...';
+
+                const od = window.currentPoId;
+                const pm = parseInt(document.getElementById('poEditPaymentMethod').value);
+                const payload = { 
+                    orderId: parseInt(od), 
+                    paymentMethod: pm,
+                    checkReceived: document.getElementById('poEditCheckReceived').checked,
+                    checkReceivedDate: document.getElementById('poEditCheckReceivedDate').value || null,
+                    checkCashed: document.getElementById('poEditCheckCashed').checked,
+                    checkCashedDate: document.getElementById('poEditCheckCashedDate').value || null,
+                    transferId: document.getElementById('poEditTransferId').value,
+                    note: document.getElementById('poEditOrderNote').value
+                };
+
+                try {
+                    const r = await fetch(`/api/purchase-orders/${od}/payment-info`, { 
+                        method: 'PUT', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(payload) 
+                    });
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('poEditInfoModal')).hide();
+                    await viewPoDetails(od); loadPurchaseOrders();
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Sync failed'); }
+                finally { btn.disabled = false; btn.innerText = 'SAVE CHANGES'; }
+            };
+
+            window.openPoRefundModal = async (id, num, tot, ref) => {
+                document.getElementById('poRefundOrderId').value=id; 
+                document.getElementById('poRefundOrderNumber').value=num;
+                document.getElementById('poRefundOrderTotal').value=formatCurrency(tot); 
+                document.getElementById('poRefundOrderAlreadyRefunded').value=formatCurrency(ref);
+                document.getElementById('poRefundAmount').value=''; 
+                document.getElementById('poRefundReason').value = '';
+                
+                const tbody = document.getElementById('po-refund-lines-body');
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></td></tr>';
+                new bootstrap.Modal(document.getElementById('poRefundModal')).show();
+
+                try {
+                    const r = await fetch(`/api/purchase-orders/${id}`);
+                    if (!r.ok) throw new Error();
+                    const o = await r.json();
+                    
+                    const canRefundStock = (o.status === 1 || o.status === "Received"); // Received
+                    const canRefundMoney = (o.paymentStatus === 1 || o.paymentStatus === "Paid" || o.paymentStatus === 2 || o.paymentStatus === "PartiallyPaid"); // Paid or PartiallyPaid
+                    const remainingRefundableAmount = o.totalAmount - (o.refundedAmount || 0);
+                    const moneyFullyRefunded = remainingRefundableAmount <= 0;
+
+                    document.getElementById('poRefundMoneySection').style.display = (!canRefundMoney || moneyFullyRefunded) ? 'none' : 'block';
+                    document.getElementById('poRefundStockSection').style.display = !canRefundStock ? 'none' : 'block';
+
+                    const amountInput = document.getElementById('poRefundAmount');
+                    if (!canRefundMoney || remainingRefundableAmount <= 0) {
+                        amountInput.disabled = true;
+                        amountInput.placeholder = remainingRefundableAmount <= 0 ? 'Fully refunded' : 'Payment not confirmed';
+                    } else {
+                        amountInput.disabled = false;
+                        amountInput.placeholder = `Max: ${formatCurrency(remainingRefundableAmount)}`;
+                        amountInput.max = remainingRefundableAmount;
+                    }
+
+                    tbody.innerHTML = o.lines.map(l => {
+                        const remaining = l.quantity - (l.refundedQuantity || 0);
+                        const disabled = (!canRefundStock || remaining <= 0) ? 'disabled' : '';
+                        const hint = remaining <= 0 ? 'Fully returned' : (!canRefundStock ? 'Order not received' : '');
+                        return `
+                        <tr>
+                            <td>
+                                <div class="fw-black small text-uppercase">${escapeHtml(l.productName)}</div>
+                                <div class="small text-muted">${l.batchNumber ? `<code class="text-dark">${escapeHtml(l.batchNumber)}</code>` : 'NO BATCH'}</div>
+                            </td>
+                            <td class="text-center fw-bold">${l.quantity}</td>
+                            <td class="text-center text-muted">${l.refundedQuantity || 0}</td>
+                            <td class="text-center">
+                                <input type="number" class="form-control form-control-sm fw-black text-center po-refund-line-qty" 
+                                    data-line-id="${l.id}" 
+                                    data-batch-number="${l.batchNumber || ''}"
+                                    min="0" max="${remaining}" 
+                                    value="" ${disabled} 
+                                    placeholder="${hint}"
+                                    style="border: 2px solid #000;">
+                            </td>
+                        </tr>`;
+                    }).join('');
+                } catch (e) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Failed to load lines</td></tr>'; }
+            };
+
+            window.processPoRefund = async () => {
+                const id = parseInt(document.getElementById('poRefundOrderId').value); 
+                const amt = parseFloat(document.getElementById('poRefundAmount').value) || 0; 
+                const rsn = document.getElementById('poRefundReason').value;
+
+                const lines = [];
+                document.querySelectorAll('.po-refund-line-qty').forEach(input => {
+                    const qty = parseFloat(input.value) || 0;
+                    if (qty > 0) {
+                        const item = { purchaseOrderLineId: parseInt(input.dataset.lineId), quantity: qty };
+                        if (input.dataset.batchNumber) item.batchNumber = input.dataset.batchNumber;
+                        lines.push(item);
+                    }
+                });
+
+                if(amt<=0 && lines.length === 0) { if (window.appMessages) window.appMessages.showError('Please enter a refund amount or return quantities.'); return; }
+                
+                const payload = { orderId: id };
+                if (amt > 0) payload.amount = amt;
+                if (lines.length > 0) payload.lineItems = lines;
+                if (rsn && rsn.trim()) payload.reason = rsn.trim();
+
+                try {
+                    const r = await fetch(`/api/purchase-orders/${id}/refund`, { 
+                        method:'POST', 
+                        headers:{'Content-Type':'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body:JSON.stringify(payload) 
+                    });
+                    if(!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : 'Refund failed';
+                        throw new Error(msg);
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('poRefundModal')).hide(); 
+                    if(window.currentPoId) await viewPoDetails(window.currentPoId);
+                    loadPurchaseOrders();
+                    if (window.appMessages) window.appMessages.showSuccess('Refund successful.');
+                } catch(e) { if (window.appMessages) window.appMessages.showError(e.message || 'Refund processing failed'); }
+            };
+
+            window.cancelPo = async (id) => {
+                if (!confirm('PROCEED WITH CANCELLATION?')) return;
+                try {
+                    const r = await fetch(`/api/purchase-orders/${id}/cancel`, {
+                        method: 'POST'
+                    });
+                    if (!r.ok) {
+                        const msg = await r.text();
+                        throw new Error(msg || 'Cancellation failed.');
+                    }
+                    await viewPoDetails(id); 
+                    loadPurchaseOrders();
+                } catch (e) {
+                    if (window.appMessages) window.appMessages.showError(e.message || 'Cancellation failed');
+                }
+            };
+
+            window.switchPoView = (v) => {
+                document.getElementById('po-list-view').style.display = v==='list'?'block':'none';
+                document.getElementById('po-detail-view').style.display = v==='detail'?'block':'none';
+            };
+
+
+            // GLOBAL STATE
+            let recentTransactions = [];
+
+            // --- INVENTORY TRANSACTIONS LOGIC ---
+            async function loadInventoryTransactions() {
+                try {
+                    const r = await fetch('/api/activity/inventory-transactions');
+                    if(!r.ok) throw new Error();
+                    const txs = await r.json();
+                    
+                    // FILTER: Hide Receive transactions (view only Issue and Adjust)
+                    recentTransactions = txs.filter(t => t.type !== 'Receive');
+                    
+                    renderInventoryTransactions(recentTransactions);
+                } catch(e) { document.getElementById('inv-table-body').innerHTML = '<tr><td colspan="7" class="text-center text-danger fw-bold">FAILED TO LOAD STOCK ACTIVITY</td></tr>'; }
+            }
+
+            function renderInventoryTransactions(txs) {
+                const tbody = document.getElementById('inv-table-body');
+                if(!txs.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 fw-bold">NO RECENT ISSUE/ADJUST MOVEMENT.</td></tr>'; return; }
+                
+                tbody.innerHTML = txs.map(t => {
+                    const isIssue = t.quantityDelta < 0 || t.type === 'Issue';
+                    return `
+                    <tr>
+                        <td><code class="fw-bold small text-muted">#${t.id}</code></td>
+                        <td class="small fw-bold">${formatDate(t.timestampUtc)}</td>
+                        <td>${getInvTypeBadge(t.type)}</td>
+                        <td class="fw-black text-uppercase small">${escapeHtml(t.productName)}</td>
+                        <td class="text-center fw-bold ${t.quantityDelta < 0 ? 'text-danger' : 'text-success'}">${t.quantityDelta > 0 ? '+' : ''}${t.quantityDelta}</td>
+                        <td class="small text-muted text-truncate" style="max-width: 200px;">${escapeHtml(t.note || '')}</td>
+                        <td class="text-end">
+                            <button class="neo-btn neo-btn-info btn-sm p-1 px-3" onclick="viewInvDetails(${t.id})">VIEW</button>
+                        </td>
+                    </tr>
+                `}).join('');
+            }
+
+            window.viewInvDetails = (id) => {
+                try {
+                    const t = recentTransactions.find(x => x.id === id);
+                    if(!t) return;
+
+                    window.switchInvView('detail');
+                    
+                    document.getElementById('inv-detail-id').innerText = '#' + t.id;
+                    document.getElementById('inv-detail-date').innerText = formatDate(t.timestampUtc);
+                    document.getElementById('inv-detail-type').innerHTML = getInvTypeBadge(t.type);
+                    
+                    const isOut = t.quantityDelta < 0;
+                    document.getElementById('inv-detail-direction').innerHTML = isOut 
+                        ? '<span class="text-danger fw-black"><i class="bi bi-arrow-down-circle-fill me-2"></i>OUTBOUND (ISSUE)</span>'
+                        : '<span class="text-success fw-black"><i class="bi bi-arrow-up-circle-fill me-2"></i>INBOUND (RECEIVE)</span>';
+                    
+                    document.getElementById('inv-detail-product').innerText = t.productName || 'UNKNOWN PRODUCT';
+                    document.getElementById('inv-detail-qty').innerText = Math.abs(t.quantityDelta) + ' UNITS';
+                    document.getElementById('inv-detail-note').innerText = t.note || 'No additional notes provided.';
+
+                } catch(e) { console.error(e); if (window.appMessages) window.appMessages.showError('Failed to render details'); }
+            };
+
+            window.switchInvView = (v) => {
+                document.getElementById('inv-list-view').style.display = v==='list'?'block':'none';
+                document.getElementById('inv-detail-view').style.display = v==='detail'?'block':'none';
+            };
+
+            init();
+        })();
+    </script>
+}

@@ -1,0 +1,1178 @@
+@{
+    ViewData["Title"] = "Customers";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <h1 class="display-3 fw-black text-uppercase mb-0">Customers</h1>
+        <button class="neo-btn neo-btn-success" onclick="createCustomer()">
+            <i class="bi bi-plus-circle"></i> ADD NEW CUSTOMER
+        </button>
+    </div>
+
+    <!-- Customers Cards Grid -->
+    <div id="customers-grid" class="row g-4 mb-5">
+        <div class="col-12 text-center py-5">
+            <div class="spinner-border" role="status"></div>
+            <p class="mt-3 fw-bold">LOADING CUSTOMERS...</p>
+        </div>
+    </div>
+
+    <!-- Customer Detail Panel (Neo Style) -->
+    <div id="detail-panel" class="neo-card p-0 overflow-hidden" style="display:none; border-width: 3px;">
+        <div class="p-4 bg-black text-white d-flex justify-content-between align-items-center">
+            <h3 class="fw-black text-uppercase mb-0" id="detail-customer-name">Customer Details</h3>
+            <button class="neo-btn neo-btn-danger btn-sm" id="btn-close-detail">
+                <i class="bi bi-x-circle"></i> CLOSE
+            </button>
+        </div>
+
+        <div class="p-5">
+            <!-- Customer Info & Balance -->
+            <div class="row g-4 mb-5">
+                <div class="col-md-6">
+                    <div class="neo-card h-100 mb-0" style="background: var(--neo-white);">
+                        <h5 class="fw-black text-uppercase mb-4 border-bottom border-2 pb-2">Information</h5>
+                        <div id="customer-info" class="fw-bold"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="neo-card h-100 mb-0 bg-success text-white">
+                        <h5 class="fw-black text-uppercase mb-4 border-bottom border-white border-2 pb-2">Balance Summary</h5>
+                        <div id="balance-info" class="fw-black fs-4"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sales Orders List Section -->
+            <div id="orders-list-section">
+                <h5 class="fw-black text-uppercase mb-4">Sales Order History</h5>
+                <div class="table-responsive neo-card p-0">
+                    <table class="table table-hover align-middle mb-0" id="sales-orders-table">
+                        <thead>
+                            <tr>
+                                <th>ORDER #</th>
+                                <th>DATE</th>
+                                <th>DUE DATE</th>
+                                <th>STATUS</th>
+                                <th>PAYMENT</th>
+                                <th class="text-end">SUBTOTAL</th>
+                                <th class="text-end">VAT</th>
+                                <th class="text-end">MAN. TAX</th>
+                                <th class="text-end">TOTAL</th>
+                                <th class="text-end">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="9" class="text-center py-5 fw-bold">LOADING ORDERS...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Order Details Section -->
+            <div id="order-details-section" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-black text-uppercase mb-0">Order: <span id="detail-order-number" class="text-primary"></span></h5>
+                    <div class="d-flex gap-2">
+                        <a id="btn-print-order" href="#" target="_blank" class="neo-btn neo-btn-primary btn-sm">
+                            <i class="bi bi-printer"></i> PRINT
+                        </a>
+                        <button class="neo-btn neo-btn-info btn-sm" onclick="closeOrderDetails()">
+                            <i class="bi bi-arrow-left"></i> BACK TO LOG
+                        </button>
+                    </div>
+                </div>
+
+                <div class="neo-card mb-4" style="background: #f8f8f8;">
+                    <div class="row g-4">
+                        <!-- Left: Info, Docs, Financials -->
+                        <div class="col-md-6 border-end border-2">
+                            <div class="mb-4">
+                                <h6 class="fw-black text-uppercase small mb-3">General Details</h6>
+                                <div class="mb-2"><strong>DATE:</strong> <span id="detail-order-date"></span></div>
+                                <div class="mb-2 d-flex align-items-center gap-2">
+                                    <strong>STATUS:</strong> <span id="detail-order-status"></span>
+                                    <button class="neo-btn btn-sm py-0 ms-2" style="font-size: 0.7rem;" onclick="openStatusModal()">EDIT</button>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <h6 class="fw-black text-uppercase small mb-3">Documents</h6>
+                                <div id="pdf-section" class="d-flex flex-column gap-2">
+                                    <!-- Injected by JS -->
+                                </div>
+                            </div>
+
+                            <div class="neo-card p-3 bg-white mb-0">
+                                <h6 class="fw-black text-uppercase small mb-3">Financial Overview</h6>
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="small fw-bold">SUBTOTAL:</span>
+                                    <span id="detail-subtotal" class="fw-bold"></span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="small fw-bold">VAT (14%):</span>
+                                    <span id="detail-vat"></span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="small fw-bold">TAX (1%):</span>
+                                    <span id="detail-man-tax"></span>
+                                </div>
+                                <div class="d-flex justify-content-between mt-2 pt-2 border-top border-2">
+                                    <span class="fw-black">TOTAL:</span>
+                                    <span id="detail-total" class="fw-black fs-4 text-success"></span>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <span class="small fw-bold">PAID:</span>
+                                    <span id="detail-paid" class="fw-bold text-success"></span>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <span class="small fw-bold">REMAINING:</span>
+                                    <span id="detail-remaining" class="fw-bold"></span>
+                                </div>
+                                <div id="detail-refunded-row" class="d-flex justify-content-between mt-2 pt-2 border-top border-2 text-danger" style="display:none !important;">
+                                    <span class="fw-black">REFUNDED:</span>
+                                    <span id="detail-refunded" class="fw-black fs-5"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Payment Terms & Notes -->
+                        <div class="col-md-6 ps-md-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-black text-uppercase small mb-0">Payment Context</h6>
+                            </div>
+                                    <div class="neo-card p-3 bg-white mb-3 bg-neo-warning">
+                                        <div class="mb-2"><strong>STATUS:</strong> <span id="detail-payment-status"></span></div>
+                                        <div class="mb-2"><strong>METHOD:</strong> <span id="detail-payment-method" class="fw-black text-uppercase"></span></div>
+                                        <div class="mb-2"><strong>DUE DATE:</strong> <span id="detail-due-date" class="fw-black text-uppercase"></span></div>
+                                        <div class="mt-3">
+                                            <button class="neo-btn neo-btn-primary btn-sm w-100 mb-2" id="btn-record-payment" onclick="openRecordPaymentModal()">RECORD PAYMENT</button>
+                                            <div class="d-flex gap-2">
+                                                <button class="neo-btn btn-sm flex-grow-1 py-0" style="font-size: 0.7rem;" onclick="openEditPaymentModal()">EDIT INFO</button>
+                                                <button class="neo-btn btn-sm flex-grow-1 py-0" style="font-size: 0.7rem;" onclick="openEditDueDateModal()">EDIT DUE DATE</button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                            <!-- Method specifics -->
+                            <div id="check-details" class="neo-card p-3 bg-white mb-3" style="display: none;">
+                                <h6 class="fw-black text-uppercase small mb-3 border-bottom border-2 pb-1">Check Verification</h6>
+                                <div class="d-flex justify-content-between mb-2"><span>RECEIVED:</span> <span id="detail-check-received"></span></div>
+                                <div class="d-flex justify-content-between mb-2"><span>RECEIVE DATE:</span> <span id="detail-check-received-date"></span></div>
+                                <div class="d-flex justify-content-between mb-2 border-top pt-2"><span>CASHED:</span> <span id="detail-check-cashed"></span></div>
+                                <div class="d-flex justify-content-between"><span>CASH DATE:</span> <span id="detail-check-cashed-date"></span></div>
+                            </div>
+
+                            <div id="bank-transfer-details" class="neo-card p-3 bg-white mb-3" style="display: none;">
+                                <h6 class="fw-black text-uppercase small mb-3 border-bottom border-2 pb-1">Transfer Trace</h6>
+                                <div class="d-flex justify-content-between"><span>REFERENCE ID:</span> <span id="detail-transfer-id" class="fw-black"></span></div>
+                            </div>
+
+                            <div class="mt-4">
+                                <h6 class="fw-black text-uppercase small mb-1">Customer Note</h6>
+                                <p id="detail-notes" class="small text-muted mb-0"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="fw-black text-uppercase mb-3">Order Line Items</h6>
+                <div class="table-responsive neo-card p-0">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-dark text-white">
+                            <tr>
+                                <th>PRODUCT</th>
+                                <th>BATCH</th>
+                                <th class="text-center">QTY</th>
+                                <th class="text-center">UNIT</th>
+                                <th class="text-end">UNIT PRICE</th>
+                                <th class="text-end">VAT</th>
+                                <th class="text-end">MAN. TAX</th>
+                                <th class="text-end">SUBTOTAL</th>
+                                <th class="text-end">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detail-lines-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODALS -->
+
+<!-- Edit Payment Info Modal -->
+<div class="modal fade" id="editPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Edit Payment Information</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="editPaymentInfoForm">
+                    <input type="hidden" id="editPaymentOrderId" />
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-black text-uppercase small">Payment Method</label>
+                        <select class="form-select fw-bold" id="editPaymentMethod" onchange="togglePaymentMethodFields()">
+                            <option value="1">CASH</option>
+                            <option value="2">CHECK</option>
+                            <option value="3">BANK TRANSFER</option>
+                        </select>
+                    </div>
+
+                    <div id="edit-check-fields" style="display: none;">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editCheckReceived">
+                                <label class="form-check-label fw-bold small">Check Received</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Received Date</label>
+                            <input type="date" class="form-control fw-bold" id="editCheckReceivedDate">
+                        </div>
+                        <hr class="border-2 opacity-100">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editCheckCashed">
+                                <label class="form-check-label fw-bold small">Check Cashed</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Check Cashed Date</label>
+                            <input type="date" class="form-control fw-bold" id="editCheckCashedDate">
+                        </div>
+                    </div>
+
+                    <div id="edit-bank-transfer-fields" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label fw-black text-uppercase small">Transfer ID / Reference</label>
+                            <input type="text" class="form-control fw-bold" id="editTransferId">
+                        </div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label fw-black text-uppercase small">Internal Note</label>
+                        <textarea class="form-control fw-bold" id="editOrderNote" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" id="savePaymentInfoBtn" onclick="savePaymentInfo()">SAVE CHANGES</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Record Payment Modal -->
+<div class="modal fade" id="recordPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Record New Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-4 text-center">
+                    <div class="small fw-bold text-uppercase opacity-50">Remaining Balance</div>
+                    <div class="h2 fw-black text-danger mb-0" id="record-remaining-balance">$0.00</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Payment Amount</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-black text-white fw-bold">$</span>
+                        <input type="number" class="form-control form-control-lg fw-black" id="paymentAmount" step="0.01">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">Reference / ID</label>
+                    <input type="text" class="form-control fw-bold" id="paymentReference" placeholder="e.g. CASH, CHECK #123, etc.">
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Note</label>
+                    <textarea class="form-control fw-bold" id="paymentNote" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-success btn-sm px-4" id="submitPaymentBtn" onclick="submitPayment()">SUBMIT PAYMENT</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Due Date Modal -->
+<div class="modal fade" id="editDueDateModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small text-white">Edit Due Date</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">New Due Date</label>
+                    <input type="date" class="form-control fw-black text-center" id="newDueDateInput">
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" onclick="saveDueDate()">UPDATE</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Customer Modal -->
+<div class="modal fade" id="createCustomerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-black text-uppercase">Register New Customer</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                @Html.AntiForgeryToken()
+                <div class="mb-4">
+                    <label class="form-label fw-black text-uppercase small">Full Name</label>
+                    <input type="text" class="form-control" id="createCustomerName" required />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-black text-uppercase small">Phone</label>
+                    <input type="text" class="form-control" id="createCustomerPhone" />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-black text-uppercase small">Email</label>
+                    <input type="email" class="form-control" id="createCustomerEmail" />
+                </div>
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">HQ Address</label>
+                    <textarea class="form-control" id="createCustomerAddress" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-success" id="btn-save-new-customer">CREATE RECORD</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Customer Modal -->
+<div class="modal fade" id="editCustomerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-neo-info">
+                <h5 class="modal-title fw-black text-uppercase">Modify Customer</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="editCustomerId" />
+                <div class="mb-4">
+                    <label class="form-label fw-black text-uppercase small">Name</label>
+                    <input type="text" class="form-control" id="editCustomerName" required />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-black text-uppercase small">Phone</label>
+                    <input type="text" class="form-control" id="editCustomerPhone" />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-black text-uppercase small">Email</label>
+                    <input type="email" class="form-control" id="editCustomerEmail" />
+                </div>
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Address</label>
+                    <textarea class="form-control" id="editCustomerAddress" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary" id="btn-save-customer">UPDATE RECORD</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Change Status Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Lifecycle Status</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <div class="mb-4">
+                    <label class="form-label fw-black text-uppercase small mb-3">Target Status</label>
+                    <select class="form-select fw-black text-center" id="updateStatusSelect">
+                        <option value="0">PENDING</option>
+                        <option value="1">DONE</option>
+                    </select>
+                </div>
+                <div id="status-warning" class="alert neo-btn-warning fw-bold p-3 mb-0" style="display: none; border-radius:0;">
+                    <i class="bi bi-exclamation-triangle"></i> STOCK DEPLETION WILL OCCUR IF SET TO DONE.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm" onclick="updateOrderStatus()">CONFIRM</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Order Modal -->
+<div class="modal fade" id="cancelOrderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-neo-warning">
+                <h5 class="modal-title fw-black text-uppercase">Irreversible Cancellation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="fw-bold mb-3">PROCEED WITH CANCELLATION OF THIS ORDER?</p>
+                <div class="neo-card bg-light p-3 border-2 mb-0">
+                    <i class="bi bi-info-circle me-2"></i> STATUS WILL BE FLIPPED TO <span class="fw-black text-danger">CANCELLED</span>.
+                </div>
+                <input type="hidden" id="cancelOrderId" />
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn" data-bs-dismiss="modal">ABORT</button>
+                <button class="neo-btn neo-btn-danger" id="btn-confirm-cancel">YES, CANCEL ORDER</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Refund Sales Order Modal -->
+<div class="modal fade" id="refundOrderModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-neo-danger">
+                <h5 class="modal-title fw-black text-uppercase text-white">Inbound Refund Request</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="refundOrderId" />
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        <label class="form-label fw-black text-uppercase small">Order Ref</label>
+                        <input type="text" class="form-control fw-bold bg-light" id="refundOrderNumber" readonly />
+                    </div>
+                    <div class="col-3">
+                         <label class="form-label fw-black text-uppercase small">Total</label>
+                         <input type="text" class="form-control fw-bold" id="refundOrderTotal" readonly />
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label fw-black text-uppercase small text-success">Recovered</label>
+                        <input type="text" class="form-control fw-bold" id="refundOrderAlreadyRefunded" readonly />
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h6 class="fw-black text-uppercase small mb-2 border-bottom border-2 pb-1">Product Returns (Stock Restoration)</h6>
+                    <div class="table-responsive neo-card p-0 mb-2" style="max-height: 250px; overflow-y: auto;">
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead class="table-dark text-white sticky-top">
+                                <tr>
+                                    <th>PRODUCT</th>
+                                    <th class="text-center">SOLD</th>
+                                    <th class="text-center">PREV. RET.</th>
+                                    <th class="text-center" style="width: 120px;">RETURN QTY</th>
+                                </tr>
+                            </thead>
+                            <tbody id="refund-lines-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="small fw-bold text-muted text-end"><i class="bi bi-info-circle me-1"></i> ENTER QUANTITIES TO RETURN TO STOCK.</div>
+                </div>
+                
+                <div class="mb-4 pt-3 border-top border-2">
+                    <h6 class="fw-black text-uppercase small mb-2">Financial Reversal</h6>
+                    <div class="row align-items-end">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-muted">CASH AMOUNT TO REFUND</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-black text-white">$</span>
+                                <input type="number" class="form-control fw-black" id="refundAmount" step="0.01" value="0" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                             <div class="alert neo-btn-warning p-2 small fw-bold mb-0" style="border-radius:0;">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i> INDEPENDENT OF STOCK. VERIFY MANUALLY.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">Reason Context</label>
+                    <textarea class="form-control" id="refundReason" rows="2" placeholder="Required for audit trail..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-danger" onclick="processRefund()">EXECUTE REFUND</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="file" id="invoiceSalesUploadInput" accept=".pdf" style="display:none" onchange="performSalesUpload('invoice')">
+<input type="file" id="receiptSalesUploadInput" accept=".pdf" style="display:none" onchange="performSalesUpload('receipt')">
+
+@section Scripts {
+    <script>
+        (function () {
+            let currentCustomerId = null;
+            let allCustomers = [];
+
+            const getStatusBadge = (s) => {
+                let cls = 'neo-btn-info'; // Pending
+                let txt = 'PENDING';
+                if(s===1) { cls='neo-btn-success'; txt='DONE'; }
+                if(s===2) { cls='neo-btn-danger text-white'; txt='CANCELLED'; }
+                return `<span class="badge ${cls}">${txt}</span>`;
+            };
+
+            const getPayBadge = (s) => {
+                let cls = 'neo-btn-danger text-white'; // Pending/Unpaid
+                let txt = 'PENDING';
+                if(s===1) { cls='neo-btn-success'; txt='PAID'; }
+                if(s===2) { cls='neo-btn-warning'; txt='PARTIAL'; }
+                return `<span class="badge ${cls}">${txt}</span>`;
+            };
+
+            const canCancelSalesOrder = (o) => {
+                // Money: no net paid amount and payment status is Pending
+                const netPaidAmount = (o.paidAmount || 0) - (o.refundedAmount || 0);
+                const paymentClear = netPaidAmount === 0 && o.paymentStatus === 0;
+                
+                // Stock: if Done, all must be refunded
+                let stockClear = true;
+                if (o.status === 1 && o.lines) { // Done
+                    const remainingStock = o.lines.reduce((sum, l) => sum + (l.quantity - (l.refundedQuantity || 0)), 0);
+                    stockClear = remainingStock === 0;
+                }
+                
+                return paymentClear && stockClear;
+            };
+
+
+
+            async function loadCustomers() {
+                try {
+                    const response = await fetch('/api/customers');
+                    if (!response.ok) throw new Error();
+                    allCustomers = await response.json();
+                    renderCustomerCards(allCustomers);
+                } catch (error) {
+                    document.getElementById('customers-grid').innerHTML = '<div class="col-12 text-center text-danger py-5 fw-black">GLOBAL SYNC FAILED. REFRESH.</div>';
+                }
+            }
+
+            function renderCustomerCards(customers) {
+                const grid = document.getElementById('customers-grid');
+                if (!customers || customers.length === 0) {
+                    grid.innerHTML = '<div class="col-12 text-center py-5 fw-black">NO CUSTOMERS DETECTED.</div>';
+                    return;
+                }
+
+                grid.innerHTML = customers.map(c => `
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="neo-card h-100 mb-0" style="background: var(--neo-white);">
+                            <div class="fw-black text-uppercase h4 mb-3 border-bottom border-2 pb-2" style="letter-spacing: -1px;">${escapeHtml(c.name)}</div>
+                            <div class="mb-2 fw-bold small"><i class="bi bi-telephone me-2"></i>${escapeHtml(c.phone || 'N/A')}</div>
+                            <div class="mb-2 fw-bold small"><i class="bi bi-envelope me-2"></i>${escapeHtml(c.email || 'N/A')}</div>
+                            <div class="mb-4 fw-bold small"><i class="bi bi-geo-alt me-2"></i>${escapeHtml(c.address || 'N/A')}</div>
+                            <div class="d-flex gap-2">
+                                <button class="neo-btn btn-sm flex-grow-1" onclick="editCustomer(${c.id})">EDIT</button>
+                                <button class="neo-btn neo-btn-success btn-sm flex-grow-1" onclick="viewCustomerHistory(${c.id})">HISTORY</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            window.createCustomer = () => {
+                document.getElementById('createCustomerName').value = '';
+                document.getElementById('createCustomerPhone').value = '';
+                document.getElementById('createCustomerEmail').value = '';
+                document.getElementById('createCustomerAddress').value = '';
+                new bootstrap.Modal(document.getElementById('createCustomerModal')).show();
+            };
+
+            document.getElementById('btn-save-new-customer').onclick = async () => {
+                const d = { name: document.getElementById('createCustomerName').value, phone: document.getElementById('createCustomerPhone').value, email: document.getElementById('createCustomerEmail').value, address: document.getElementById('createCustomerAddress').value };
+                try {
+                    const r = await fetch('/api/customers', { method:'POST', headers:{'Content-Type':'application/json','RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value}, body:JSON.stringify(d) });
+                    if(!r.ok) throw new Error();
+                    bootstrap.Modal.getInstance(document.getElementById('createCustomerModal')).hide();
+                    await loadCustomers();
+                } catch(e) { if (window.appMessages) window.appMessages.showError("Registration failed"); }
+            };
+
+            window.editCustomer = (id) => {
+                const c = allCustomers.find(cx => cx.id === id); if(!c) return;
+                document.getElementById('editCustomerId').value = c.id; document.getElementById('editCustomerName').value = c.name;
+                document.getElementById('editCustomerPhone').value = c.phone || ''; document.getElementById('editCustomerEmail').value = c.email || '';
+                document.getElementById('editCustomerAddress').value = c.address || '';
+                new bootstrap.Modal(document.getElementById('editCustomerModal')).show();
+            };
+
+            document.getElementById('btn-save-customer').onclick = async () => {
+                const id = parseInt(document.getElementById('editCustomerId').value);
+                const d = { id:id, name:document.getElementById('editCustomerName').value, phone:document.getElementById('editCustomerPhone').value, email:document.getElementById('editCustomerEmail').value, address:document.getElementById('editCustomerAddress').value };
+                try {
+                    const r = await fetch(`/api/customers/${id}`, { method:'PUT', headers:{'Content-Type':'application/json','RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value}, body:JSON.stringify(d) });
+                    if(!r.ok) throw new Error();
+                    bootstrap.Modal.getInstance(document.getElementById('editCustomerModal')).hide();
+                    await loadCustomers(); if(currentCustomerId === id) viewCustomerHistory(id);
+                } catch(e) { if (window.appMessages) window.appMessages.showError("Update failed"); }
+            };
+
+            window.viewCustomerHistory = async (id) => {
+                document.getElementById('order-details-section').style.display = 'none';
+                document.getElementById('orders-list-section').style.display = 'block';
+                document.querySelector('#sales-orders-table tbody').innerHTML = '<tr><td colspan="9" class="text-center py-5 fw-bold">SYNCING DATA...</td></tr>';
+                currentCustomerId = id;
+                await refreshCustomerData(id);
+                document.getElementById('detail-panel').style.display = 'block';
+                document.getElementById('detail-panel').classList.add('active');
+                document.getElementById('detail-panel').scrollIntoView({ behavior: 'smooth' });
+            };
+
+            async function refreshCustomerData(id) {
+                try {
+                    const [detail, orders] = await Promise.all([ fetch(`/api/customers/${id}`).then(r=>r.json()), fetch(`/api/customers/${id}/sales-orders`).then(r=>r.json()) ]);
+                    document.getElementById('detail-customer-name').textContent = detail.customer.name.toUpperCase();
+                    document.getElementById('customer-info').innerHTML = `
+                        <div class="d-flex justify-content-between mb-2"><span>PHONE:</span> <span>${escapeHtml(detail.customer.phone || 'N/A')}</span></div>
+                        <div class="d-flex justify-content-between mb-2"><span>EMAIL:</span> <span>${escapeHtml(detail.customer.email || 'N/A')}</span></div>
+                        <div class="d-flex justify-content-between"><span>ADDRESS:</span> <span class="text-end" style="max-width: 60%;">${escapeHtml(detail.customer.address || 'N/A')}</span></div>
+                    `;
+                    document.getElementById('balance-info').innerHTML = `
+                        <div class="d-flex justify-content-between mb-2"><span>TOTAL PENDING:</span> <span>${formatCurrency(detail.balance.totalPending)}</span></div>
+                        <div class="d-flex justify-content-between pt-2 border-top border-white"><span class="text-warning">DESERVED (OVERDUE):</span> <span class="text-warning">${formatCurrency(detail.balance.deserved)}</span></div>
+                    `;
+                    renderSalesOrders(orders);
+                } catch(e) { console.error("Data refresh failed", e); }
+            }
+
+            window.viewOrderDetails = async (id) => {
+                try {
+                    const r = await fetch(`/api/sales-orders/${id}`); if(!r.ok) throw new Error();
+                    const o = await r.json();
+                    document.getElementById('detail-order-number').textContent = o.orderNumber;
+                    document.getElementById('btn-print-order').href = `/SalesOrders/Details/${o.id}`;
+                    document.getElementById('detail-order-date').textContent = formatDate(o.orderDate);
+                    document.getElementById('detail-order-status').innerHTML = getStatusBadge(o.status);
+                    document.getElementById('detail-payment-status').innerHTML = getPayBadge(o.paymentStatus);
+                    document.getElementById('detail-payment-method').textContent = (o.paymentMethod === 1 ? 'CASH' : o.paymentMethod === 2 ? 'CHECK' : o.paymentMethod === 3 ? 'BANK TRANSFER' : 'N/A');
+                    document.getElementById('detail-due-date').textContent = formatDate(o.dueDate);
+                    
+                    const cs = document.getElementById('check-details');
+                    if (o.paymentMethod === 2) { 
+                        cs.style.display = 'block';
+                        document.getElementById('detail-check-received').innerHTML = o.checkReceived ? '<span class="badge neo-btn-success">YES</span>' : '<span class="badge neo-btn-danger">NO</span>';
+                        document.getElementById('detail-check-received-date').textContent = o.checkReceivedDate ? formatDate(o.checkReceivedDate) : '-';
+                        document.getElementById('detail-check-cashed').innerHTML = o.checkCashed ? '<span class="badge neo-btn-success">YES</span>' : '<span class="badge neo-btn-danger">NO</span>';
+                        document.getElementById('detail-check-cashed-date').textContent = o.checkCashedDate ? formatDate(o.checkCashedDate) : '-';
+                    } else { cs.style.display = 'none'; }
+
+                    const bs = document.getElementById('bank-transfer-details');
+                    if (o.paymentMethod === 3) { bs.style.display = 'block'; document.getElementById('detail-transfer-id').textContent = o.transferId || '-'; }
+                    else { bs.style.display = 'none'; }
+
+                    renderDocumentsSection(o);
+                    
+                    document.getElementById('detail-subtotal').textContent = formatCurrency(o.subtotal);
+                    document.getElementById('detail-vat').textContent = formatCurrency(o.vatAmount);
+                    document.getElementById('detail-man-tax').textContent = formatCurrency(o.manufacturingTaxAmount);
+                    document.getElementById('detail-total').textContent = formatCurrency(o.totalAmount);
+                    document.getElementById('detail-paid').textContent = formatCurrency(o.paidAmount || 0);
+                    
+                    const rem = o.remainingAmount || 0;
+                    const remEl = document.getElementById('detail-remaining');
+                    remEl.textContent = formatCurrency(rem);
+                    remEl.className = rem > 0 ? 'fw-bold text-danger' : 'fw-bold text-success';
+
+                    const rr = document.getElementById('detail-refunded-row');
+                    if (o.refundedAmount > 0) { rr.style.setProperty('display', 'flex', 'important'); document.getElementById('detail-refunded').textContent = '-' + formatCurrency(o.refundedAmount); }
+                    else { rr.style.setProperty('display', 'none', 'important'); }
+                    
+                    document.getElementById('detail-notes').textContent = o.note || 'NO NOTES.';
+                    document.getElementById('detail-lines-body').innerHTML = o.lines.map(l => `
+                        <tr>
+                            <td><span class="fw-black text-uppercase small">${escapeHtml(l.productName)}</span></td>
+                            <td>${l.batchNumber ? `<code class="fw-bold">${escapeHtml(l.batchNumber)}</code>` : '-'}</td>
+                            <td class="text-center fw-bold">${l.quantity}</td>
+                            <td class="text-center small">${escapeHtml(l.unit)}</td>
+                            <td class="text-end fw-bold">${formatCurrency(l.unitPrice)}</td>
+                            <td class="text-end small">${l.lineVatAmount > 0 ? formatCurrency(l.lineVatAmount) : '-'}</td>
+                            <td class="text-end small">${l.lineManufacturingTaxAmount > 0 ? formatCurrency(l.lineManufacturingTaxAmount) : '-'}</td>
+                            <td class="text-end fw-bold">${formatCurrency(l.lineSubtotal)}</td>
+                            <td class="text-end fw-black">${formatCurrency(l.lineTotal)}</td>
+                        </tr>
+                    `).join('');
+
+                    document.getElementById('orders-list-section').style.display = 'none';
+                    document.getElementById('order-details-section').style.display = 'block';
+                    window.currentDetailOrder = o;
+                } catch (e) { if (window.appMessages) window.appMessages.showError("Details sync failed"); }
+            };
+
+            window.openStatusModal = () => {
+                const o = window.currentDetailOrder; if (!o) return;
+                document.getElementById('updateStatusSelect').value = o.status;
+                document.getElementById('status-warning').style.display = (o.status !== 1) ? 'block' : 'none';
+                new bootstrap.Modal(document.getElementById('statusModal')).show();
+            };
+
+            window.updateOrderStatus = async () => {
+                const o = window.currentDetailOrder; if (!o) return;
+                const ns = parseInt(document.getElementById('updateStatusSelect').value);
+                const od = o.id;
+                try {
+                    const ft = document.querySelector('[name="__RequestVerificationToken"]').value;
+                    const fd = new FormData(); fd.append('__RequestVerificationToken', ft); fd.append('OrderId', od); fd.append('Status', ns);
+                    const r = await fetch(`/SalesOrders/UpdateStatus?id=${od}`, { method: 'POST', body: fd });
+                    if (!r.ok) throw new Error(await r.text());
+                    bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
+                    await viewOrderDetails(od);
+                    if (currentCustomerId) await refreshCustomerData(currentCustomerId);
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Status update failed'); }
+            };
+
+            window.openEditPaymentModal = () => {
+                const o = window.currentDetailOrder; if (!o) return;
+                document.getElementById('editPaymentOrderId').value = o.id;
+                document.getElementById('editPaymentMethod').value = o.paymentMethod || 1; 
+                togglePaymentMethodFields(); 
+                document.getElementById('editCheckReceived').checked = o.checkReceived;
+                document.getElementById('editCheckReceivedDate').value = o.checkReceivedDate ? o.checkReceivedDate.split('T')[0] : '';
+                document.getElementById('editCheckCashed').checked = o.checkCashed;
+                document.getElementById('editCheckCashedDate').value = o.checkCashedDate ? o.checkCashedDate.split('T')[0] : '';
+                document.getElementById('editTransferId').value = o.transferId || '';
+                document.getElementById('editOrderNote').value = o.note || '';
+                new bootstrap.Modal(document.getElementById('editPaymentModal')).show();
+            };
+
+            window.togglePaymentMethodFields = () => {
+                const m = parseInt(document.getElementById('editPaymentMethod').value);
+                document.getElementById('edit-check-fields').style.display = m === 2 ? 'block' : 'none';
+                document.getElementById('edit-bank-transfer-fields').style.display = m === 3 ? 'block' : 'none';
+            };
+
+            window.savePaymentInfo = async () => {
+                const btn = document.getElementById('savePaymentInfoBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>SAVING...';
+
+                const od = document.getElementById('editPaymentOrderId').value;
+                const pm = parseInt(document.getElementById('editPaymentMethod').value);
+                const payload = { 
+                    orderId: parseInt(od), 
+                    paymentMethod: pm,
+                    checkReceived: document.getElementById('editCheckReceived').checked,
+                    checkReceivedDate: document.getElementById('editCheckReceivedDate').value || null,
+                    checkCashed: document.getElementById('editCheckCashed').checked,
+                    checkCashedDate: document.getElementById('editCheckCashedDate').value || null,
+                    transferId: document.getElementById('editTransferId').value,
+                    note: document.getElementById('editOrderNote').value
+                };
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${od}/payment`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, body: JSON.stringify(payload) });
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('editPaymentModal')).hide();
+                    await viewOrderDetails(od);
+                    if (currentCustomerId) await refreshCustomerData(currentCustomerId);
+                } catch (e) { 
+                    if (window.appMessages) window.appMessages.showError(e.message || 'Sync failed'); 
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = 'SAVE CHANGES';
+                }
+            };
+
+            window.openRecordPaymentModal = () => {
+                const o = window.currentDetailOrder; if (!o) return;
+                const remaining = o.remainingAmount || 0;
+                document.getElementById('record-remaining-balance').textContent = formatCurrency(remaining);
+                document.getElementById('paymentAmount').value = remaining.toFixed(2);
+                document.getElementById('paymentReference').value = '';
+                document.getElementById('paymentNote').value = '';
+                new bootstrap.Modal(document.getElementById('recordPaymentModal')).show();
+            };
+
+            window.submitPayment = async () => {
+                const btn = document.getElementById('submitPaymentBtn');
+                const amount = parseFloat(document.getElementById('paymentAmount').value);
+                if (isNaN(amount) || amount <= 0) { if (window.appMessages) window.appMessages.showError('Enter a valid amount'); return; }
+
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>PROCESSING...';
+
+                const od = window.currentDetailOrder.id;
+                const payload = {
+                    amount: amount,
+                    paymentDate: new Date().toISOString(),
+                    paymentMethod: window.currentDetailOrder.paymentMethod || 1,
+                    paymentType: 0, // Sale
+                    reference: document.getElementById('paymentReference').value,
+                    note: document.getElementById('paymentNote').value
+                };
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${od}/payments`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(payload) 
+                    });
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('recordPaymentModal')).hide();
+                    await viewOrderDetails(od);
+                    if (currentCustomerId) await refreshCustomerData(currentCustomerId);
+                } catch (e) {
+                    if (window.appMessages) window.appMessages.showError(e.message || 'Payment failed');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = 'SUBMIT PAYMENT';
+                }
+            };
+
+            window.openEditDueDateModal = () => {
+                const o = window.currentDetailOrder; if (!o) return;
+                document.getElementById('newDueDateInput').value = o.dueDate ? o.dueDate.split('T')[0] : '';
+                new bootstrap.Modal(document.getElementById('editDueDateModal')).show();
+            };
+
+            window.saveDueDate = async () => {
+                const od = window.currentDetailOrder.id;
+                const newDate = document.getElementById('newDueDateInput').value;
+                if (!newDate) return;
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${od}/due-date`, { 
+                        method: 'PUT', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(new Date(newDate).toISOString()) 
+                    });
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : 'Failed to update due date';
+                        throw new Error(msg);
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('editDueDateModal')).hide();
+                    await viewOrderDetails(od);
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Failed to update due date'); }
+            };
+
+            function renderDocumentsSection(o) {
+                const c = document.getElementById('pdf-section');
+                c.innerHTML = `
+                    <div class="mb-3 d-flex flex-column gap-2">
+                        <div class="d-flex align-items-center justify-content-between p-2 border border-2 border-black bg-white">
+                            <span class="small fw-black text-uppercase">INVOICE PDF</span>
+                            <div class="d-flex gap-1">
+                                ${o.invoicePath ? `
+                                    <a href="${o.invoicePath}" target="_blank" class="neo-btn neo-btn-primary btn-sm p-1 px-2"><i class="bi bi-download"></i></a>
+                                    <button onclick="deleteSalesDocument('invoice', ${o.id})" class="neo-btn neo-btn-danger btn-sm p-1 px-2"><i class="bi bi-trash"></i></button>
+                                ` : `<button onclick="triggerSalesUpload('invoice', ${o.id})" class="neo-btn btn-sm p-1 px-2">UPLOAD</button>`}
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between p-2 border border-2 border-black bg-white">
+                            <span class="small fw-black text-uppercase">RECEIPT PDF</span>
+                            <div class="d-flex gap-1">
+                                ${o.receiptPath ? `
+                                    <a href="${o.receiptPath}" target="_blank" class="neo-btn neo-btn-primary btn-sm p-1 px-2"><i class="bi bi-download"></i></a>
+                                    <button onclick="deleteSalesDocument('receipt', ${o.id})" class="neo-btn neo-btn-danger btn-sm p-1 px-2"><i class="bi bi-trash"></i></button>
+                                ` : `<button onclick="triggerSalesUpload('receipt', ${o.id})" class="neo-btn btn-sm p-1 px-2">UPLOAD</button>`}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            window.triggerSalesUpload = (type, od) => {
+                const input = document.getElementById(type + 'SalesUploadInput');
+                input.dataset.orderId = od;
+                input.click();
+            };
+
+            window.performSalesUpload = async (type) => {
+                const input = document.getElementById(type + 'SalesUploadInput');
+                const od = input.dataset.orderId;
+                const file = input.files[0];
+                if (!file) return;
+
+                const fd = new FormData(); fd.append('file', file);
+                try {
+                    const r = await fetch(`/api/sales-orders/${od}/${type}`, { 
+                        method: 'POST', 
+                        headers: { 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: fd 
+                    });
+                    if (!r.ok) throw new Error();
+                    await viewOrderDetails(od);
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Upload failed'); } finally { input.value = ''; }
+            };
+
+            window.deleteSalesDocument = async (type, od) => {
+                if (!confirm('DELETE?')) return;
+                try {
+                    const r = await fetch(`/api/sales-orders/${od}/${type}`, { 
+                        method: 'DELETE', 
+                        headers: { 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value } 
+                    });
+                    if (!r.ok) throw new Error();
+                    await viewOrderDetails(od);
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Delete failed'); }
+            };
+
+
+
+
+
+            window.closeOrderDetails = () => { document.getElementById('order-details-section').style.display = 'none'; document.getElementById('orders-list-section').style.display = 'block'; };
+
+            function renderSalesOrders(orders) {
+                const tbody = document.querySelector('#sales-orders-table tbody');
+                if (!orders || orders.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-5 fw-bold">NO SALES DETECTED.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = orders.map(o => {
+                    const canCancel = canCancelSalesOrder(o);
+                    const cancelTooltip = canCancel
+                        ? 'Cancel this order (no automatic refunds will occur).'
+                        : 'You must fully refund stock and money before cancelling this order.';
+                    return `
+                        <tr>
+                            <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
+                            <td class="small fw-bold">${formatDate(o.orderDate)}</td>
+                            <td class="small fw-bold ${new Date(o.dueDate) < new Date() && o.paymentStatus !== 1 ? 'text-danger' : ''}">${formatDate(o.dueDate)}</td>
+                            <td>${getStatusBadge(o.status)}</td>
+                            <td>${getPayBadge(o.paymentStatus)}</td>
+                            <td class="text-end fw-bold">${formatCurrency(o.subtotal)}</td>
+                            <td class="text-end fw-bold">${formatCurrency(o.vatAmount)}</td>
+                            <td class="text-end fw-bold text-danger">${o.manufacturingTaxAmount > 0 ? '-' + formatCurrency(o.manufacturingTaxAmount) : '-'}</td>
+                            <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
+                            <td class="text-end">
+                                <div class="d-flex gap-1 justify-content-end">
+                                    <button class="neo-btn neo-btn-info btn-sm p-1 px-2" onclick="viewOrderDetails(${o.id})">VIEW</button>
+                                    ${(o.status === 1 || o.paidAmount > 0) ? `<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>` : ''}
+                                    ${o.status !== 2 ? `<button class="neo-btn neo-btn-warning btn-sm p-1 px-2" onclick="cancelOrder(${o.id})" ${canCancel ? '' : 'disabled'} title="${cancelTooltip}">CANCEL</button>` : ''}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+            }
+
+            window.cancelOrder = (od) => { document.getElementById('cancelOrderId').value = od; new bootstrap.Modal(document.getElementById('cancelOrderModal')).show(); };
+            document.getElementById('btn-confirm-cancel').onclick = async () => {
+                const od = parseInt(document.getElementById('cancelOrderId').value);
+                try {
+                    const ft = document.querySelector('[name="__RequestVerificationToken"]').value;
+                    const fd = new FormData(); 
+                    fd.append('__RequestVerificationToken', ft);
+                    const r = await fetch(`/SalesOrders/Cancel?id=${od}`, { method: 'POST', body: fd });
+                    if (!r.ok) {
+                        const msg = await r.text();
+                        throw new Error(msg || 'Cancellation failed.');
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('cancelOrderModal')).hide();
+                    if (currentCustomerId) { viewCustomerHistory(currentCustomerId); if (document.getElementById('order-details-section').style.display === 'block') viewOrderDetails(od); }
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Cancellation failed'); }
+            };
+
+            // -- REFUND VALIDATION HELPER --
+            function validateRefundForm() {
+                const amt = parseFloat(document.getElementById('refundAmount').value) || 0;
+                let hasLines = false;
+                document.querySelectorAll('.refund-line-qty').forEach(input => {
+                    if ((parseFloat(input.value) || 0) > 0) hasLines = true;
+                });
+                const btn = document.getElementById('btn-execute-refund');
+                if (btn) btn.disabled = !(amt > 0 || hasLines);
+            }
+
+            window.openRefundModal = async (id, num, tot, ref) => {
+                document.getElementById('refundOrderId').value = id; 
+                document.getElementById('refundOrderNumber').value = num;
+                document.getElementById('refundOrderTotal').value = formatCurrency(tot); 
+                document.getElementById('refundOrderAlreadyRefunded').value = formatCurrency(ref || 0);
+                document.getElementById('refundAmount').value = ''; 
+                document.getElementById('refundReason').value = '';
+                
+                // Disable button initially
+                const btn = document.getElementById('btn-execute-refund');
+                if (btn) btn.disabled = true;
+
+                // Attach amount change listener
+                document.getElementById('refundAmount').oninput = validateRefundForm;
+                
+                // Fetch latest lines info for refunds
+                const tbody = document.getElementById('refund-lines-body');
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></td></tr>';
+                new bootstrap.Modal(document.getElementById('refundOrderModal')).show();
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${id}`);
+                    if (!r.ok) throw new Error();
+                    const o = await r.json();
+                    
+                    // Determine eligibility based on order state
+                    // Status 1 = Done, PaymentStatus 1 = Paid
+                    const canRefundStock = (o.status === 1);
+                    // Fix: Eligibility depends on having money to refund (Net Paid > 0).
+                    const canRefundMoney = (o.paidAmount > 0);
+                    const remainingRefundableAmount = o.totalAmount - (o.refundedAmount || 0);
+                    const moneyFullyRefunded = remainingRefundableAmount <= 0;
+
+                    // Money refund input
+                    const amountInput = document.getElementById('refundAmount');
+                    if (!canRefundMoney || moneyFullyRefunded) {
+                        amountInput.disabled = true;
+                        amountInput.value = '';
+                        amountInput.placeholder = moneyFullyRefunded ? 'Fully refunded' : 'Payment not received';
+                    } else {
+                        amountInput.disabled = false;
+                        amountInput.placeholder = `Max: ${formatCurrency(remainingRefundableAmount)}`;
+                        amountInput.max = remainingRefundableAmount;
+                    }
+                    
+                    tbody.innerHTML = o.lines.map(l => {
+                        const remaining = l.quantity - (l.refundedQuantity || 0);
+                        const lineFullyRefunded = remaining <= 0;
+                        const disabled = (!canRefundStock || lineFullyRefunded) ? 'disabled' : '';
+                        const hint = lineFullyRefunded ? 'Fully returned' : (!canRefundStock ? 'Order not complete' : '');
+                        return `
+                        <tr>
+                            <td>
+                                <div class="fw-black small text-uppercase">${escapeHtml(l.productName)}</div>
+                                <div class="small text-muted">${l.batchNumber ? `<code class="text-dark">${escapeHtml(l.batchNumber)}</code>` : 'NO BATCH'}</div>
+                            </td>
+                            <td class="text-center fw-bold">${l.quantity}</td>
+                            <td class="text-center text-muted col-refunded-qty">${l.refundedQuantity || 0}</td>
+                            <td class="text-center">
+                                <input type="number" class="form-control form-control-sm fw-black text-center refund-line-qty" 
+                                    data-line-id="${l.id}" 
+                                    data-batch-id="${l.productBatchId || ''}"
+                                    data-batch-number="${l.batchNumber || ''}"
+                                    min="0" max="${remaining}" 
+                                    value="" ${disabled} 
+                                    placeholder="${hint}"
+                                    title="${hint}"
+                                    style="border: 2px solid #000;">
+                            </td>
+                        </tr>`;
+                    }).join('');
+
+                    // Attach event listeners to line inputs
+                    document.querySelectorAll('.refund-line-qty').forEach(input => {
+                        input.oninput = validateRefundForm;
+                    });
+                    validateRefundForm();
+                } catch (e) {
+                     tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger fw-bold">FAILED TO LOAD LINES</td></tr>';
+                }
+            };
+
+            window.processRefund = async () => {
+                const id = parseInt(document.getElementById('refundOrderId').value); 
+                const amt = parseFloat(document.getElementById('refundAmount').value) || 0; 
+                const rsn = document.getElementById('refundReason').value;
+
+                // Collect line items with batch info
+                const lines = [];
+                document.querySelectorAll('.refund-line-qty').forEach(input => {
+                    const qty = parseFloat(input.value) || 0;
+                    if (qty > 0) {
+                        const item = { 
+                            salesOrderLineId: parseInt(input.dataset.lineId), 
+                            quantity: qty 
+                        };
+                        // Include batch info if available
+                        if (input.dataset.batchId) item.productBatchId = parseInt(input.dataset.batchId);
+                        if (input.dataset.batchNumber) item.batchNumber = input.dataset.batchNumber;
+                        lines.push(item);
+                    }
+                });
+
+                // UI-side validation (should not reach here if button is correctly disabled)
+                if (amt <= 0 && lines.length === 0) {
+                    if (window.appMessages) window.appMessages.showError('Please specify a refund amount, returned products, or both.'); return;
+                }
+
+                // Construct clean payload - only include meaningful fields
+                const payload = { orderId: id };
+                if (amt > 0) payload.amount = amt;
+                if (lines.length > 0) payload.lineItems = lines;
+                if (rsn && rsn.trim()) payload.reason = rsn.trim();
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${id}/refund`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
+                        body: JSON.stringify(payload) 
+                    });
+                    
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : (errText || 'Request failed');
+                        throw new Error(msg);
+                    }
+
+                    // SUCCESS PATH
+                    const modalEl = document.getElementById('refundOrderModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                    modal.hide();
+                    
+                    if (window.appMessages) window.appMessages.showSuccess("Refund processed successfully.");
+                    
+                    // Refresh data
+                    if (currentCustomerId) await refreshCustomerData(currentCustomerId);
+                    if (document.getElementById('order-details-section').style.display === 'block') await viewOrderDetails(id);
+                } catch (e) {
+                    const msg = (e && e.message) ? e.message : 'Refund failed';
+                    if (window.appMessages) window.appMessages.showError(msg);
+                }
+            };
+
+            document.getElementById('btn-close-detail').onclick = () => {
+                document.getElementById('detail-panel').classList.remove('active');
+                document.getElementById('detail-panel').style.display = 'none';
+                document.getElementById('order-details-section').style.display = 'none';
+                document.getElementById('orders-list-section').style.display = 'block';
+                currentCustomerId = null;
+            };
+
+            function escapeHtml(t) { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+            function formatCurrency(a) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(a); }
+            function formatDate(d) { return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
+
+            loadCustomers();
+        })();
+    </script>
+}
