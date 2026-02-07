@@ -60,12 +60,11 @@
                                 <th class="text-end">VAT</th>
                                 <th class="text-end">MAN. TAX</th>
                                 <th class="text-end">TOTAL</th>
-                                <th>PRODUCTS</th>
                                 <th class="text-end">ACTIONS</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr><td colspan="10" class="text-center py-5 fw-bold">LOADING ORDERS...</td></tr>
+                            <tr><td colspan="9" class="text-center py-5 fw-bold">LOADING ORDERS...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -950,7 +949,6 @@
                     return;
                 }
                 tbody.innerHTML = orders.map(o => {
-                    const ps = o.lines.map(l => `${l.productName} (${l.quantity})`).join(', ');
                     const canCancel = canCancelSalesOrder(o);
                     const cancelTooltip = canCancel
                         ? 'Cancel this order (no automatic refunds will occur).'
@@ -966,7 +964,6 @@
                             <td class="text-end fw-bold">${formatCurrency(o.vatAmount)}</td>
                             <td class="text-end fw-bold text-danger">${o.manufacturingTaxAmount > 0 ? '-' + formatCurrency(o.manufacturingTaxAmount) : '-'}</td>
                             <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
-                            <td class="text-truncate" style="max-width: 250px;" title="${escapeHtml(ps)}">${escapeHtml(ps)}</td>
                             <td class="text-end">
                                 <div class="d-flex gap-1 justify-content-end">
                                     <button class="neo-btn neo-btn-info btn-sm p-1 px-2" onclick="viewOrderDetails(${o.id})">VIEW</button>
