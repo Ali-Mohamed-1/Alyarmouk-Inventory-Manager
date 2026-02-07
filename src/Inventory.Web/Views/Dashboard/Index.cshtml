@@ -629,7 +629,7 @@
                     if (!resp.ok) throw new Error();
                     batchModal.hide();
                     loadProducts(); // Simple refresh
-                } catch (e) { alert('SAVE FAILED'); } finally { this.disabled = false; }
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Save failed'); } finally { this.disabled = false; }
             });
         })();
     </script>

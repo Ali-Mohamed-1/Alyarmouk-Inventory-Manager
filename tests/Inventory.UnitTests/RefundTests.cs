@@ -177,7 +177,7 @@ namespace Inventory.UnitTests
             var req = new RefundSalesOrderRequest { OrderId = orderId, Amount = 50 };
 
             var ex = await Assert.ThrowsAsync<ValidationException>(() => _salesServices.RefundAsync(req, _user));
-            Assert.Contains("payment", ex.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("net paid", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]
@@ -263,6 +263,73 @@ namespace Inventory.UnitTests
             };
 
             await Assert.ThrowsAsync<ValidationException>(() => _salesServices.RefundAsync(req, _user));
+        }
+
+        // =============================================
+        // NEW STRICT REFUND PREDICATE TESTS
+        // =============================================
+
+        [Fact]
+        public async Task RefundSalesOrder_PartialRefund_WhenNetPaidIsPositive_Succeeds()
+        {
+             // Arrange: Order Total 100, Paid 50 (Partially Paid)
+             var orderId = await CreateSalesOrderWithTotalAsync(100m);
+             await _salesServices.AddPaymentAsync(orderId, new Inventory.Application.DTOs.Payment.CreatePaymentRequest
+             {
+                 Amount = 50,
+                 PaymentDate = DateTimeOffset.UtcNow,
+                 PaymentMethod = PaymentMethod.Cash
+             }, _user);
+
+             // Act: Refund 20
+             await _salesServices.RefundAsync(new RefundSalesOrderRequest
+             {
+                 OrderId = orderId,
+                 Amount = 20
+             }, _user);
+
+             // Assert: Net Paid should be 30 (50 - 20)
+             var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
+             Assert.Equal(20, order.RefundedAmount);
+             Assert.Equal(30, order.GetPaidAmount());
+             Assert.Equal(PaymentStatus.PartiallyPaid, order.PaymentStatus);
+        }
+
+        [Fact]
+        public async Task RefundSalesOrder_WhenNetPaidIsZero_ThrowsValidationException()
+        {
+             // Arrange: Order Total 100, Paid 0 (Pending)
+             var orderId = await CreateSalesOrderWithTotalAsync(100m);
+             // No payment added
+
+             // Act & Assert
+             var ex = await Assert.ThrowsAsync<ValidationException>(() => _salesServices.RefundAsync(new RefundSalesOrderRequest
+             {
+                 OrderId = orderId,
+                 Amount = 10
+             }, _user));
+             Assert.Contains("net paid", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task RefundSalesOrder_WhenRefundAmountExceedsNetPaid_ThrowsValidationException()
+        {
+             // Arrange: Order Total 100, Paid 50
+             var orderId = await CreateSalesOrderWithTotalAsync(100m);
+             await _salesServices.AddPaymentAsync(orderId, new Inventory.Application.DTOs.Payment.CreatePaymentRequest
+             {
+                 Amount = 50,
+                 PaymentDate = DateTimeOffset.UtcNow,
+                 PaymentMethod = PaymentMethod.Cash
+             }, _user);
+
+             // Act & Assert: Try to refund 60 (more than 50 paid)
+             var ex = await Assert.ThrowsAsync<ValidationException>(() => _salesServices.RefundAsync(new RefundSalesOrderRequest
+             {
+                 OrderId = orderId,
+                 Amount = 60
+             }, _user));
+             Assert.Contains("exceeds net paid", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
 
         // =============================================

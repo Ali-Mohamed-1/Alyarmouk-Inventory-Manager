@@ -44,7 +44,7 @@
             }
             else
             {
-                <a asp-controller="PurchaseOrders" asp-action="Index" class="neo-btn">Back</a>
+                <a asp-controller="Dashboard" asp-action="Index" class="neo-btn">Back</a>
             }
             <button class="neo-btn neo-btn-primary" onclick="window.print()">PRINT HARDCOPY</button>
         </div>
@@ -617,8 +617,10 @@
                 .then(r => r.ok ? r.json() : Promise.reject())
                 .then(o => {
                     const canRefundStock = (o.status === 1 || o.status === "Received");
-                    const canRefundMoney = (o.paymentStatus === 1 || o.paymentStatus === "Paid" || o.paymentStatus === 2 || o.paymentStatus === "PartiallyPaid");
-                    const remainingRefundableAmount = o.totalAmount - (o.refundedAmount || 0);
+                    // Fix: Eligibility depends on having money to refund (Net Paid > 0), not just the status label.
+                    const canRefundMoney = (o.paidAmount > 0);
+                    // Max refundable money is the Net Paid amount. We cannot refund more than what we hold.
+                    const remainingRefundableAmount = o.paidAmount || 0;
                     const moneyFullyRefunded = remainingRefundableAmount <= 0;
 
                     document.getElementById('poRefundMoneySection').style.display = (!canRefundMoney || moneyFullyRefunded) ? 'none' : 'block';
@@ -677,7 +679,7 @@
                 }
             });
 
-            if (amt <= 0 && lines.length === 0) { alert('Please specify a refund amount, returned products, or both.'); return; }
+            if (amt <= 0 && lines.length === 0) { if (window.appMessages) window.appMessages.showError('Please specify a refund amount, returned products, or both.'); return; }
 
             const payload = { orderId: id };
             if (amt > 0) payload.amount = amt;
@@ -692,12 +694,13 @@
                 });
                 if (!r.ok) {
                     const errText = await r.text();
-                    try { const j = JSON.parse(errText); throw new Error(j.detail || j.title || errText); } catch (e) { if (e.message) throw e; throw new Error(errText); }
+                    const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                    throw new Error(msg);
                 }
                 bootstrap.Modal.getInstance(document.getElementById('poRefundOrderModal')).hide();
-                alert('REFUND PROCESSED SUCCESSFULLY.');
+                if (window.appMessages) window.appMessages.showSuccess('Refund processed successfully.');
                 location.reload();
-            } catch (e) { alert(e.message); }
+            } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Refund failed'); }
         }
 
         function openEditPaymentDeadlineModal() {
@@ -748,14 +751,15 @@
                 if (response.ok) {
                     location.reload();
                 } else {
-                    const err = await response.text();
-                    alert('Failed to update info: ' + err);
+                    const errText = await response.text();
+                    const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(response, errText) : errText;
+                    if (window.appMessages) window.appMessages.showError(msg);
                     btn.disabled = false;
                     btn.innerText = 'SAVE CHANGES';
                 }
             } catch (error) {
                 console.error(error);
-                alert('An error occurred.');
+                if (window.appMessages) window.appMessages.showError(error.message || 'An error occurred.');
                 btn.disabled = false;
                 btn.innerText = 'SAVE CHANGES';
             }
@@ -764,12 +768,12 @@
         async function submitPayment() {
             const amount = parseFloat(document.getElementById('paymentAmount').value);
             if (isNaN(amount) || amount <= 0) {
-                alert('Please enter a valid amount.');
+                if (window.appMessages) window.appMessages.showError('Please enter a valid amount.');
                 return;
             }
 
             if (amount > @Model.RemainingAmount) {
-                alert('Amount exceeds remaining balance.');
+                if (window.appMessages) window.appMessages.showError('Amount exceeds remaining balance.');
                 return;
             }
 
@@ -798,14 +802,15 @@
                 if (response.ok) {
                     location.reload();
                 } else {
-                    const err = await response.text();
-                    alert('Failed to record payment: ' + err);
+                    const errText = await response.text();
+                    const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(response, errText) : errText;
+                    if (window.appMessages) window.appMessages.showError(msg);
                     btn.disabled = false;
                     btn.innerText = 'CONFIRM PAYMENT';
                 }
             } catch (error) {
                 console.error(error);
-                alert('An error occurred.');
+                if (window.appMessages) window.appMessages.showError(error.message || 'An error occurred.');
                 btn.disabled = false;
                 btn.innerText = 'CONFIRM PAYMENT';
             }
@@ -831,11 +836,13 @@
                 if (response.ok) {
                     location.reload();
                 } else {
-                    alert('Failed to update payment deadline.');
+                    const errText = await response.text();
+                    const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(response, errText) : 'Failed to update payment deadline.';
+                    if (window.appMessages) window.appMessages.showError(msg);
                 }
             } catch (error) {
                 console.error(error);
-                alert('An error occurred.');
+                if (window.appMessages) window.appMessages.showError(error.message || 'An error occurred.');
             }
         }
     </script>

@@ -779,11 +779,14 @@
 
                 try {
                     const r = await fetch(`${endpointBase}/${id}/${type}`, { method:'POST', body:fd });
-                    if(!r.ok) throw new Error(await r.text());
-                    
+                    if(!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
                     document.getElementById(inputId).value = ''; // Reset
                     if(isSo) await viewSoDetails(id); else await viewPoDetails(id);
-                } catch(e) { alert("Upload error: " + e.message); }
+                } catch(e) { if (window.appMessages) window.appMessages.showError(e.message || 'Upload error'); }
             };
 
             window.deleteDoc = async (type) => {
@@ -794,9 +797,13 @@
 
                 try {
                     const r = await fetch(`${endpointBase}/${id}/${type}`, { method:'DELETE' });
-                    if(!r.ok) throw new Error();
+                    if(!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : 'Delete failed';
+                        throw new Error(msg);
+                    }
                     if(isSo) await viewSoDetails(id); else await viewPoDetails(id);
-                } catch(e) { alert("Delete failed"); }
+                } catch(e) { if (window.appMessages) window.appMessages.showError(e.message || 'Delete failed'); }
             };
             
             const getSoStatusBadge = (s) => {
@@ -947,7 +954,7 @@
                         </tr>
                     `).join('');
 
-                } catch(e) { alert("Details failed to load"); window.switchSoView('list'); }
+                } catch(e) { if (window.appMessages) window.appMessages.showError('Details failed to load'); window.switchSoView('list'); }
             };
 
             window.switchSoView = (v) => {
@@ -1038,7 +1045,7 @@
                         </tr>
                     `).join('');
 
-                } catch(e) { alert("Details failed to load"); window.switchPoView('list'); }
+                } catch(e) { if (window.appMessages) window.appMessages.showError('Details failed to load'); window.switchPoView('list'); }
             };
 
             // --- SO ACTIONS JS ---
@@ -1068,10 +1075,14 @@
                     const ft = document.querySelector('[name="__RequestVerificationToken"]').value;
                     const fd = new FormData(); fd.append('__RequestVerificationToken', ft); fd.append('OrderId', od); fd.append('Status', ns);
                     const r = await fetch(`/SalesOrders/UpdateStatus?id=${od}`, { method: 'POST', body: fd });
-                    if (!r.ok) throw new Error(await r.text());
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
                     bootstrap.Modal.getInstance(document.getElementById('soStatusModal')).hide();
                     await viewSoDetails(od); loadSalesOrders(); // Refresh both
-                } catch (e) { alert('Status push failed: ' + e.message); }
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Status push failed'); }
             };
 
             window.openSoRecordPaymentModal = () => {
@@ -1087,7 +1098,7 @@
             window.submitSoPayment = async () => {
                 const btn = document.getElementById('submitSoPaymentBtn');
                 const amount = parseFloat(document.getElementById('soPaymentAmount').value);
-                if (isNaN(amount) || amount <= 0) { alert('Enter a valid amount'); return; }
+                if (isNaN(amount) || amount <= 0) { if (window.appMessages) window.appMessages.showError('Enter a valid amount'); return; }
 
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>PROCESSING...';
@@ -1108,10 +1119,14 @@
                         headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value },
                         body: JSON.stringify(payload)
                     });
-                    if (!r.ok) throw new Error(await r.text());
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
                     bootstrap.Modal.getInstance(document.getElementById('soRecordPaymentModal')).hide();
                     await viewSoDetails(od); loadSalesOrders();
-                } catch (e) { alert('Payment failed: ' + e.message); }
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Payment failed'); }
                 finally { btn.disabled = false; btn.innerText = 'SUBMIT PAYMENT'; }
             };
 
@@ -1158,10 +1173,14 @@
                         headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
                         body: JSON.stringify(payload) 
                     });
-                    if (!r.ok) throw new Error(await r.text());
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
                     bootstrap.Modal.getInstance(document.getElementById('soEditInfoModal')).hide();
                     await viewSoDetails(od); loadSalesOrders();
-                } catch (e) { alert('Sync failed: ' + e.message); }
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Sync failed'); }
                 finally { btn.disabled = false; btn.innerText = 'SAVE CHANGES'; }
             };
 
@@ -1183,7 +1202,7 @@
                     }
                     bootstrap.Modal.getInstance(document.getElementById('soCancelModal')).hide();
                     await viewSoDetails(od); loadSalesOrders();
-                } catch (e) { alert(e.message || 'Cancellation failed'); }
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Cancellation failed'); }
             };
 
             // -- REFUND VALIDATION HELPER --
@@ -1278,7 +1297,7 @@
                     }
                 });
 
-                if (amt <= 0 && lines.length === 0) return alert('Please enter a refund amount or return quantities.');
+                if (amt <= 0 && lines.length === 0) { if (window.appMessages) window.appMessages.showError('Please enter a refund amount or return quantities.'); return; }
 
                 const payload = { orderId: id };
                 if (amt > 0) payload.amount = amt;
@@ -1292,13 +1311,15 @@
                         body: JSON.stringify(payload) 
                     });
                     if (!r.ok) {
-                        try { const j = await r.json(); throw new Error(j.detail || 'Refund failed'); } catch(e2) { throw new Error('Refund failed'); }
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : 'Refund failed';
+                        throw new Error(msg);
                     }
                     bootstrap.Modal.getInstance(document.getElementById('soRefundModal')).hide();
                     if(window.currentSoId) await viewSoDetails(window.currentSoId);
                     loadSalesOrders();
-                    alert("REFUND SUCCESSFUL");
-                } catch (e) { alert("Refund error: " + e.message); }
+                    if (window.appMessages) window.appMessages.showSuccess('Refund successful.');
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Refund error'); }
             };
 
 
@@ -1324,10 +1345,14 @@
                         headers:{ 'Content-Type':'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
                         body:JSON.stringify(status) 
                     });
-                    if(!r.ok) throw new Error();
+                    if(!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : 'Update failed';
+                        throw new Error(msg);
+                    }
                     bootstrap.Modal.getInstance(document.getElementById('poStatusModal')).hide();
                     viewPoDetails(id); loadPurchaseOrders();
-                } catch(e) { alert("Update failed"); }
+                } catch(e) { if (window.appMessages) window.appMessages.showError(e.message || 'Update failed'); }
             };
 
             window.openPoRecordPaymentModal = () => {
@@ -1343,7 +1368,7 @@
             window.submitPoPayment = async () => {
                 const btn = document.getElementById('submitPoPaymentBtn');
                 const amount = parseFloat(document.getElementById('poPaymentAmount').value);
-                if (isNaN(amount) || amount <= 0) { alert('Enter a valid amount'); return; }
+                if (isNaN(amount) || amount <= 0) { if (window.appMessages) window.appMessages.showError('Enter a valid amount'); return; }
 
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>PROCESSING...';
@@ -1364,10 +1389,14 @@
                         headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value },
                         body: JSON.stringify(payload)
                     });
-                    if (!r.ok) throw new Error(await r.text());
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
                     bootstrap.Modal.getInstance(document.getElementById('poRecordPaymentModal')).hide();
                     await viewPoDetails(od); loadPurchaseOrders();
-                } catch (e) { alert('Payment failed: ' + e.message); }
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Payment failed'); }
                 finally { btn.disabled = false; btn.innerText = 'SUBMIT PAYMENT'; }
             };
 
@@ -1414,10 +1443,14 @@
                         headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value }, 
                         body: JSON.stringify(payload) 
                     });
-                    if (!r.ok) throw new Error(await r.text());
+                    if (!r.ok) {
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : errText;
+                        throw new Error(msg);
+                    }
                     bootstrap.Modal.getInstance(document.getElementById('poEditInfoModal')).hide();
                     await viewPoDetails(od); loadPurchaseOrders();
-                } catch (e) { alert('Sync failed: ' + e.message); }
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Sync failed'); }
                 finally { btn.disabled = false; btn.innerText = 'SAVE CHANGES'; }
             };
 
@@ -1497,7 +1530,7 @@
                     }
                 });
 
-                if(amt<=0 && lines.length === 0) return alert('Please enter a refund amount or return quantities.');
+                if(amt<=0 && lines.length === 0) { if (window.appMessages) window.appMessages.showError('Please enter a refund amount or return quantities.'); return; }
                 
                 const payload = { orderId: id };
                 if (amt > 0) payload.amount = amt;
@@ -1511,13 +1544,15 @@
                         body:JSON.stringify(payload) 
                     });
                     if(!r.ok) {
-                         try { const j = await r.json(); throw new Error(j.detail || 'Refund failed'); } catch(e2) { throw new Error('Refund failed'); }
+                        const errText = await r.text();
+                        const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(r, errText) : 'Refund failed';
+                        throw new Error(msg);
                     }
                     bootstrap.Modal.getInstance(document.getElementById('poRefundModal')).hide(); 
                     if(window.currentPoId) await viewPoDetails(window.currentPoId);
                     loadPurchaseOrders();
-                    alert("REFUND SUCCESSFUL");
-                } catch(e) { alert("Refund processing failed: " + e.message); }
+                    if (window.appMessages) window.appMessages.showSuccess('Refund successful.');
+                } catch(e) { if (window.appMessages) window.appMessages.showError(e.message || 'Refund processing failed'); }
             };
 
             window.cancelPo = async (id) => {
@@ -1533,7 +1568,7 @@
                     await viewPoDetails(id); 
                     loadPurchaseOrders();
                 } catch (e) {
-                    alert(e.message || 'Cancellation failed');
+                    if (window.appMessages) window.appMessages.showError(e.message || 'Cancellation failed');
                 }
             };
 
@@ -1601,7 +1636,7 @@
                     document.getElementById('inv-detail-qty').innerText = Math.abs(t.quantityDelta) + ' UNITS';
                     document.getElementById('inv-detail-note').innerText = t.note || 'No additional notes provided.';
 
-                } catch(e) { console.error(e); alert("Failed to render details"); }
+                } catch(e) { console.error(e); if (window.appMessages) window.appMessages.showError('Failed to render details'); }
             };
 
             window.switchInvView = (v) => {

@@ -397,7 +397,7 @@
                     if (val === 5) { // Custom
                         const from = document.getElementById('date-from').value;
                         const to = document.getElementById('date-to').value;
-                        if (!from || !to) { alert('Select both dates'); return; }
+                        if (!from || !to) { if (window.appMessages) window.appMessages.showError('Select both dates'); return; }
                         
                         currentFilter = {
                             DateRangeType: 5,
@@ -438,13 +438,17 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
                         });
-                        if (!res.ok) throw new Error();
+                        if (!res.ok) {
+                            const errText = await res.text();
+                            const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(res, errText) : errText;
+                            throw new Error(msg);
+                        }
                         expForm.reset();
                         expDateInput.value = new Date().toISOString().split('T')[0];
                         await refreshFinancialData();
-                        alert('Expense added!');
+                        if (window.appMessages) window.appMessages.showSuccess('Expense added!');
                     } catch (err) {
-                        alert('Failed to add expense');
+                        if (window.appMessages) window.appMessages.showError(err.message || 'Failed to add expense');
                     } finally {
                         if (btn) btn.disabled = false;
                     }

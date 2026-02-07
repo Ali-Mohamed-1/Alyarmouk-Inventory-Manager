@@ -31,33 +31,43 @@ namespace Inventory.Infrastructure.Services
                 .AsNoTracking()
                 .CountAsync(ct);
 
-            // Get total on-hand stock across all products
-            var totalOnHand = await _db.StockSnapshots
+            // Get total on-hand stock across all products (from Batches now)
+            var totalOnHand = await _db.ProductBatches
                 .AsNoTracking()
-                .SumAsync(s => (decimal?)s.OnHand, ct) ?? 0m;
+                .SumAsync(b => (decimal?)b.OnHand, ct) ?? 0m;
 
-            // Get low stock count (products where OnHand <= ReorderPoint and product is active)
-            var lowStockCount = await (from p in _db.Products
-                                       join s in _db.StockSnapshots on p.Id equals s.ProductId into ps
-                                       from snapshot in ps.DefaultIfEmpty()
-                                       where p.IsActive && (snapshot == null || snapshot.OnHand <= p.ReorderPoint)
-                                       select p)
+            // Get low stock count (products where Sum(Batch.OnHand) <= ReorderPoint and product is active)
+            // We need to group batches by product first
+            var lowStockCount = await _db.Products
                 .AsNoTracking()
+                .Where(p => p.IsActive)
+                .Select(p => new
+                {
+                    p.Id,
+                    p.ReorderPoint,
+                    TotalOnHand = _db.ProductBatches.Where(b => b.ProductId == p.Id).Sum(b => (decimal?)b.OnHand) ?? 0m
+                })
+                .Where(x => x.TotalOnHand <= x.ReorderPoint)
                 .CountAsync(ct);
 
             // Get stock by category
-            var stockByCategory = await (from p in _db.Products
-                                         join c in _db.categories on p.CategoryId equals c.Id
-                                         join s in _db.StockSnapshots on p.Id equals s.ProductId into ps
-                                         from snapshot in ps.DefaultIfEmpty()
-                                         where p.IsActive
-                                         group new { snapshot, c } by new { c.Id, c.Name } into g
-                                         select new DashboardStockByCategoryPointDto
-                                         {
-                                             CategoryName = g.Key.Name,
-                                             OnHand = g.Sum(x => x.snapshot != null ? x.snapshot.OnHand : 0m)
-                                         })
+            // This is a bit more complex to translate to batches efficiently in one query due to grouping
+            // We'll calculate it by joining products and batches
+            var stockByCategory = await _db.Products
                 .AsNoTracking()
+                .Where(p => p.IsActive)
+                .Join(_db.categories, p => p.CategoryId, c => c.Id, (p, c) => new { p, c })
+                .Select(x => new
+                {
+                    CategoryName = x.c.Name,
+                    Stock = _db.ProductBatches.Where(b => b.ProductId == x.p.Id).Sum(b => (decimal?)b.OnHand) ?? 0m
+                })
+                .GroupBy(x => x.CategoryName)
+                .Select(g => new DashboardStockByCategoryPointDto
+                {
+                    CategoryName = g.Key,
+                    OnHand = g.Sum(x => x.Stock)
+                })
                 .OrderBy(x => x.CategoryName)
                 .ToListAsync(ct);
 
@@ -72,22 +82,28 @@ namespace Inventory.Infrastructure.Services
 
         public async Task<IReadOnlyList<LowStockItemResponseDto>> GetLowStockAsync(CancellationToken ct = default)
         {
-            return await (from p in _db.Products
-                         join c in _db.categories on p.CategoryId equals c.Id
-                         join s in _db.StockSnapshots on p.Id equals s.ProductId into ps
-                         from snapshot in ps.DefaultIfEmpty()
-                         where p.IsActive && (snapshot == null || snapshot.OnHand <= p.ReorderPoint)
-                         orderby snapshot != null ? snapshot.OnHand : 0m ascending, p.Name ascending
-                         select new LowStockItemResponseDto
-                         {
-                             ProductId = p.Id,
-                             ProductName = p.Name,
-                             CategoryName = c.Name,
-                             OnHand = snapshot != null ? snapshot.OnHand : 0m,
-                             Unit = p.Unit,
-                             ReorderPoint = p.ReorderPoint
-                         })
+            // Similar logic: Active products where Total Batch OnHand <= ReorderPoint
+            return await _db.Products
                 .AsNoTracking()
+                .Where(p => p.IsActive)
+                .Select(p => new
+                {
+                    Product = p,
+                    CategoryName = p.Category.Name,
+                    TotalOnHand = _db.ProductBatches.Where(b => b.ProductId == p.Id).Sum(b => (decimal?)b.OnHand) ?? 0m
+                })
+                .Where(x => x.TotalOnHand <= x.Product.ReorderPoint)
+                .OrderBy(x => x.TotalOnHand)
+                .ThenBy(x => x.Product.Name)
+                .Select(x => new LowStockItemResponseDto
+                {
+                    ProductId = x.Product.Id,
+                    ProductName = x.Product.Name,
+                    CategoryName = x.CategoryName,
+                    OnHand = x.TotalOnHand,
+                    Unit = x.Product.Unit,
+                    ReorderPoint = x.Product.ReorderPoint
+                })
                 .ToListAsync(ct);
         }
 

@@ -1020,13 +1020,16 @@ namespace Inventory.Infrastructure.Services
             // Money refund: allowed when net paid > 0 (ledger-based). PaymentStatus is descriptive, not a gate.
             // Block only when there is nothing to refund.
             decimal netPaid = order.GetPaidAmount();
-            if (hasAmount && netPaid <= 0)
-                throw new ValidationException("Cannot refund money when net paid payment amount is zero.");
+            
+            // Allow refunding 0 amount if only returning stock
+            if (hasAmount)
+            {
+                if (netPaid <= 0)
+                    throw new ValidationException("Cannot refund money when net paid amount is zero or negative.");
 
-            // Cap: cannot refund more than we have (net paid). Multiple partial refunds allowed until net paid reaches zero.
-            decimal remainingRefundableAmount = netPaid;
-            if (hasAmount && req.Amount > remainingRefundableAmount)
-                throw new ValidationException($"Refund amount exceeds remaining refundable amount. Max refundable: {remainingRefundableAmount:C}");
+                if (req.Amount > netPaid)
+                    throw new ValidationException($"Refund amount ({req.Amount:C}) exceeds net paid amount ({netPaid:C}).");
+            }
 
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try

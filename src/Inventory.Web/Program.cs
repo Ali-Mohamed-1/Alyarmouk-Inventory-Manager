@@ -1,6 +1,7 @@
 using Inventory.Infrastructure;
 using Inventory.Infrastructure.Data;
 using Inventory.Web;
+using Inventory.Web.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,6 +36,9 @@ builder.Services.AddAuthorization(options =>
 var app = builder.Build();
 
 await app.SeedIdentityAsync();
+
+// Central exception handling: domain exceptions → userMessage, no stack traces
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

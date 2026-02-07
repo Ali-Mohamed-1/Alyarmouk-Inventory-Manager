@@ -40,7 +40,7 @@
         // Add Line Item
         btnAddLine.addEventListener('click', () => {
             if (!state.selectedSupplierId) {
-                alert('Please select a supplier first.');
+                if (window.appMessages) window.appMessages.showError('Please select a supplier first.');
                 return;
             }
             addNewLine();
@@ -160,9 +160,10 @@
 
             if (pid) {
                 // If product provides a default last used cost, use it initially
-                if (opt && opt.dataset.cost) {
-                    costInput.value = opt.dataset.cost;
-                }
+                // REMOVED at User Request: Don't auto-load last cost. Only load on logical batch selection.
+                // if (opt && opt.dataset.cost) {
+                //    costInput.value = opt.dataset.cost;
+                // }
 
                 // Load Batches for Datalist
                 try {
@@ -252,7 +253,7 @@
 
         const rows = linesTableBody.querySelectorAll('tr');
         if (rows.length === 0) {
-            alert('Please add at least one product line.');
+            if (window.appMessages) window.appMessages.showError('Please add at least one product line.');
             return;
         }
 
@@ -284,8 +285,9 @@
             });
 
             if (!resp.ok) {
-                const errorData = await resp.json();
-                throw new Error(JSON.stringify(errorData));
+                const errText = await resp.text();
+                const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(resp, errText) : errText;
+                throw new Error(msg);
             }
 
             // Success - Close Modal Robustly
@@ -310,7 +312,7 @@
             }, 150);
         } catch (err) {
             console.error('Submission failed', err);
-            alert('FAILED TO COMPLETE RECEIPT. Please check your data.');
+            if (window.appMessages) window.appMessages.showError(err.message || 'Failed to complete receipt. Please check your data.');
         } finally {
             btnSubmit.disabled = false;
             btnSubmit.innerHTML = '<i class="bi bi-check2-circle me-1"></i> COMPLETE RECEIPT';

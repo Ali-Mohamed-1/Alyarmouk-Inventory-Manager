@@ -7,8 +7,12 @@
 
 <div class="container-fluid py-3">
     <div class="d-flex justify-content-between align-items-center mb-5">
-        <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Receive <span class="text-primary">Stock</span></h1>
-        <a asp-action="Index" class="neo-btn">BACK TO LOG</a>
+        <div>
+            <a asp-controller="Dashboard" asp-action="Index" class="text-decoration-none text-muted small fw-bold mb-2 d-block">
+                <i class="bi bi-arrow-left me-1"></i> BACK
+            </a>
+            <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Receive <span class="text-primary">Stock</span></h1>
+        </div>
     </div>
 
     <form asp-action="Create" method="post">
@@ -134,9 +138,92 @@
 </div>
 
 @section Scripts {
+    <style>
+        /* Hide number input arrows/spinners */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+
     <script>
         let poLineIndex = 0;
-        const poProducts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(products.Select(p => new { p.Id, p.Name })));
+        const poProducts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(products.Select(p => new { p.Id, p.Name, p.Sku, p.Unit })));
+
+        // Global click handler to close dropdowns
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.searchable-dropdown')) {
+                document.querySelectorAll('.searchable-dropdown .dropdown-menu').forEach(menu => {
+                    menu.classList.remove('show');
+                });
+            }
+        });
+
+        async function fetchBatches(productId) {
+            try {
+                const response = await fetch(`/api/products/${productId}/batches`);
+                const allBatches = await response.json();
+                return allBatches;
+            } catch (error) {
+                console.error('Error loading batches:', error);
+                return [];
+            }
+        }
+
+        // Custom Dropdown Helper
+        function setupDropdown(input, list, items, onSelect, itemRenderer, allowCustom = false) {
+            const show = () => {
+                // Close others
+                document.querySelectorAll('.searchable-dropdown .dropdown-menu.show').forEach(m => m !== list && m.classList.remove('show'));
+
+                list.innerHTML = '';
+                const filter = input.value.toLowerCase();
+                const filtered = items.filter(i => itemRenderer(i).text.toLowerCase().includes(filter));
+
+                if (filtered.length === 0) {
+                     if (!allowCustom) {
+                        list.innerHTML = '<li class="dropdown-item text-muted small">No matches found</li>';
+                     }
+                } else {
+                    filtered.forEach(item => {
+                        const rendered = itemRenderer(item);
+                        const li = document.createElement('li');
+                        li.className = 'dropdown-item small py-2 border-bottom';
+                        li.style.cursor = 'pointer';
+                        li.style.whiteSpace = 'normal';
+                        li.innerHTML = rendered.html;
+                        li.onclick = () => {
+                            input.value = rendered.text;
+                            onSelect(item);
+                            list.classList.remove('show');
+                        };
+                        list.appendChild(li);
+                    });
+                }
+                
+                if (filtered.length > 0 || !allowCustom) {
+                    list.classList.add('show');
+                } else {
+                    list.classList.remove('show');
+                }
+            };
+
+            input.addEventListener('focus', show);
+            input.addEventListener('input', show);
+            
+            if (allowCustom) {
+                 input.addEventListener('change', () => {
+                     // If the current value doesn't match any item, it's a custom value
+                     // We don't trigger onSelect in that case, or we trigger it with null
+                     // For PO batches, typing a new batch is valid, but we don't load cost.
+                 });
+            }
+        }
 
         function addPoLineItem() {
             const container = document.getElementById('po-line-items-container');
@@ -146,31 +233,91 @@
             const row = document.createElement('tr');
             row.id = `po-line-row-${idx}`;
             row.innerHTML = `
-                <td class="ps-4">
-                    <select name="Lines[${idx}].ProductId" class="form-select fw-bold text-uppercase" required>
-                        <option value="">-- SELECT PRODUCT --</option>
-                        ${poProducts.map(p => `<option value="${p.id}">${p.name.toUpperCase()}</option>`).join('')}
-                    </select>
-                </td>
-                <td>
-                    <input name="Lines[${idx}].BatchNumber" type="text" class="form-control fw-bold small" placeholder="Optional batch / lot">
-                </td>
-                <td>
-                    <input name="Lines[${idx}].Quantity" type="number" step="0.01" min="0.0001" class="form-control fw-black text-center" value="1.00" required>
-                </td>
-                <td>
-                    <div class="input-group">
-                        <span class="input-group-text bg-black text-white">$</span>
-                        <input name="Lines[${idx}].UnitPrice" type="number" step="0.01" min="0" class="form-control fw-black text-center" value="0.00" required>
+                <td class="ps-4 align-top">
+                     <div class="searchable-dropdown position-relative" id="product-dropdown-${idx}">
+                        <input type="text" class="form-control fw-black text-uppercase" placeholder="SEARCH PRODUCT..." id="product-search-${idx}" autocomplete="off" required>
+                        <input type="hidden" name="Lines[${idx}].ProductId" id="product-id-input-${idx}">
+                        <ul class="dropdown-menu w-100 shadow-lg border-0 rounded-0" id="product-list-${idx}" style="max-height: 300px; overflow-y: auto;"></ul>
                     </div>
                 </td>
-                <td class="text-end pe-4">
+                <td class="align-top">
+                    <div class="searchable-dropdown position-relative" id="batch-dropdown-${idx}">
+                        <input type="text" name="Lines[${idx}].BatchNumber" class="form-control fw-bold small" placeholder="New or Existing Batch" id="batch-search-${idx}" disabled autocomplete="off">
+                        <ul class="dropdown-menu w-100 shadow-lg border-0 rounded-0" id="batch-list-${idx}" style="max-height: 300px; overflow-y: auto;"></ul>
+                    </div>
+                </td>
+                <td class="align-top">
+                    <input name="Lines[${idx}].Quantity" type="number" step="0.01" min="0.0001" class="form-control fw-black text-center" value="1.00" required>
+                </td>
+                <td class="align-top">
+                    <div class="input-group">
+                        <span class="input-group-text bg-black text-white">$</span>
+                        <input name="Lines[${idx}].UnitPrice" id="price-input-${idx}" type="number" step="0.01" min="0" class="form-control fw-black text-center" value="0.00" required>
+                    </div>
+                </td>
+                <td class="text-end pe-4 align-top">
                     <button type="button" class="neo-btn neo-btn-danger btn-sm py-1" onclick="removePoLineItem(${idx})">
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
             `;
             container.appendChild(row);
+
+            // Bind Product Dropdown
+            const pInput = document.getElementById(`product-search-${idx}`);
+            const pList = document.getElementById(`product-list-${idx}`);
+
+            setupDropdown(pInput, pList, poProducts, async (product) => {
+                // On Product Select
+                document.getElementById(`product-id-input-${idx}`).value = product.Id;
+                // document.getElementById(`product-name-input-${idx}`).value = product.Name; // Not needed for PO create post
+                document.getElementById(`price-input-${idx}`).value = "";
+
+                // Reset Batch
+                const bInput = document.getElementById(`batch-search-${idx}`);
+                const bList = document.getElementById(`batch-list-${idx}`);
+                bInput.value = '';
+                bInput.disabled = true;
+                
+                // Load Batches
+                const batches = await fetchBatches(product.Id);
+                
+                bInput.disabled = false;
+                bInput.placeholder = "Select or Type Batch...";
+                
+                if (batches.length > 0) {
+                     setupDropdown(bInput, bList, batches, (batch) => {
+                        // On Batch Select
+                        // Auto-load Cost
+                        const cost = batch.unitCost ?? batch.UnitCost ?? 0;
+                        document.getElementById(`price-input-${idx}`).value = cost.toFixed(2);
+                    }, (batch) => {
+                        // Batch Renderer
+                         const onHand = batch.onHand ?? batch.OnHand ?? 0;
+                         const cost = batch.unitCost ?? batch.UnitCost ?? 0;
+                         return {
+                            text: batch.batchNumber ?? batch.BatchNumber,
+                            html: `
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold">${batch.batchNumber ?? batch.BatchNumber}</span>
+                                    <span class="badge bg-light text-dark border">Qty: ${onHand}</span>
+                                </div>
+                                <div class="small text-muted">Cost: $${cost.toFixed(2)}</div>
+                            `
+                        };
+                    }, true); // Allow custom values
+                }
+
+            }, (product) => {
+                 // Product Renderer
+                 return {
+                    text: product.Name.toUpperCase(),
+                    html: `
+                        <div class="fw-bold">${product.Name.toUpperCase()}</div>
+                         <div class="small text-muted">SKU: ${product.Sku || 'N/A'}</div>
+                    `
+                };
+            });
         }
 
         function removePoLineItem(idx) {
