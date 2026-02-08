@@ -81,6 +81,25 @@
         </main>
     </div>
 
+    <!-- Global Confirmation Modal -->
+    <div class="modal fade" id="appConfirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-3 border-black">
+                <div class="modal-header bg-black text-white border-0">
+                    <h5 class="modal-title fw-black" id="appConfirmModalTitle">CONFIRM ACTION</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="fw-bold mb-3" id="appConfirmModalMessage"></p>
+                </div>
+                <div class="modal-footer border-0 p-3">
+                    <button type="button" class="neo-btn neo-btn-secondary" data-bs-dismiss="modal">CANCEL</button>
+                    <button type="button" class="neo-btn neo-btn-danger" id="appConfirmModalOkBtn">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="toast-container position-fixed bottom-0 end-0 p-3" id="appToastContainer" style="z-index: 1100;"></div>
 
     <footer class="footer py-5 bg-black text-white mt-auto">

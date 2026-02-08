@@ -730,7 +730,7 @@
             };
 
             window.cancelSupplierOrder = async (id) => {
-                if (!confirm('PROCEED WITH CANCELLATION?')) return;
+                if (!await window.appMessages.confirm('Are you sure you want to cancel this order?')) return;
                 try {
                     const r = await fetch(`/api/purchase-orders/${id}/cancel`, {
                         method: 'POST'
@@ -787,7 +787,7 @@
                 } catch(e) { if (window.appMessages) window.appMessages.showError(e.message || 'Upload error'); }
             };
             window.deleteDocument = async (type) => {
-                if(!confirm('DELETE THIS FILE?')) return;
+                if(!await window.appMessages.confirm('Delete this file?')) return;
                 try {
                     const r = await fetch(`/api/purchase-orders/${currentOrderId}/${type}`, { method:'DELETE' });
                     if(!r.ok) {
@@ -1058,7 +1058,7 @@
                     const canRefundStock = (o.status === 1);
                     // Fix: Eligibility depends on having money to refund (Net Paid > 0).
                     const canRefundMoney = (o.paidAmount > 0);
-                    const remainingRefundableAmount = o.totalAmount - (o.refundedAmount || 0);
+                    const remainingRefundableAmount = (o.paidAmount || 0) - (o.refundedAmount || 0);
                     const moneyFullyRefunded = remainingRefundableAmount <= 0;
 
                     // Money refund input

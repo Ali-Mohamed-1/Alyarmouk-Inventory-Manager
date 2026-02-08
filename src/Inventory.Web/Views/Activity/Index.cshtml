@@ -452,7 +452,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                <p class="fw-bold mb-3">PROCEED WITH CANCELLATION?</p>
+                <p class="fw-bold mb-3">Are you sure you want to cancel this order?</p>
                 <div class="neo-card bg-light p-3 border-2 mb-0">
                     <i class="bi bi-info-circle me-2"></i> IRREVERSIBLE ACTION.
                 </div>
@@ -1556,7 +1556,7 @@
             };
 
             window.cancelPo = async (id) => {
-                if (!confirm('PROCEED WITH CANCELLATION?')) return;
+                if (!await window.appMessages.confirm('Are you sure you want to cancel this order?')) return;
                 try {
                     const r = await fetch(`/api/purchase-orders/${id}/cancel`, {
                         method: 'POST'

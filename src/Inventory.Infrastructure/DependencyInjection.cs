@@ -13,7 +13,17 @@ namespace Inventory.Infrastructure
         {
             services.AddDbContext<AppDbContext>(options =>
             {
-                options.UseSqlServer(config.GetConnectionString("DefaultConnection"));
+                options.UseSqlServer(
+                    config.GetConnectionString("DefaultConnection"),
+                    sqlOptions =>
+                    {
+                        // Set command timeout to 300 seconds (5 minutes)
+                        // This handles extremely slow localdb instances or complex transaction chains
+                        sqlOptions.CommandTimeout(300);
+                        
+                        // Note: EnableRetryOnFailure is disabled because it conflicts with
+                        // manual transaction management (BeginTransactionAsync).
+                    });
             });
 
             // Application service registrations

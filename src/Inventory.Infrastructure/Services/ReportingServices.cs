@@ -71,11 +71,17 @@ namespace Inventory.Infrastructure.Services
                 .OrderBy(x => x.CategoryName)
                 .ToListAsync(ct);
 
+            // Get total sales and purchase orders count
+            var totalSalesOrders = await _db.SalesOrders.CountAsync(ct);
+            var totalPurchaseOrders = await _db.PurchaseOrders.CountAsync(ct);
+
             return new DashboardResponseDto
             {
                 TotalProducts = totalProducts,
                 TotalOnHand = totalOnHand,
                 LowStockCount = lowStockCount,
+                TotalSalesOrders = totalSalesOrders,
+                TotalPurchaseOrders = totalPurchaseOrders,
                 StockByCategory = stockByCategory
             };
         }
