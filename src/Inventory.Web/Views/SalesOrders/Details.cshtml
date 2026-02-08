@@ -268,7 +268,6 @@
                         </div>
                         @{
                             var canRefundMoney = Model.Status != Inventory.Domain.Entities.SalesOrderStatus.Cancelled && 
-                                (Model.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.Paid || Model.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.PartiallyPaid) && 
                                 (Model.PaidAmount - Model.RefundedAmount) > 0;
                             var canRefundStock = Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done && Model.Lines.Any(l => l.Quantity - l.RefundedQuantity > 0);
                             var showRefundButton = canRefundMoney || canRefundStock;

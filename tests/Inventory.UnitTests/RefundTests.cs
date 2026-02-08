@@ -156,7 +156,7 @@ namespace Inventory.UnitTests
         }
 
         [Fact]
-        public async Task RefundMoney_WhenPaymentStatusNotPaid_Throws()
+        public async Task RefundMoney_WhenNetPaidIsZero_Throws()
         {
             // Arrange: Order is Done but unpaid (no payment recorded)
             var createReq = new CreateSalesOrderRequest
@@ -329,7 +329,7 @@ namespace Inventory.UnitTests
                  OrderId = orderId,
                  Amount = 60
              }, _user));
-             Assert.Contains("exceeds net paid", ex.Message, StringComparison.OrdinalIgnoreCase);
+             Assert.Contains("cannot exceed", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
 
         // =============================================

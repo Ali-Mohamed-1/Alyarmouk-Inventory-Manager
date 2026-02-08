@@ -265,7 +265,6 @@
                         </div>
                         @{
                             var canRefundMoneyPo = Model.Status != Inventory.Domain.Entities.PurchaseOrderStatus.Cancelled && 
-                                (Model.PaymentStatus == Inventory.Domain.Entities.PurchasePaymentStatus.Paid || Model.PaymentStatus == Inventory.Domain.Entities.PurchasePaymentStatus.PartiallyPaid) && 
                                 (Model.PaidAmount - Model.RefundedAmount) > 0;
                             var canRefundStockPo = Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received && Model.Lines.Any(l => l.Quantity - l.RefundedQuantity > 0);
                             var showRefundButtonPo = canRefundMoneyPo || canRefundStockPo;

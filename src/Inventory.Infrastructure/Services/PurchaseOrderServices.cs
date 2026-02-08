@@ -338,11 +338,11 @@ namespace Inventory.Infrastructure.Services
             if (order.Status == PurchaseOrderStatus.Cancelled)
                 throw new ValidationException("Order is already cancelled.");
 
-            // Money condition: no net paid amount and status must be Unpaid
+            // Money condition: no net paid amount (ledger-based)
             var netPaidAmount = order.GetPaidAmount();
-            if (netPaidAmount != 0 || order.PaymentStatus != PurchasePaymentStatus.Unpaid)
+            if (netPaidAmount != 0)
             {
-                throw new ValidationException("You must fully refund stock and money before cancelling this order.");
+                throw new ValidationException($"Order cannot be cancelled while it has a paid balance. Please refund {netPaidAmount:C} first.");
             }
 
             // Stock condition: if order was Received, all quantities must be fully refunded
@@ -548,10 +548,10 @@ namespace Inventory.Infrastructure.Services
             if (hasAmount)
             {
                 if (netPaid <= 0)
-                    throw new ValidationException("Cannot refund money when net paid amount is zero or negative.");
+                    throw new ValidationException($"No refundable amount remaining. Maximum refundable: {netPaid:C}");
 
                 if (req.Amount > netPaid)
-                    throw new ValidationException($"Refund amount ({req.Amount:C}) exceeds net paid amount ({netPaid:C}).");
+                    throw new ValidationException($"Refund amount exceeds available balance. Maximum refundable: {netPaid:C}");
             }
 
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);

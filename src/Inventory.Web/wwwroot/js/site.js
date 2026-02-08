@@ -38,5 +38,46 @@ window.appMessages = {
 
     showSuccess(message) {
         this._showToast(message, 'success');
+    },
+
+    confirm(message, title = 'CONFIRM ACTION') {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('appConfirmModal');
+            const messageEl = document.getElementById('appConfirmModalMessage');
+            const titleEl = document.getElementById('appConfirmModalTitle');
+            const okBtn = document.getElementById('appConfirmModalOkBtn');
+            
+            if (!modal || !messageEl || !titleEl || !okBtn) {
+                // Fallback to browser confirm if modal not found
+                resolve(confirm(message));
+                return;
+            }
+            
+            messageEl.textContent = message;
+            titleEl.textContent = title;
+            
+            const bsModal = new bootstrap.Modal(modal);
+            
+            const handleOk = () => {
+                cleanup();
+                resolve(true);
+            };
+            
+            const handleCancel = () => {
+                cleanup();
+                resolve(false);
+            };
+            
+            const cleanup = () => {
+                okBtn.removeEventListener('click', handleOk);
+                modal.removeEventListener('hidden.bs.modal', handleCancel);
+                bsModal.hide();
+            };
+            
+            okBtn.addEventListener('click', handleOk);
+            modal.addEventListener('hidden.bs.modal', handleCancel, { once: true });
+            
+            bsModal.show();
+        });
     }
 };
