@@ -106,10 +106,40 @@ namespace Inventory.Infrastructure.Services
         {
             if (req is null) throw new ArgumentNullException(nameof(req));
 
+            decimal currentOnHand = 0;
+            if (req.ProductBatchId.HasValue && req.ProductBatchId.Value > 0)
+            {
+                currentOnHand = await _db.ProductBatches
+                    .Where(b => b.Id == req.ProductBatchId.Value)
+                    .Select(b => b.OnHand)
+                    .FirstOrDefaultAsync(ct);
+            }
+            else if (!string.IsNullOrWhiteSpace(req.BatchNumber))
+            {
+                currentOnHand = await _db.ProductBatches
+                    .Where(b => b.ProductId == req.ProductId && b.BatchNumber == req.BatchNumber)
+                    .Select(b => b.OnHand)
+                    .FirstOrDefaultAsync(ct);
+            }
+            else
+            {
+                 currentOnHand = await GetOnHandAsync(req.ProductId, ct);
+            }
+
+            decimal adjustment = req.Adjustment;
+            // If Adjustment is 0 but NewQuantity is provided (and different from 0 or different from current), 
+            // calculate the adjustment. 
+            // Note: If user actually wanted to adjust BY 0, this logic might be ambiguous, 
+            // but usually Adjust UI means "Set to this level".
+            if (adjustment == 0 && req.NewQuantity != currentOnHand)
+            {
+                adjustment = req.NewQuantity - currentOnHand;
+            }
+
             var txReq = new CreateInventoryTransactionRequest
             {
                 ProductId = req.ProductId,
-                Quantity = req.Adjustment, // If negative, it reduces stock. If positive, it increases.
+                Quantity = adjustment, // If negative, it reduces stock. If positive, it increases.
                 Type = InventoryTransactionType.Adjust,
                 BatchNumber = req.BatchNumber,
                 ProductBatchId = req.ProductBatchId,

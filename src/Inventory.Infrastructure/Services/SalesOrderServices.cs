@@ -823,7 +823,6 @@ namespace Inventory.Infrastructure.Services
 
                 // AUDIT LOG: Record the status update
 
-                await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
             }
             catch (Exception ex)

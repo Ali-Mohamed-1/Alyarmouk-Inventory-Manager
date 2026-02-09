@@ -30,7 +30,7 @@ namespace Inventory.Infrastructure.Services
             if (req.ProductId <= 0)
                 throw new ArgumentOutOfRangeException(nameof(req), "Product ID must be positive.");
 
-            if (req.Quantity <= 0)
+            if (req.Quantity <= 0 && req.Type != InventoryTransactionType.Adjust)
                 throw new ValidationException("Quantity must be greater than zero.");
 
             // Verify product exists and is active
@@ -154,9 +154,6 @@ namespace Inventory.Infrastructure.Services
 
                 _db.InventoryTransactions.Add(inventoryTransaction);
                 await _db.SaveChangesAsync(ct); 
-
-
-                await _db.SaveChangesAsync(ct);
 
                 if (transaction != null)
                 {
