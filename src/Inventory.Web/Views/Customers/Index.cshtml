@@ -553,9 +553,8 @@
             };
 
             const canCancelSalesOrder = (o) => {
-                // Money: no net paid amount and payment status is Pending
-                const netPaidAmount = (o.paidAmount || 0) - (o.refundedAmount || 0);
-                const paymentClear = netPaidAmount === 0 && o.paymentStatus === 0;
+                // Use netCash property directly
+                const paymentClear = (o.netCash || 0) === 0;
                 
                 // Stock: if Done, all must be refunded
                 let stockClear = true;

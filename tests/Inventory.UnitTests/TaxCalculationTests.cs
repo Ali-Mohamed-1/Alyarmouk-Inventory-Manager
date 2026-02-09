@@ -34,13 +34,11 @@
                 _db = new AppDbContext(options);
                 _db.Database.EnsureCreated();
 
-                // Mock Audit Writer for now since we don't need to test it
-                var auditMock = new MockAuditLogWriter();
                 var invServicesMock = new MockInventoryServices();
                 var finServicesMock = new MockFinancialServices();
 
-                _salesServices = new SalesOrderServices(_db, auditMock, invServicesMock, finServicesMock);
-                _purchaseServices = new PurchaseOrderServices(_db, auditMock, invServicesMock, finServicesMock);
+                _salesServices = new SalesOrderServices(_db, invServicesMock, finServicesMock);
+                _purchaseServices = new PurchaseOrderServices(_db, invServicesMock, finServicesMock);
 
                 _user = new UserContext("test-user", "Test User");
 
@@ -414,28 +412,6 @@
             Assert.Equal(11.10m, order.TotalAmount);
         }
 
-        public class MockAuditLogWriter : IAuditLogWriter
-        {
-            public Task LogCreateAsync<T>(object entityId, UserContext user, object? afterState = null, CancellationToken ct = default) where T : class
-            {
-                return Task.CompletedTask;
-            }
-
-            public Task LogUpdateAsync<T>(object entityId, UserContext user, object? beforeState = null, object? afterState = null, CancellationToken ct = default) where T : class
-            {
-                return Task.CompletedTask;
-            }
-
-            public Task LogDeleteAsync<T>(object entityId, UserContext user, object? beforeState = null, CancellationToken ct = default) where T : class
-            {
-                return Task.CompletedTask;
-            }
-
-            public Task LogAsync(string entityType, string entityId, AuditAction action, UserContext user, string? changesJson = null, CancellationToken ct = default)
-            {
-                return Task.CompletedTask;
-            }
-        }
 
         public class MockInventoryTransactionServices : IInventoryTransactionServices
         {

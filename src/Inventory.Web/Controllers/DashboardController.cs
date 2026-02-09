@@ -53,8 +53,7 @@ public sealed class DashboardController : Controller
             totalSalesOrders = dashboard.TotalSalesOrders,
             totalPurchaseOrders = dashboard.TotalPurchaseOrders,
             lowStockCount = dashboard.LowStockCount,
-            totalOnHand = dashboard.TotalOnHand,
-            stockByCategory = dashboard.StockByCategory
+            totalOnHand = dashboard.TotalOnHand
         });
     }
 }

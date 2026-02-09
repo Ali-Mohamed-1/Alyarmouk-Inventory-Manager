@@ -50,26 +50,6 @@ namespace Inventory.Infrastructure.Services
                 .Where(x => x.TotalOnHand <= x.ReorderPoint)
                 .CountAsync(ct);
 
-            // Get stock by category
-            // This is a bit more complex to translate to batches efficiently in one query due to grouping
-            // We'll calculate it by joining products and batches
-            var stockByCategory = await _db.Products
-                .AsNoTracking()
-                .Where(p => p.IsActive)
-                .Join(_db.categories, p => p.CategoryId, c => c.Id, (p, c) => new { p, c })
-                .Select(x => new
-                {
-                    CategoryName = x.c.Name,
-                    Stock = _db.ProductBatches.Where(b => b.ProductId == x.p.Id).Sum(b => (decimal?)b.OnHand) ?? 0m
-                })
-                .GroupBy(x => x.CategoryName)
-                .Select(g => new DashboardStockByCategoryPointDto
-                {
-                    CategoryName = g.Key,
-                    OnHand = g.Sum(x => x.Stock)
-                })
-                .OrderBy(x => x.CategoryName)
-                .ToListAsync(ct);
 
             // Get total sales and purchase orders count
             var totalSalesOrders = await _db.SalesOrders.CountAsync(ct);
@@ -81,8 +61,7 @@ namespace Inventory.Infrastructure.Services
                 TotalOnHand = totalOnHand,
                 LowStockCount = lowStockCount,
                 TotalSalesOrders = totalSalesOrders,
-                TotalPurchaseOrders = totalPurchaseOrders,
-                StockByCategory = stockByCategory
+                TotalPurchaseOrders = totalPurchaseOrders
             };
         }
 
@@ -92,23 +71,13 @@ namespace Inventory.Infrastructure.Services
             return await _db.Products
                 .AsNoTracking()
                 .Where(p => p.IsActive)
-                .Select(p => new
+                .Select(p => new LowStockItemResponseDto
                 {
-                    Product = p,
-                    CategoryName = p.Category.Name,
-                    TotalOnHand = _db.ProductBatches.Where(b => b.ProductId == p.Id).Sum(b => (decimal?)b.OnHand) ?? 0m
-                })
-                .Where(x => x.TotalOnHand <= x.Product.ReorderPoint)
-                .OrderBy(x => x.TotalOnHand)
-                .ThenBy(x => x.Product.Name)
-                .Select(x => new LowStockItemResponseDto
-                {
-                    ProductId = x.Product.Id,
-                    ProductName = x.Product.Name,
-                    CategoryName = x.CategoryName,
-                    OnHand = x.TotalOnHand,
-                    Unit = x.Product.Unit,
-                    ReorderPoint = x.Product.ReorderPoint
+                    ProductId = p.Id,
+                    ProductName = p.Name,
+                    OnHand = _db.ProductBatches.Where(b => b.ProductId == p.Id).Sum(b => (decimal?)b.OnHand) ?? 0m,
+                    Unit = p.Unit,
+                    ReorderPoint = p.ReorderPoint
                 })
                 .ToListAsync(ct);
         }
@@ -335,91 +304,24 @@ namespace Inventory.Infrastructure.Services
             var purchasePaymentsTotal = purchaseTransactions.Sum(p => p.TxAmount);
 
             // Bank Balance (Global / Running Total)
-            // Rule: Base + All Revenue - All Expenses - Net Taxes (Global)
+            // Rule: Base + All Revenue - All Expenses (Strict Cash Basis from Ledger)
+            // FinancialTransactions table is the Single Source of Truth for money movement.
+            // It allows for accurate bank reconciliation because it records actual payments/refunds.
+            
             var bankSettings = await _db.BankSystemSettings.AsNoTracking().FirstOrDefaultAsync(ct);
             var BaseBankBalance = bankSettings?.BankBaseBalance ?? 0m;
 
-            // 1. All Time Revenue (and Tax components)
-            var allRevenue = await (from t in _db.FinancialTransactions
-                                    join so in _db.SalesOrders on t.SalesOrderId equals so.Id
-                                    where t.Type == FinancialTransactionType.Revenue
-                                    select new { t.Amount, so.TotalAmount, so.VatAmount, so.ManufacturingTaxAmount })
-                                    .AsNoTracking().ToListAsync(ct);
+            var totalRevenue = await _db.FinancialTransactions
+                .AsNoTracking()
+                .Where(t => t.Type == FinancialTransactionType.Revenue)
+                .SumAsync(t => (decimal?)t.Amount, ct) ?? 0m;
 
-            var global_revenue = 0m;
-            var global_sales_vat = 0m;
-            var global_sales_man_tax = 0m;
+            var totalExpenses = await _db.FinancialTransactions
+                .AsNoTracking()
+                .Where(t => t.Type == FinancialTransactionType.Expense)
+                .SumAsync(t => (decimal?)t.Amount, ct) ?? 0m;
 
-            foreach (var r in allRevenue)
-            {
-                if (r.TotalAmount <= 0) continue;
-                var ratio = r.Amount / r.TotalAmount;
-                global_revenue += r.Amount;
-                global_sales_vat += r.VatAmount * ratio;
-                global_sales_man_tax += r.ManufacturingTaxAmount * ratio;
-            }
-
-            // 2. All Time Expenses (and Tax components)
-            var allExpenses = await (from t in _db.FinancialTransactions
-                                     join po in _db.PurchaseOrders on t.PurchaseOrderId equals po.Id into pos
-                                     from po in pos.DefaultIfEmpty()
-                                     where t.Type == FinancialTransactionType.Expense
-                                     select new { t.Amount, TotalAmount = po != null ? po.TotalAmount : 0m, VatAmount = po != null ? po.VatAmount : 0m, ManTax = po != null ? po.ManufacturingTaxAmount : 0m })
-                                     .AsNoTracking().ToListAsync(ct);
-
-            var global_expenses = 0m;
-            var global_purch_vat = 0m;
-            var global_purch_man_tax = 0m;
-
-            foreach (var e in allExpenses)
-            {
-                global_expenses += e.Amount;
-                // Only extract tax if linked to PO
-                if (e.TotalAmount > 0)
-                {
-                    var ratio = e.Amount / e.TotalAmount;
-                    global_purch_vat += e.VatAmount * ratio;
-                    global_purch_man_tax += e.ManTax * ratio;
-                }
-            }
-
-            // 3. Global Refunds
-            // Sales Refund reduces Bank (Money Out)
-            var globalSalesRefunds = await _db.RefundTransactions
-                .Where(r => r.Type == RefundType.SalesOrder)
-                .SumAsync(r => (decimal?)r.Amount, ct) ?? 0m;
-
-            // Purchase Refund increases Bank (Money In) - Wait, Expenses reduced Bank, so finding a refund means we got money back.
-            // But usually RefundTransactions are just records.
-            // If I refunded a customer 10, my bank lost 10.
-            // If a supplier refunded me 10, my bank gained 10.
-            var globalPurchaseRefunds = await _db.RefundTransactions
-                .Where(r => r.Type == RefundType.PurchaseOrder)
-                .SumAsync(r => (decimal?)r.Amount, ct) ?? 0m;
-
-            // Adjust taxes for refunds (Global)
-            decimal globalRefundBaseDivisor = 1m + TaxConstants.VatRate - TaxConstants.ManufacturingTaxRate;
-            
-            // Sales Refund Tax Reversal
-            decimal globalSalesRefBase = globalSalesRefunds / (globalRefundBaseDivisor > 0 ? globalRefundBaseDivisor : 1.13m);
-            global_sales_vat -= globalSalesRefBase * TaxConstants.VatRate;
-            global_sales_man_tax -= globalSalesRefBase * TaxConstants.ManufacturingTaxRate;
-
-            // Purchase Refund Tax Reversal
-            decimal globalPurchRefBase = globalPurchaseRefunds / (globalRefundBaseDivisor > 0 ? globalRefundBaseDivisor : 1.13m);
-            global_purch_vat -= globalPurchRefBase * TaxConstants.VatRate;
-            global_purch_man_tax -= globalPurchRefBase * TaxConstants.ManufacturingTaxRate;
-
-            var global_net_vat = global_sales_vat - global_purch_vat;
-            var global_net_man_tax = global_sales_man_tax - global_purch_man_tax;
-
-            // Final Bank Calculation
-            // Bank = Base + (Revenue - SalesRefunds) - (Expenses - PurchaseRefunds) - NetTaxes
-            // Wait, Expense is Outflow. PurchaseRefund is Inflow.
-            // Net Cash Flow = Revenue - SalesRefunds - (Expenses - PurchaseRefunds)
-            var net_cash_flow = (global_revenue - globalSalesRefunds) - (global_expenses - globalPurchaseRefunds);
-            
-            var bankBalance = BaseBankBalance + net_cash_flow - global_net_vat - global_net_man_tax;
+            var bankBalance = BaseBankBalance + totalRevenue - totalExpenses;
 
             return new FinancialSummaryResponseDto
             {

@@ -46,11 +46,19 @@ namespace Inventory.Application.DTOs
         string? TransferId,
         decimal PaidAmount,
         decimal RemainingAmount,
-        decimal TotalPending,
         decimal DeservedAmount,
         bool IsOverdue,
         List<PaymentRecordDto> Payments,
-        List<PurchaseOrderLineResponse> Lines);
+        List<PurchaseOrderLineResponse> Lines)
+    {
+        public decimal RemainingAmount { get; set; } // Legacy/Pending
+
+        public decimal TotalPaid { get; set; }
+        public decimal TotalRefunded { get; set; }
+        public decimal NetCash { get; set; }
+        public decimal PendingAmount { get; set; }
+        public decimal RefundDue { get; set; }
+    }
 
     public record PurchaseOrderLineResponse(
         long Id,

@@ -17,18 +17,15 @@ namespace Inventory.Infrastructure.Services
     public sealed class PurchaseOrderServices : IPurchaseOrderServices
     {
         private readonly AppDbContext _db;
-        private readonly IAuditLogWriter _auditWriter;
         private readonly IInventoryServices _inventoryServices;
         private readonly IFinancialServices _financialServices;
 
         public PurchaseOrderServices(
             AppDbContext db,
-            IAuditLogWriter auditWriter,
             IInventoryServices inventoryServices,
             IFinancialServices financialServices)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
-            _auditWriter = auditWriter ?? throw new ArgumentNullException(nameof(auditWriter));
             _inventoryServices = inventoryServices ?? throw new ArgumentNullException(nameof(inventoryServices));
             _financialServices = financialServices ?? throw new ArgumentNullException(nameof(financialServices));
         }
@@ -276,19 +273,6 @@ namespace Inventory.Infrastructure.Services
                 purchaseOrder.RecalculatePaymentStatus();
                 await _db.SaveChangesAsync(ct);
 
-                // AUDIT LOG
-                await _auditWriter.LogCreateAsync<PurchaseOrder>(
-                    purchaseOrder.Id,
-                    user,
-                    afterState: new
-                    {
-                        OrderNumber = purchaseOrder.OrderNumber,
-                        SupplierId = purchaseOrder.SupplierId,
-                        LineCount = lineItems.Count,
-                        TotalAmount = purchaseOrder.TotalAmount,
-                        ConnectedToStock = req.ConnectToReceiveStock
-                    },
-                    ct);
 
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
@@ -351,11 +335,11 @@ namespace Inventory.Infrastructure.Services
             if (order.Status == PurchaseOrderStatus.Cancelled)
                 throw new ValidationException("Order is already cancelled.");
 
-            // Money condition: no net paid amount (ledger-based)
-            var netPaidAmount = order.GetPaidAmount();
-            if (netPaidAmount != 0)
+            // Money condition: no net money held (ledger-based)
+            var netCash = order.GetNetCash();
+            if (netCash != 0)
             {
-                throw new ValidationException($"Order cannot be cancelled while it has a paid balance. Please refund {netPaidAmount:C} first.");
+                throw new ValidationException($"Order cannot be cancelled while we hold money. Net Cash: {netCash:C}. Please refund/collect difference first.");
             }
 
             // Stock condition: if order was Received, all quantities must be fully refunded
@@ -375,12 +359,6 @@ namespace Inventory.Infrastructure.Services
                 order.Status = PurchaseOrderStatus.Cancelled;
 
                 await _db.SaveChangesAsync(ct);
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
-                    id,
-                    user,
-                    new { Status = previousStatus },
-                    new { Status = order.Status },
-                    ct);
 
                 await transaction.CommitAsync(ct);
             }
@@ -436,7 +414,6 @@ namespace Inventory.Infrastructure.Services
                 }
 
                 await _db.SaveChangesAsync(ct);
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(id, user, new { Status = previousStatus }, new { Status = status }, ct);
                 
                 await transaction.CommitAsync(ct);
             }
@@ -466,7 +443,6 @@ namespace Inventory.Infrastructure.Services
                 order.PaymentDeadline = newDeadline;
 
                 await _db.SaveChangesAsync(ct);
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(id, user, new { PaymentDeadline = previousDeadline }, new { PaymentDeadline = newDeadline }, ct);
 
                 await transaction.CommitAsync(ct);
             }
@@ -491,9 +467,9 @@ namespace Inventory.Infrastructure.Services
             if (order.Status == PurchaseOrderStatus.Cancelled)
                 throw new ValidationException("Cannot add payments to a cancelled order.");
 
-            var remaining = order.GetRemainingAmount();
-            if (req.Amount > remaining)
-                throw new ValidationException($"Payment amount {req.Amount:C} exceeds remaining balance {remaining:C}.");
+            var pending = order.GetPendingAmount();
+            if (req.Amount > pending)
+                throw new ValidationException($"Payment amount {req.Amount:C} exceeds pending amount {pending:C}.");
 
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
@@ -522,7 +498,6 @@ namespace Inventory.Infrastructure.Services
 
                 await _db.SaveChangesAsync(ct);
                 
-                await _auditWriter.LogCreateAsync<PaymentRecord>(payment.Id, user, afterState: payment, ct);
 
                 await transaction.CommitAsync(ct);
             }
@@ -566,16 +541,16 @@ namespace Inventory.Infrastructure.Services
                 throw new ValidationException("Cannot refund stock before order is received.");
 
             // Money refund: allowed when net paid > 0 (ledger-based). PaymentStatus is descriptive, not a gate.
-            decimal netPaid = order.GetPaidAmount();
+            decimal netCash = order.GetNetCash();
 
             // Allow refunding 0 amount if only returning stock
             if (hasAmount)
             {
-                if (netPaid <= 0)
-                    throw new ValidationException($"No refundable net paid amount remaining (zero). Maximum refundable: {netPaid:C}");
+                if (netCash <= 0)
+                    throw new ValidationException($"No refundable money found (Net Cash: {netCash:C}).");
 
-                if (req.Amount > netPaid)
-                    throw new ValidationException($"Refund amount cannot exceed available balance. Maximum refundable: {netPaid:C}");
+                if (req.Amount > netCash)
+                    throw new ValidationException($"Refund amount cannot exceed Net Cash held. Max refundable: {netCash:C}");
             }
 
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
@@ -660,7 +635,6 @@ namespace Inventory.Infrastructure.Services
                 await _financialServices.CreateFinancialTransactionFromPaymentAsync(refundPayment, user, ct);
 
                 await _db.SaveChangesAsync(ct);
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(order.Id, user, before, new { order.RefundedAmount, order.PaymentStatus }, ct);
                 
                 await transaction.CommitAsync(ct);
             }
@@ -693,12 +667,6 @@ namespace Inventory.Infrastructure.Services
 
                 await _db.SaveChangesAsync(ct);
 
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
-                    purchaseOrder.Id,
-                    user,
-                    beforeState: new { InvoicePath = previousInvoicePath },
-                    afterState: new { InvoicePath = purchaseOrder.InvoicePath, InvoiceUploadedUtc = purchaseOrder.InvoiceUploadedUtc },
-                    ct);
 
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
@@ -734,12 +702,6 @@ namespace Inventory.Infrastructure.Services
 
                 await _db.SaveChangesAsync(ct);
 
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
-                    purchaseOrder.Id,
-                    user,
-                    beforeState: new { InvoicePath = previousInvoicePath },
-                    afterState: new { InvoicePath = (string?)null, InvoiceUploadedUtc = (DateTimeOffset?)null },
-                    ct);
 
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
@@ -773,12 +735,6 @@ namespace Inventory.Infrastructure.Services
 
                 await _db.SaveChangesAsync(ct);
 
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
-                    purchaseOrder.Id,
-                    user,
-                    beforeState: new { ReceiptPath = previousReceiptPath },
-                    afterState: new { ReceiptPath = purchaseOrder.ReceiptPath, ReceiptUploadedUtc = purchaseOrder.ReceiptUploadedUtc },
-                    ct);
 
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
@@ -813,13 +769,6 @@ namespace Inventory.Infrastructure.Services
                 purchaseOrder.ReceiptUploadedUtc = null;
 
                 await _db.SaveChangesAsync(ct);
-
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
-                    purchaseOrder.Id,
-                    user,
-                    beforeState: new { ReceiptPath = previousReceiptPath },
-                    afterState: new { ReceiptPath = (string?)null, ReceiptUploadedUtc = (DateTimeOffset?)null },
-                    ct);
 
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
@@ -856,13 +805,6 @@ namespace Inventory.Infrastructure.Services
                 order.IsStockProcessed = true;
                 await _db.SaveChangesAsync(ct);
                 
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
-                    order.Id, 
-                    user, 
-                    beforeState: new { IsStockProcessed = false },
-                    afterState: new { IsStockProcessed = true },
-                    ct);
-
                 await transaction.CommitAsync(ct);
             }
             catch (Exception)
@@ -942,23 +884,6 @@ namespace Inventory.Infrastructure.Services
                 }
 
                 await _db.SaveChangesAsync(ct);
-
-                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
-                    purchaseOrder.Id,
-                    user,
-                    beforeState: beforeState,
-                    afterState: new 
-                    { 
-                        purchaseOrder.PaymentMethod,
-                        purchaseOrder.CheckReceived, 
-                        purchaseOrder.CheckReceivedDate,
-                        purchaseOrder.CheckCashed,
-                        purchaseOrder.CheckCashedDate,
-                        purchaseOrder.TransferId,
-                        purchaseOrder.Note
-                    },
-                    ct);
-
                 await transaction.CommitAsync(ct);
             }
             catch (Exception)
@@ -970,9 +895,10 @@ namespace Inventory.Infrastructure.Services
 
         private static PurchaseOrderResponse MapToResponse(PurchaseOrder o)
         {
-            var paidAmount = o.GetPaidAmount();
-            var remainingAmount = o.GetRemainingAmount();
-
+            // Collection Status
+            var totalPaid = o.GetTotalPaid();
+            var pending = o.GetPendingAmount();
+            
             return new PurchaseOrderResponse(
                 o.Id,
                 o.OrderNumber,
@@ -1005,11 +931,10 @@ namespace Inventory.Infrastructure.Services
                 o.CheckCashed,
                 o.CheckCashedDate,
                 o.TransferId,
-                paidAmount,
-                remainingAmount,
-                remainingAmount, // TotalPending
-                (o.PaymentDeadline.HasValue && o.PaymentDeadline.Value < DateTimeOffset.UtcNow && remainingAmount > 0) ? remainingAmount : 0, // DeservedAmount
-                o.PaymentDeadline.HasValue && o.PaymentDeadline.Value < DateTimeOffset.UtcNow && remainingAmount > 0, // IsOverdue
+                totalPaid, // PaidAmount now reflects Collection
+                pending,   // RemainingAmount now reflects Pending
+                o.GetDeservedAmount(),
+                o.IsOverdue(),
                 o.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new PaymentRecordDto
                 {
                     Id = p.Id,
@@ -1034,7 +959,15 @@ namespace Inventory.Infrastructure.Services
                     l.LineVatAmount,
                     l.LineManufacturingTaxAmount,
                     l.LineTotal,
-                    l.RefundedQuantity)).ToList());
+                    l.RefundedQuantity)).ToList())
+            {
+                TotalPaid = totalPaid,
+                TotalRefunded = o.GetTotalRefunded(),
+                NetCash = o.GetNetCash(),
+                PendingAmount = pending,
+                RefundDue = o.GetRefundDue(),
+                RemainingAmount = pending
+            };
         }
 
         #endregion

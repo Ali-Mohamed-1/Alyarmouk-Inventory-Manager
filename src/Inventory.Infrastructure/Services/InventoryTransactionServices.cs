@@ -16,12 +16,10 @@ namespace Inventory.Infrastructure.Services
     {
         private const int MaxTake = 1000;
         private readonly AppDbContext _db;
-        private readonly IAuditLogWriter _auditWriter;
 
-        public InventoryTransactionServices(AppDbContext db, IAuditLogWriter auditWriter)
+        public InventoryTransactionServices(AppDbContext db)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
-            _auditWriter = auditWriter ?? throw new ArgumentNullException(nameof(auditWriter));
         }
 
         public async Task<long> CreateAsync(CreateInventoryTransactionRequest req, UserContext user, CancellationToken ct = default)
@@ -157,18 +155,6 @@ namespace Inventory.Infrastructure.Services
                 _db.InventoryTransactions.Add(inventoryTransaction);
                 await _db.SaveChangesAsync(ct); 
 
-                await _auditWriter.LogCreateAsync<InventoryTransaction>(
-                    inventoryTransaction.Id,
-                    user,
-                    afterState: new
-                    {
-                        ProductId = inventoryTransaction.ProductId,
-                        QuantityDelta = inventoryTransaction.QuantityDelta,
-                        Type = inventoryTransaction.Type.ToString(),
-                        CustomerId = inventoryTransaction.clientId > 0 ? inventoryTransaction.clientId : (int?)null,
-                        Note = inventoryTransaction.Note
-                    },
-                    ct);
 
                 await _db.SaveChangesAsync(ct);
 

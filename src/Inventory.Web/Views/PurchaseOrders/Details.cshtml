@@ -439,12 +439,16 @@
                         <label class="form-label fw-black text-uppercase small">Order Ref</label>
                         <input type="text" class="form-control fw-bold bg-light" id="poRefundOrderNumber" value="@Model.OrderNumber" readonly />
                     </div>
-                    <div class="col-3">
+                    <div class="col-2">
                         <label class="form-label fw-black text-uppercase small">Total</label>
                         <input type="text" class="form-control fw-bold" id="poRefundOrderTotal" value="@Model.TotalAmount.ToString("N2")" readonly />
                     </div>
-                    <div class="col-3">
-                        <label class="form-label fw-black text-uppercase small text-success">Recovered</label>
+                    <div class="col-2">
+                        <label class="form-label fw-black text-uppercase small">Paid</label>
+                        <input type="text" class="form-control fw-bold text-success" id="poRefundOrderPaid" value="0.00" readonly />
+                    </div>
+                    <div class="col-2">
+                        <label class="form-label fw-black text-uppercase small text-danger">Recovered</label>
                         <input type="text" class="form-control fw-bold" id="poRefundOrderAlreadyRefunded" value="@Model.RefundedAmount.ToString("N2")" readonly />
                     </div>
                 </div>
@@ -648,6 +652,7 @@
             document.getElementById('poRefundOrderId').value = id;
             document.getElementById('poRefundOrderNumber').value = '@Model.OrderNumber';
             document.getElementById('poRefundOrderTotal').value = '@Model.TotalAmount.ToString("N2")';
+            document.getElementById('poRefundOrderPaid').value = '0.00'; // Will be updated by fetch
             document.getElementById('poRefundOrderAlreadyRefunded').value = '@Model.RefundedAmount.ToString("N2")';
             document.getElementById('poRefundAmount').value = '';
             document.getElementById('poRefundReason').value = '';
@@ -665,6 +670,12 @@
                     // Max refundable money is the Net Paid amount. We cannot refund more than what we hold.
                     const remainingRefundableAmount = o.paidAmount || 0;
                     const moneyFullyRefunded = remainingRefundableAmount <= 0;
+
+                    // Update Paid field in header (Gross Paid)
+                    const grossPaid = (o.payments || [])
+                        .filter(p => p.paymentType === 1) // 1 = Payment
+                        .reduce((sum, p) => sum + p.amount, 0);
+                    document.getElementById('poRefundOrderPaid').value = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2 }).format(grossPaid);
 
                     document.getElementById('poRefundMoneySection').style.display = (!canRefundMoney || moneyFullyRefunded) ? 'none' : 'block';
                     document.getElementById('poRefundStockSection').style.display = !canRefundStock ? 'none' : 'block';

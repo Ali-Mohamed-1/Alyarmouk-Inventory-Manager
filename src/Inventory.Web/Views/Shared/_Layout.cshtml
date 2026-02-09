@@ -38,14 +38,20 @@
                         <li class="nav-item">
                             <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Activity" ? "active" : "")" asp-area="" asp-controller="Activity" asp-action="Index">TRANSACTIONS</a>
                         </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownHistory" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                HISTORICAL
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="navbarDropdownHistory">
+                                <li><a class="dropdown-item" asp-controller="SalesOrders" asp-action="CreateHistorical">Add Sales Order</a></li>
+                                <li><a class="dropdown-item" asp-controller="PurchaseOrders" asp-action="CreateHistorical">Add Purchase Order</a></li>
+                            </ul>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Notifications" ? "active" : "")" asp-area="" asp-controller="Notifications" asp-action="Index">DEADLINES</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Financial" ? "active" : "")" asp-area="" asp-controller="Financial" asp-action="Index">FINANCIAL</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "RecordHistory" ? "active" : "")" asp-area="" asp-controller="RecordHistory" asp-action="Index">RECORD HISTORY</a>
                         </li>
                     </ul>
 

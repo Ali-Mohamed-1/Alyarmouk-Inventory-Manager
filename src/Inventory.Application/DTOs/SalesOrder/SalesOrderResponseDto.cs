@@ -28,10 +28,14 @@ namespace Inventory.Application.DTOs.SalesOrder
         public PaymentStatus PaymentStatus { get; init; }
         
         public decimal PaidAmount { get; init; }
-        public decimal RemainingAmount { get; init; }
-        public decimal TotalPending { get; init; }
-        public decimal DeservedAmount { get; init; }
-        public bool IsOverdue { get; init; }
+        public decimal RemainingAmount { get; set; } // Legacy, keep for now or map to PendingAmount
+        public decimal TotalPaid { get; set; }
+        public decimal TotalRefunded { get; set; }
+        public decimal NetCash { get; set; }
+        public decimal PendingAmount { get; set; }
+        public decimal RefundDue { get; set; }
+        public decimal DeservedAmount { get; set; }
+        public bool IsOverdue { get; set; }
         public List<PaymentRecordDto> Payments { get; init; } = new();
 
         public bool? CheckReceived { get; init; }

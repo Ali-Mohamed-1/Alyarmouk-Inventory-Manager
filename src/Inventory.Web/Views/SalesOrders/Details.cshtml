@@ -454,7 +454,11 @@
                         <input type="text" class="form-control fw-bold" id="refundOrderTotal" value="@Model.TotalAmount.ToString("N2")" readonly />
                     </div>
                     <div class="col-3">
-                        <label class="form-label fw-black text-uppercase small text-success">Recovered</label>
+                        <label class="form-label fw-black text-uppercase small">Paid</label>
+                        <input type="text" class="form-control fw-bold text-success" id="refundOrderPaid" value="0.00" readonly />
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label fw-black text-uppercase small text-danger">Recovered</label>
                         <input type="text" class="form-control fw-bold" id="refundOrderAlreadyRefunded" value="@Model.RefundedAmount.ToString("N2")" readonly />
                     </div>
                 </div>
@@ -682,6 +686,7 @@
             document.getElementById('refundOrderId').value = id;
             document.getElementById('refundOrderNumber').value = '@Model.OrderNumber';
             document.getElementById('refundOrderTotal').value = '@Model.TotalAmount.ToString("N2")';
+            document.getElementById('refundOrderPaid').value = '0.00'; // Will be updated by fetch
             document.getElementById('refundOrderAlreadyRefunded').value = '@Model.RefundedAmount.ToString("N2")';
             document.getElementById('refundAmount').value = '';
             document.getElementById('refundReason').value = '';
@@ -700,6 +705,12 @@
                     // Max refundable money is the Net Paid amount. We cannot refund more than what we hold.
                     const remainingRefundableAmount = o.paidAmount || 0;
                     const moneyFullyRefunded = remainingRefundableAmount <= 0;
+
+                    // Update Paid field in header (Gross Paid)
+                    const grossPaid = (o.payments || [])
+                        .filter(p => p.paymentType === 1) // 1 = Payment
+                        .reduce((sum, p) => sum + p.amount, 0);
+                    document.getElementById('refundOrderPaid').value = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2 }).format(grossPaid);
 
                     document.getElementById('refundMoneySection').style.display = (!canRefundMoney || moneyFullyRefunded) ? 'none' : 'block';
                     document.getElementById('refundStockSection').style.display = !canRefundStock ? 'none' : 'block';

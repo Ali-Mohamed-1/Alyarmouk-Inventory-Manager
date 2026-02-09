@@ -10,12 +10,10 @@ namespace Inventory.Web.Controllers;
 public sealed class ProductsController : Controller
 {
     private readonly IProductServices _products;
-    private readonly ICategoryServices _categories;
 
-    public ProductsController(IProductServices products, ICategoryServices categories)
+    public ProductsController(IProductServices products)
     {
         _products = products;
-        _categories = categories;
     }
 
     [HttpGet]
@@ -37,9 +35,8 @@ public sealed class ProductsController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Create(CancellationToken cancellationToken)
+    public IActionResult Create()
     {
-        ViewBag.Categories = await _categories.GetAllAsync(cancellationToken);
         return View(new CreateProductRequest());
     }
 
@@ -49,7 +46,6 @@ public sealed class ProductsController : Controller
     {
         if (!ModelState.IsValid)
         {
-            ViewBag.Categories = await _categories.GetAllAsync(cancellationToken);
             return View(model);
         }
 
@@ -72,7 +68,6 @@ public sealed class ProductsController : Controller
             Id = existing.Id,
             Sku = existing.Sku,
             Name = existing.Name,
-            CategoryId = existing.CategoryId,
             Unit = existing.Unit,
 
             ReorderPoint = existing.ReorderPoint,
@@ -80,7 +75,6 @@ public sealed class ProductsController : Controller
             RowVersion = existing.RowVersion
         };
 
-        ViewBag.Categories = await _categories.GetAllAsync(cancellationToken);
         return View(model);
     }
 
@@ -95,7 +89,6 @@ public sealed class ProductsController : Controller
 
         if (!ModelState.IsValid)
         {
-            ViewBag.Categories = await _categories.GetAllAsync(cancellationToken);
             return View(model);
         }
 

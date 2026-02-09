@@ -77,7 +77,6 @@
                     <tr>
                         <th>Name</th>
                         <th>SKU</th>
-                        <th>Category</th>
                         <th class="text-end">Safe Stock</th>
                         <th class="text-end">On Hand</th>
                         <th class="text-end">Reserved</th>
@@ -316,12 +315,6 @@
                             <input type="text" id="addSku" name="Sku" class="form-control" required />
                         </div>
                         <div class="col-md-6">
-                            <label for="addCategoryId" class="form-label fw-black text-uppercase small">Category</label>
-                            <select id="addCategoryId" name="CategoryId" class="form-select" required>
-                                <option value="">-- LOADING --</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
                             <label for="addUnit" class="form-label fw-black text-uppercase small">Unit</label>
                             <input type="text" id="addUnit" name="Unit" class="form-control" required />
                         </div>
@@ -432,13 +425,13 @@
                                     <span class="fw-black text-uppercase">${escapeHtml(x.name)}</span>
                                 </td>
                                 <td><code class="fw-bold fs-6">${escapeHtml(x.sku)}</code></td>
-                                <td><span class="text-uppercase small fw-bold">${escapeHtml(x.categoryName)}</span></td>
                                 <td class="text-end">${formatNumber(x.reorderPoint)} ${escapeHtml(x.unit)}</td>
                                 <td class="text-end fw-black">${formatNumber(x.onHand)}</td>
                                 <td class="text-end">${formatNumber(x.reserved)}</td>
                                 <td class="text-end fw-black text-primary">${formatNumber(x.available)}</td>
                                 <td><span class="badge ${badgeClass}">${statusText}</span></td>
                                 <td class="text-end">
+                                    <a class="neo-btn neo-btn-success btn-sm me-1" href="/Products/AddBatch/${x.productId}">ADD BATCH</a>
                                     <a class="neo-btn neo-btn-info btn-sm" href="/Products/Edit/${x.productId}">EDIT</a>
                                 </td>
                             </tr>`;
@@ -567,19 +560,8 @@
                 dropdowns.forEach(d => { if(d) d.innerHTML = options; });
             }
 
-            function loadCategories() {
-                fetch('/Lookups/Categories')
-                    .then(r => r.ok ? r.json() : Promise.reject())
-                    .then(cats => {
-                        const selectAdd = document.getElementById('addCategoryId');
-                        const options = '<option value="">-- SELECT CATEGORY --</option>' +
-                            cats.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-                        if(selectAdd) selectAdd.innerHTML = options;
-                    });
-            }
 
             refreshDashboard();
-            loadCategories();
 
             document.getElementById('btn-receive-stock').addEventListener('click', () => { new bootstrap.Modal(document.getElementById('receiveStockModal')).show(); });
             // Issue/Adjust now use direct links, no modal listeners needed

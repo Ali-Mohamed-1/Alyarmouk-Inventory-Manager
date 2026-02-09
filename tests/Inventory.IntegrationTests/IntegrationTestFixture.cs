@@ -29,15 +29,12 @@ public sealed class IntegrationTestFixture : IDisposable
 
         // Register all real services (mirrors DependencyInjection.AddInfraStructure)
         services.AddScoped<IProductServices, ProductServices>();
-        services.AddScoped<ICategoryServices, CategoryServices>();
         services.AddScoped<ICustomerServices, CustomerServices>();
         services.AddScoped<ISalesOrderServices, SalesOrderServices>();
         services.AddScoped<IInventoryServices, InventoryServices>();
         services.AddScoped<IInventoryTransactionServices, InventoryTransactionServices>();
         services.AddScoped<IStockSnapshotServices, StockSnapshotServices>();
         services.AddScoped<IReportingServices, ReportingServices>();
-        services.AddScoped<IAuditLogServices, AuditLogServices>();
-        services.AddScoped<IAuditLogWriter, AuditLogWriter>();
         services.AddScoped<ISupplierServices, SupplierServices>();
         services.AddScoped<IPurchaseOrderServices, PurchaseOrderServices>();
         services.AddScoped<IProductBatchServices, ProductBatchServices>();

@@ -32,12 +32,11 @@ namespace Inventory.UnitTests
             _db = new AppDbContext(options);
             _db.Database.EnsureCreated();
 
-            var auditMock = new RefundTests.MockAuditLogWriter();
             var financialMock = new RefundTests.CapturingFinancialServices();
-            var transactionServices = new InventoryTransactionServices(_db, auditMock);
-            var stockSnapshotServices = new StockSnapshotServices(_db, auditMock);
+            var transactionServices = new InventoryTransactionServices(_db);
+            var stockSnapshotServices = new StockSnapshotServices(_db);
             _inventoryServices = new InventoryServices(_db, transactionServices, stockSnapshotServices);
-            _salesServices = new SalesOrderServices(_db, auditMock, _inventoryServices, financialMock);
+            _salesServices = new SalesOrderServices(_db, _inventoryServices, financialMock);
             
             _user = new UserContext("test-user", "Test User");
 

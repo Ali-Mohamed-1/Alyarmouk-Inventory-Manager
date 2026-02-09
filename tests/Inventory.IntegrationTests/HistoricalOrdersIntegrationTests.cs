@@ -79,7 +79,7 @@ public class HistoricalOrdersIntegrationTests : IClassFixture<IntegrationTestFix
         Assert.Equal(SalesOrderStatus.Done, order.Status);
         Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
         Assert.Equal(1000, order.TotalAmount);
-        Assert.Equal(1000, order.GetPaidAmount());
+        Assert.Equal(1000, order.GetTotalPaid());
     }
 
     [Fact]
@@ -116,7 +116,7 @@ public class HistoricalOrdersIntegrationTests : IClassFixture<IntegrationTestFix
         Assert.Equal(PurchaseOrderStatus.Received, order.Status);
         Assert.Equal(PurchasePaymentStatus.Paid, order.PaymentStatus);
         Assert.Equal(800, order.TotalAmount);
-        Assert.Equal(800, order.GetPaidAmount());
+        Assert.Equal(800, order.GetTotalPaid());
     }
 
     [Fact]
@@ -484,7 +484,7 @@ public class HistoricalOrdersIntegrationTests : IClassFixture<IntegrationTestFix
         Assert.NotNull(order);
         Assert.Equal(PurchasePaymentStatus.Paid, order.PaymentStatus);
         Assert.Equal(1000, order.TotalAmount);
-        Assert.Equal(1000, order.GetPaidAmount());
+        Assert.Equal(1000, order.GetTotalPaid());
         Assert.Single(order.Payments);
     }
 }

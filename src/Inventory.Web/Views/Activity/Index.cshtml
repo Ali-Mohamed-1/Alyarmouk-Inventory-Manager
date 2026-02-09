@@ -487,8 +487,8 @@
                         <input type="text" class="form-control fw-bold bg-light" id="soRefundOrderNumber" readonly />
                     </div>
                     <div class="col-6">
-                        <label class="form-label fw-black text-uppercase small">Order Total</label>
-                        <input type="text" class="form-control fw-bold" id="soRefundOrderTotal" readonly />
+                        <label class="form-label fw-black text-uppercase small">Paid Amount</label>
+                        <input type="text" class="form-control fw-bold" id="soRefundPaidAmount" readonly />
                     </div>
                     <div class="col-6">
                         <label class="form-label fw-black text-uppercase small text-success">Already Refunded</label>
@@ -681,8 +681,8 @@
                         <input type="text" class="form-control fw-bold bg-light" id="poRefundOrderNumber" readonly />
                     </div>
                     <div class="col-6">
-                        <label class="form-label fw-black text-uppercase small">Order Total</label>
-                        <input type="text" class="form-control fw-bold" id="poRefundOrderTotal" readonly />
+                        <label class="form-label fw-black text-uppercase small">Paid Amount</label>
+                        <input type="text" class="form-control fw-bold" id="poRefundPaidAmount" readonly />
                     </div>
                     <div class="col-6">
                         <label class="form-label fw-black text-uppercase small text-success">Already Refunded</label>
@@ -832,7 +832,8 @@
             const canCancelSalesOrder = (o) => {
                 if (o.status === 2) return false; // Already cancelled
 
-                const paymentClear = (o.paidAmount || 0) === 0 && o.paymentStatus === 0;
+                // Use netCash property directly
+                const paymentClear = (o.netCash || 0) === 0;
 
                 let stockClear = true;
                 if (o.status === 1) { // Done
@@ -849,7 +850,8 @@
             const canCancelPurchaseOrder = (o) => {
                 if (o.status === 2) return false; // Already cancelled
 
-                const paymentClear = (o.paidAmount || 0) === 0 && o.paymentStatus === 0; // Unpaid
+                // Use netCash property directly
+                const paymentClear = (o.netCash || 0) === 0;
 
                 let stockClear = true;
                 if (o.status === 1) { // Received
@@ -933,7 +935,7 @@
                     // Actions Container
                     const actionsHtml = [];
                     if (o.status === 1) { // Done
-                        actionsHtml.push(`<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openSoRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>`);
+                        actionsHtml.push(`<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openSoRefundModal(${o.id}, '${o.orderNumber}', ${o.paidAmount}, ${o.refundedAmount})">REFUND</button>`);
                     }
                     if (o.status !== 2) { // Not cancelled
                         const canCancel = canCancelSalesOrder(o);
@@ -1025,7 +1027,7 @@
                     // PO Actions
                     const poActionsHtml = [];
                     if (o.status === 1) { // Received
-                        poActionsHtml.push(`<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openPoRefundModal(${o.id}, '${o.orderNumber}', ${o.totalAmount}, ${o.refundedAmount})">REFUND</button>`);
+                        poActionsHtml.push(`<button class="neo-btn neo-btn-danger btn-sm p-1 px-2" onclick="openPoRefundModal(${o.id}, '${o.orderNumber}', ${o.paidAmount}, ${o.refundedAmount})">REFUND</button>`);
                     }
                     if (o.status !== 2) { // Not cancelled
                         const canCancelPo = canCancelPurchaseOrder(o);
@@ -1224,10 +1226,10 @@
                 // Actually, let's implement validation fully.
             }
 
-            window.openSoRefundModal = async (id, num, tot, ref) => {
+            window.openSoRefundModal = async (id, num, paidAmt, ref) => {
                 document.getElementById('soRefundOrderId').value = id; 
                 document.getElementById('soRefundOrderNumber').value = num;
-                document.getElementById('soRefundOrderTotal').value = formatCurrency(tot); 
+                document.getElementById('soRefundPaidAmount').value = formatCurrency(paidAmt); 
                 document.getElementById('soRefundOrderAlreadyRefunded').value = formatCurrency(ref || 0);
                 document.getElementById('soRefundAmount').value = ''; 
                 document.getElementById('soRefundReason').value = '';
@@ -1242,8 +1244,8 @@
                     const o = await r.json();
                     
                     const canRefundStock = (o.status === 1 || o.status === "Done");
-                    const canRefundMoney = (o.paymentStatus === 1 || o.paymentStatus === "Paid" || o.paymentStatus === 2 || o.paymentStatus === "PartiallyPaid");
-                    const remainingRefundableAmount = o.totalAmount - (o.refundedAmount || 0);
+                    const canRefundMoney = (o.paidAmount > 0);
+                    const remainingRefundableAmount = o.paidAmount;
                     const moneyFullyRefunded = remainingRefundableAmount <= 0;
 
                     document.getElementById('soRefundMoneySection').style.display = (!canRefundMoney || moneyFullyRefunded) ? 'none' : 'block';
@@ -1252,7 +1254,7 @@
                     const amountInput = document.getElementById('soRefundAmount');
                     if (!canRefundMoney || moneyFullyRefunded) {
                         amountInput.disabled = true;
-                        amountInput.placeholder = moneyFullyRefunded ? 'Fully refunded' : 'Payment not valid for refund';
+                        amountInput.placeholder = moneyFullyRefunded ? 'Fully refunded' : 'No paid amount to refund';
                     } else {
                         amountInput.disabled = false;
                         amountInput.placeholder = `Max: ${formatCurrency(remainingRefundableAmount)}`;
@@ -1461,10 +1463,10 @@
                 finally { btn.disabled = false; btn.innerText = 'SAVE CHANGES'; }
             };
 
-            window.openPoRefundModal = async (id, num, tot, ref) => {
+            window.openPoRefundModal = async (id, num, paidAmt, ref) => {
                 document.getElementById('poRefundOrderId').value=id; 
                 document.getElementById('poRefundOrderNumber').value=num;
-                document.getElementById('poRefundOrderTotal').value=formatCurrency(tot); 
+                document.getElementById('poRefundPaidAmount').value=formatCurrency(paidAmt); 
                 document.getElementById('poRefundOrderAlreadyRefunded').value=formatCurrency(ref);
                 document.getElementById('poRefundAmount').value=''; 
                 document.getElementById('poRefundReason').value = '';
@@ -1479,17 +1481,17 @@
                     const o = await r.json();
                     
                     const canRefundStock = (o.status === 1 || o.status === "Received"); // Received
-                    const canRefundMoney = (o.paymentStatus === 1 || o.paymentStatus === "Paid" || o.paymentStatus === 2 || o.paymentStatus === "PartiallyPaid"); // Paid or PartiallyPaid
-                    const remainingRefundableAmount = o.totalAmount - (o.refundedAmount || 0);
+                    const canRefundMoney = (o.paidAmount > 0); 
+                    const remainingRefundableAmount = o.paidAmount;
                     const moneyFullyRefunded = remainingRefundableAmount <= 0;
 
                     document.getElementById('poRefundMoneySection').style.display = (!canRefundMoney || moneyFullyRefunded) ? 'none' : 'block';
                     document.getElementById('poRefundStockSection').style.display = !canRefundStock ? 'none' : 'block';
 
                     const amountInput = document.getElementById('poRefundAmount');
-                    if (!canRefundMoney || remainingRefundableAmount <= 0) {
+                    if (!canRefundMoney || moneyFullyRefunded) {
                         amountInput.disabled = true;
-                        amountInput.placeholder = remainingRefundableAmount <= 0 ? 'Fully refunded' : 'Payment not confirmed';
+                        amountInput.placeholder = moneyFullyRefunded ? 'Fully refunded' : 'No paid amount to refund';
                     } else {
                         amountInput.disabled = false;
                         amountInput.placeholder = `Max: ${formatCurrency(remainingRefundableAmount)}`;

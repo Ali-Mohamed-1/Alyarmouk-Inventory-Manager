@@ -84,8 +84,8 @@ public class SalesOrderIntegrationTests : IClassFixture<IntegrationTestFixture>,
         order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId, ct);
         order.RecalculatePaymentStatus();
         Assert.Equal(PaymentStatus.PartiallyPaid, order.PaymentStatus);
-        Assert.Equal(500, order.GetPaidAmount());
-        Assert.Equal(500, order.GetRemainingAmount());
+        Assert.Equal(500, order.GetTotalPaid());
+        Assert.Equal(500, order.GetPendingAmount());
 
         // 5. Mark order as Done
         await _salesServices.UpdateStatusAsync(orderId, new UpdateSalesOrderStatusRequest { OrderId = orderId, Status = SalesOrderStatus.Done }, _user, ct: ct);
@@ -121,7 +121,7 @@ public class SalesOrderIntegrationTests : IClassFixture<IntegrationTestFixture>,
         Assert.Equal(5, order.Lines.First().RefundedQuantity);
         Assert.Equal(250, order.RefundedAmount);
         Assert.Equal(PaymentStatus.PartiallyPaid, order.PaymentStatus);
-        Assert.Equal(750, order.GetPaidAmount());
+        Assert.Equal(750, order.GetTotalPaid());
 
         // 9. Refund remaining stock (5)
         await _salesServices.RefundAsync(new RefundSalesOrderRequest
@@ -314,14 +314,14 @@ public class SalesOrderIntegrationTests : IClassFixture<IntegrationTestFixture>,
         var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId, ct);
         order.RecalculatePaymentStatus();
         Assert.Equal(PaymentStatus.PartiallyPaid, order.PaymentStatus);
-        Assert.Equal(400, order.GetPaidAmount());
+        Assert.Equal(400, order.GetTotalPaid());
 
         await _salesServices.AddPaymentAsync(orderId, new CreatePaymentRequest { Amount = 600, PaymentDate = DateTimeOffset.UtcNow, PaymentMethod = PaymentMethod.Cash }, _user, ct);
         _db.ChangeTracker.Clear();
         order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId, ct);
         order.RecalculatePaymentStatus();
         Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
-        Assert.Equal(1000, order.GetPaidAmount());
+        Assert.Equal(1000, order.GetTotalPaid());
     }
 
     [Fact]
@@ -350,21 +350,21 @@ public class SalesOrderIntegrationTests : IClassFixture<IntegrationTestFixture>,
         var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId, ct);
         order.RecalculatePaymentStatus();
         Assert.Equal(PaymentStatus.PartiallyPaid, order.PaymentStatus);
-        Assert.Equal(700, order.GetPaidAmount());
+        Assert.Equal(700, order.GetTotalPaid());
 
         await _salesServices.RefundAsync(new RefundSalesOrderRequest { OrderId = orderId, Amount = 400, Reason = "Second partial refund" }, _user, ct);
         _db.ChangeTracker.Clear();
         order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId, ct);
         order.RecalculatePaymentStatus();
         Assert.Equal(PaymentStatus.PartiallyPaid, order.PaymentStatus);
-        Assert.Equal(300, order.GetPaidAmount());
+        Assert.Equal(300, order.GetTotalPaid());
 
         await _salesServices.RefundAsync(new RefundSalesOrderRequest { OrderId = orderId, Amount = 300, Reason = "Final refund" }, _user, ct);
         _db.ChangeTracker.Clear();
         order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId, ct);
         order.RecalculatePaymentStatus();
         Assert.Equal(PaymentStatus.Pending, order.PaymentStatus);
-        Assert.Equal(0, order.GetPaidAmount());
+        Assert.Equal(0, order.GetTotalPaid());
     }
 
     [Fact]
@@ -392,25 +392,25 @@ public class SalesOrderIntegrationTests : IClassFixture<IntegrationTestFixture>,
         _db.ChangeTracker.Clear();
         var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId, ct);
         order.RecalculatePaymentStatus();
-        Assert.Equal(100, order.GetPaidAmount());
+        Assert.Equal(100, order.GetTotalPaid());
 
         await _salesServices.AddPaymentAsync(orderId, new CreatePaymentRequest { Amount = 200, PaymentDate = DateTimeOffset.UtcNow, PaymentMethod = PaymentMethod.Cash }, _user, ct);
         _db.ChangeTracker.Clear();
         order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId, ct);
         order.RecalculatePaymentStatus();
-        Assert.Equal(300, order.GetPaidAmount());
+        Assert.Equal(300, order.GetTotalPaid());
 
         await _salesServices.RefundAsync(new RefundSalesOrderRequest { OrderId = orderId, Amount = 200, Reason = "Second partial refund" }, _user, ct);
         _db.ChangeTracker.Clear();
         order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId, ct);
         order.RecalculatePaymentStatus();
-        Assert.Equal(100, order.GetPaidAmount());
+        Assert.Equal(100, order.GetTotalPaid());
 
         await _salesServices.RefundAsync(new RefundSalesOrderRequest { OrderId = orderId, Amount = 100, Reason = "Final refund" }, _user, ct);
         _db.ChangeTracker.Clear();
         order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId, ct);
         order.RecalculatePaymentStatus();
-        Assert.Equal(0, order.GetPaidAmount());
+        Assert.Equal(0, order.GetTotalPaid());
     }
 
     [Fact]
@@ -444,7 +444,7 @@ public class SalesOrderIntegrationTests : IClassFixture<IntegrationTestFixture>,
         _db.ChangeTracker.Clear();
         order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId, ct);
         order.RecalculatePaymentStatus();
-        Assert.Equal(0, order.GetPaidAmount());
+        Assert.Equal(0, order.GetTotalPaid());
     }
 
     [Fact]
