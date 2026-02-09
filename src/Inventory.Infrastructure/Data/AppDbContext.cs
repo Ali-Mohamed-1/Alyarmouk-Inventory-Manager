@@ -27,6 +27,7 @@ namespace Inventory.Infrastructure.Data
         public DbSet<RefundTransaction> RefundTransactions { get; set; }
         public DbSet<RefundTransactionLine> RefundTransactionLines { get; set; }
         public DbSet<PaymentRecord> PaymentRecords { get; set; }
+        public DbSet<BankSystemSettings> BankSystemSettings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -157,6 +158,7 @@ namespace Inventory.Infrastructure.Data
                 b.Property(o => o.VatAmount).HasPrecision(18, 2);
                 b.Property(o => o.ManufacturingTaxAmount).HasPrecision(18, 2);
                 b.Property(o => o.ReceiptExpenses).HasPrecision(18, 2);
+                b.Property(o => o.OrderDate).IsRequired();
                 b.Property(o => o.RefundedAmount).HasPrecision(18, 2);
 
                 b.HasOne(o => o.Supplier)

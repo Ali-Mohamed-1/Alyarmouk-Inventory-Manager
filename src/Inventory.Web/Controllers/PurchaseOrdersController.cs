@@ -51,6 +51,28 @@ public sealed class PurchaseOrdersController : Controller
         return View(new CreatePurchaseOrderRequest());
     }
 
+    [HttpGet]
+    public async Task<IActionResult> CreateHistorical(CancellationToken cancellationToken)
+    {
+        ViewBag.Suppliers = await _suppliers.GetForDropdownAsync(cancellationToken);
+        ViewBag.Products = await _products.GetAllAsync(cancellationToken);
+        return View(new CreatePurchaseOrderRequest 
+        { 
+            IsHistorical = true, 
+            Status = Inventory.Domain.Entities.PurchaseOrderStatus.Received,
+            ConnectToReceiveStock = false // Explicitly false, though CreateAsync ignores it for historical if logic is correct
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ActivateStock(long id, CancellationToken cancellationToken)
+    {
+        var user = GetUserContext();
+        await _orders.ActivateStockAsync(id, user, cancellationToken);
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(CreatePurchaseOrderRequest model, CancellationToken cancellationToken)
@@ -59,7 +81,7 @@ public sealed class PurchaseOrdersController : Controller
         {
             ViewBag.Suppliers = await _suppliers.GetForDropdownAsync(cancellationToken);
             ViewBag.Products = await _products.GetAllAsync(cancellationToken);
-            return View(model);
+            return model.IsHistorical ? View("CreateHistorical", model) : View(model);
         }
 
         var user = GetUserContext();

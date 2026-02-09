@@ -139,6 +139,7 @@ namespace Inventory.Infrastructure.Services
                     SupplierId = req.SupplierId,
                     SupplierNameSnapshot = supplier.Name,
                     CreatedUtc = DateTimeOffset.UtcNow,
+                    OrderDate = req.OrderDate ?? DateTimeOffset.UtcNow,
                     CreatedByUserId = user.UserId,
                     CreatedByUserDisplayName = user.UserDisplayName,
                     // Treat the incoming DueDate as the initial supplier payment deadline
@@ -152,6 +153,18 @@ namespace Inventory.Infrastructure.Services
                     Status = PurchaseOrderStatus.Pending
                     // PaymentStatus is derived from ledger - defaults to Unpaid
                 };
+
+                // Handle Historical Orders
+                if (req.IsHistorical)
+                {
+                    purchaseOrder.IsHistorical = true;
+                    purchaseOrder.IsStockProcessed = false;
+                    
+                    if (req.Status.HasValue)
+                    {
+                        purchaseOrder.Status = req.Status.Value;
+                    }
+                }
 
                 // Add to DB context to generate ID
                 _db.PurchaseOrders.Add(purchaseOrder);
@@ -247,7 +260,7 @@ namespace Inventory.Infrastructure.Services
                     {
                         PurchaseOrderId = purchaseOrder.Id,
                         Amount = purchaseOrder.TotalAmount,
-                        PaymentDate = DateTimeOffset.UtcNow,
+                        PaymentDate = purchaseOrder.OrderDate,
                         PaymentMethod = req.PaymentMethod,
                         PaymentType = PaymentRecordType.Payment,
                         Reference = "INITIAL-PAYMENT",
@@ -408,7 +421,18 @@ namespace Inventory.Infrastructure.Services
                 // 3. Transitioning INTO Received -> Apply Effects
                 if (status == PurchaseOrderStatus.Received)
                 {
-                    await _inventoryServices.ProcessPurchaseOrderStockAsync(order.Id, user, timestamp, ct);
+                    if (order.IsHistorical)
+                    {
+                        if (!order.IsStockProcessed)
+                        {
+                            await _inventoryServices.ProcessPurchaseOrderStockAsync(order.Id, user, order.CreatedUtc, ct);
+                            order.IsStockProcessed = true;
+                        }
+                    }
+                    else
+                    {
+                        await _inventoryServices.ProcessPurchaseOrderStockAsync(order.Id, user, timestamp, ct);
+                    }
                 }
 
                 await _db.SaveChangesAsync(ct);
@@ -548,10 +572,10 @@ namespace Inventory.Infrastructure.Services
             if (hasAmount)
             {
                 if (netPaid <= 0)
-                    throw new ValidationException($"No refundable amount remaining. Maximum refundable: {netPaid:C}");
+                    throw new ValidationException($"No refundable net paid amount remaining (zero). Maximum refundable: {netPaid:C}");
 
                 if (req.Amount > netPaid)
-                    throw new ValidationException($"Refund amount exceeds available balance. Maximum refundable: {netPaid:C}");
+                    throw new ValidationException($"Refund amount cannot exceed available balance. Maximum refundable: {netPaid:C}");
             }
 
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
@@ -807,6 +831,47 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
+        public async Task ActivateStockAsync(long orderId, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            
+            var order = await _db.PurchaseOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            if (order == null) throw new NotFoundException($"Purchase Order {orderId} not found.");
+
+            if (!order.IsHistorical)
+                throw new ValidationException("Only historical orders can be manually activated.");
+
+            if (order.IsStockProcessed)
+                throw new ValidationException("Stock has already been processed for this order.");
+
+            if (order.Status != PurchaseOrderStatus.Received)
+                throw new ValidationException("Order must be in 'Received' status to activate stock.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                // Process stock using the Order Date (CreatedUtc) as the timestamp
+                await _inventoryServices.ProcessPurchaseOrderStockAsync(order.Id, user, order.CreatedUtc, ct);
+                
+                order.IsStockProcessed = true;
+                await _db.SaveChangesAsync(ct);
+                
+                await _auditWriter.LogUpdateAsync<PurchaseOrder>(
+                    order.Id, 
+                    user, 
+                    beforeState: new { IsStockProcessed = false },
+                    afterState: new { IsStockProcessed = true },
+                    ct);
+
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+        }
+
         public async Task UpdatePaymentInfoAsync(long id, UpdatePurchaseOrderPaymentRequest req, UserContext user, CancellationToken ct = default)
         {
             ValidateUser(user);
@@ -928,6 +993,8 @@ namespace Inventory.Infrastructure.Services
                 o.TotalAmount,
                 o.RefundedAmount,
                 o.Note,
+                o.IsHistorical,
+                o.IsStockProcessed,
                 o.InvoicePath,
                 o.InvoiceUploadedUtc,
                 o.ReceiptPath,

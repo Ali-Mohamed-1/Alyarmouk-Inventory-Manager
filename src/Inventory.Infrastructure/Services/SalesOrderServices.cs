@@ -280,7 +280,19 @@ namespace Inventory.Infrastructure.Services
                 salesOrder.ManufacturingTaxAmount = totalManTax;
                 salesOrder.TotalAmount = totalOrderAmount;
 
-                // 4. Handle Initial Payment (if requested as Paid)
+                // 4. Handle Historical Status
+                if (req.IsHistorical)
+                {
+                    salesOrder.IsHistorical = true;
+                    salesOrder.IsStockProcessed = false;
+                    // Allow creating as Done/Cancelled directly
+                    if (req.Status.HasValue) 
+                    {
+                        salesOrder.Status = req.Status.Value;
+                    }
+                }
+                
+                // 5. Handle Initial Payment (if requested as Paid)
                 if (req.PaymentStatus == PaymentStatus.Paid)
                 {
                     var payment = new PaymentRecord
@@ -288,7 +300,7 @@ namespace Inventory.Infrastructure.Services
                         OrderType = OrderType.SalesOrder,
                         SalesOrderId = salesOrder.Id,
                         Amount = salesOrder.TotalAmount,
-                        PaymentDate = DateTimeOffset.UtcNow,
+                        PaymentDate = salesOrder.OrderDate, // Use the order date specifically
                         PaymentMethod = salesOrder.PaymentMethod,
                         PaymentType = PaymentRecordType.Payment,
                         Note = "Full payment recorded at order creation.",
@@ -318,7 +330,9 @@ namespace Inventory.Infrastructure.Services
                         PaymentStatus = salesOrder.PaymentStatus.ToString(),
                         LineCount = lineItems.Count,
                         Note = salesOrder.Note,
-                        TotalAmount = salesOrder.TotalAmount
+                        TotalAmount = salesOrder.TotalAmount,
+                        IsHistorical = salesOrder.IsHistorical,
+                        Status = salesOrder.Status.ToString()
                     },
                     ct);
 
@@ -326,7 +340,8 @@ namespace Inventory.Infrastructure.Services
                 await transaction.CommitAsync(ct);
 
                 // 2. Reserve stock if order is Pending (Done is handled by inventory processing already if requested)
-                if (salesOrder.Status == SalesOrderStatus.Pending)
+                // SKIP RESERVATION FOR HISTORICAL ORDERS
+                if (!salesOrder.IsHistorical && salesOrder.Status == SalesOrderStatus.Pending)
                 {
                     await _inventoryServices.ReserveSalesOrderStockAsync(salesOrder.Id, user, ct);
                 }
@@ -451,6 +466,8 @@ namespace Inventory.Infrastructure.Services
                     VatAmount = o.VatAmount,
                     ManufacturingTaxAmount = o.ManufacturingTaxAmount,
                     TotalAmount = o.TotalAmount,
+                    IsHistorical = o.IsHistorical,
+                    IsStockProcessed = o.IsStockProcessed,
                     RefundedAmount = o.RefundedAmount,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
                     {
@@ -752,7 +769,23 @@ namespace Inventory.Infrastructure.Services
                 // 3. Transitioning INTO Done -> Apply effects
                 if (req.Status == SalesOrderStatus.Done)
                 {
-                    await _inventoryServices.ProcessSalesOrderStockAsync(salesOrder.Id, user, timestamp, ct);
+                    // For historical orders, we update status but DO NOT process stock immediately
+                    // Stock must be explicitly activated unless we decide that changing status to Done implicitly activates it.
+                    // Requirement: "Stock adjustments only occur when the order's status is changed ... to a stock-impacting state"
+                    // This implies implicit activation on status change.
+                    
+                    if (salesOrder.IsHistorical)
+                    {
+                        if (!salesOrder.IsStockProcessed) 
+                        {
+                            await _inventoryServices.ProcessSalesOrderStockAsync(salesOrder.Id, user, salesOrder.OrderDate, ct);
+                            salesOrder.IsStockProcessed = true;
+                        }
+                    }
+                    else
+                    {
+                        await _inventoryServices.ProcessSalesOrderStockAsync(salesOrder.Id, user, timestamp, ct);
+                    }
                 }
 
                 await _db.SaveChangesAsync(ct);
@@ -806,6 +839,49 @@ namespace Inventory.Infrastructure.Services
             {
                 await transaction.RollbackAsync(ct);
                 throw new ConflictException("Could not update due date.", ex);
+            }
+        }
+
+
+
+        public async Task ActivateStockAsync(long orderId, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            
+            var order = await _db.SalesOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            if (order == null) throw new NotFoundException($"Sales Order {orderId} not found.");
+
+            if (!order.IsHistorical)
+                throw new ValidationException("Only historical orders can be manually activated.");
+
+            if (order.IsStockProcessed)
+                throw new ValidationException("Stock has already been processed for this order.");
+
+            if (order.Status != SalesOrderStatus.Done)
+                throw new ValidationException("Order must be in 'Done' status to activate stock.");
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                // Process stock using the Order Date as the timestamp for the transaction
+                await _inventoryServices.ProcessSalesOrderStockAsync(order.Id, user, order.OrderDate, ct);
+                
+                order.IsStockProcessed = true;
+                await _db.SaveChangesAsync(ct);
+                
+                await _auditWriter.LogUpdateAsync<SalesOrder>(
+                    order.Id, 
+                    user, 
+                    beforeState: new { IsStockProcessed = false },
+                    afterState: new { IsStockProcessed = true },
+                    ct);
+
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
             }
         }
 
@@ -1025,10 +1101,10 @@ namespace Inventory.Infrastructure.Services
             if (hasAmount)
             {
                 if (netPaid <= 0)
-                    throw new ValidationException($"No refundable amount remaining. Maximum refundable: {netPaid:C}");
+                    throw new ValidationException($"No refundable net paid amount remaining (zero). Maximum refundable: {netPaid:C}");
 
                 if (req.Amount > netPaid)
-                    throw new ValidationException($"Refund amount exceeds available balance. Maximum refundable: {netPaid:C}");
+                    throw new ValidationException($"Refund amount cannot exceed available balance. Maximum refundable: {netPaid:C}");
             }
 
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
@@ -1226,6 +1302,9 @@ namespace Inventory.Infrastructure.Services
                 throw new ConflictException("Could not update payment info due to a database conflict.", ex);
             }
         }
+
+
+
 
 
 

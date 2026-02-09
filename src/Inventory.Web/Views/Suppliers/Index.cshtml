@@ -151,6 +151,11 @@
                                         <span class="small fw-bold">TAX:</span>
                                         <span id="view-order-man-tax"></span>
                                     </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="small fw-bold">RECEIPT EXPENSES:</span>
+                                        <span id="view-order-receipt-exp"></span>
+                                    </div>
+
                                     <div class="d-flex justify-content-between mt-2 pt-2 border-top border-2">
                                         <span class="fw-black">TOTAL:</span>
                                         <span id="view-order-total" class="fw-black fs-4 text-success"></span>
@@ -708,7 +713,9 @@
                     document.getElementById('view-order-subtotal').innerText = formatCurrency(o.subtotal);
                     document.getElementById('view-order-vat').innerText = formatCurrency(o.vatAmount);
                     document.getElementById('view-order-man-tax').innerText = formatCurrency(o.manufacturingTaxAmount);
+                    document.getElementById('view-order-receipt-exp').innerText = formatCurrency(o.receiptExpenses || 0);
                     document.getElementById('view-order-total').innerText = formatCurrency(o.totalAmount);
+
                     document.getElementById('view-order-paid').innerText = formatCurrency(o.paidAmount || 0);
                     
                     const rem = o.remainingAmount || 0;

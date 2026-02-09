@@ -131,6 +131,11 @@ public class PurchaseOrder
     /// </summary>
     public string? TransferId { get; set; }
 
+    /// <summary>
+    /// Order creation date (local business date).
+    /// </summary>
+    public DateTimeOffset OrderDate { get; set; } = DateTimeOffset.UtcNow;
+
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public string CreatedByUserId { get; set; } = "";
     public string CreatedByUserDisplayName { get; set; } = "";
@@ -169,6 +174,17 @@ public class PurchaseOrder
     public DateTimeOffset? ReceiptUploadedUtc { get; set; }
     
     public List<PurchaseOrderLine> Lines { get; set; } = new();
+
+    /// <summary>
+    /// Indicates if this order was imported as a historical record.
+    /// Historical orders do not affect stock creation-time, only when explicitly activated.
+    /// </summary>
+    public bool IsHistorical { get; set; }
+
+    /// <summary>
+    /// For historical orders, tracks whether the stock impact has been applied.
+    /// </summary>
+    public bool IsStockProcessed { get; set; }
 }
 
 public class PurchaseOrderLine

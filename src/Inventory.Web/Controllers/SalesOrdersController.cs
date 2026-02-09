@@ -44,6 +44,13 @@ public sealed class SalesOrdersController : Controller
         return View(new CreateSalesOrderRequest());
     }
 
+    [HttpGet]
+    public async Task<IActionResult> CreateHistorical(CancellationToken cancellationToken)
+    {
+        ViewBag.Customers = await _customers.GetForDropdownAsync(cancellationToken);
+        return View(new CreateSalesOrderRequest { IsHistorical = true, Status = Inventory.Domain.Entities.SalesOrderStatus.Done });
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(CreateSalesOrderRequest model, CancellationToken cancellationToken)
@@ -51,7 +58,7 @@ public sealed class SalesOrdersController : Controller
         if (!ModelState.IsValid)
         {
             ViewBag.Customers = await _customers.GetForDropdownAsync(cancellationToken);
-            return View(model);
+            return model.IsHistorical ? View("CreateHistorical", model) : View(model);
         }
 
         var user = GetUserContext();
@@ -79,6 +86,15 @@ public sealed class SalesOrdersController : Controller
     {
         var user = GetUserContext();
         await _orders.CancelAsync(id, user, cancellationToken);
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ActivateStock(long id, CancellationToken cancellationToken)
+    {
+        var user = GetUserContext();
+        await _orders.ActivateStockAsync(id, user, cancellationToken);
         return RedirectToAction(nameof(Details), new { id });
     }
 

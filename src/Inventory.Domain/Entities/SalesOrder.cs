@@ -191,6 +191,17 @@ public  class SalesOrder
     public decimal RefundedAmount { get; set; }
     
     public List<SalesOrderLine> Lines { get; set; } = new();
+
+    /// <summary>
+    /// Indicates if this order was imported as a historical record.
+    /// Historical orders do not affect stock creation-time, only when explicitly activated.
+    /// </summary>
+    public bool IsHistorical { get; set; }
+
+    /// <summary>
+    /// For historical orders, tracks whether the stock impact has been applied.
+    /// </summary>
+    public bool IsStockProcessed { get; set; }
 }
 
 public class SalesOrderLine

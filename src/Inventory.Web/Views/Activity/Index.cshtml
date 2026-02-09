@@ -221,6 +221,11 @@
                                 <span class="small fw-bold">TAX:</span>
                                 <span id="po-detail-man-tax"></span>
                             </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small fw-bold">RECEIPT EXPENSES:</span>
+                                <span id="po-detail-receipt-exp"></span>
+                            </div>
+
                             <div class="d-flex justify-content-between mt-3 pt-2 border-top border-2">
                                 <span class="fw-black">TOTAL:</span>
                                 <span id="po-detail-total" class="fw-black fs-4 text-success"></span>
@@ -1013,7 +1018,9 @@
                     document.getElementById('po-detail-subtotal').innerText = formatCurrency(o.subtotal);
                     document.getElementById('po-detail-vat').innerText = formatCurrency(o.vatAmount);
                     document.getElementById('po-detail-man-tax').innerText = formatCurrency(o.manufacturingTaxAmount);
+                    document.getElementById('po-detail-receipt-exp').innerText = formatCurrency(o.receiptExpenses || 0);
                     document.getElementById('po-detail-total').innerText = formatCurrency(o.totalAmount);
+
 
                     // PO Actions
                     const poActionsHtml = [];

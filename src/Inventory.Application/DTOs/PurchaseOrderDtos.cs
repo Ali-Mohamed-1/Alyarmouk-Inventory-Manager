@@ -32,6 +32,8 @@ namespace Inventory.Application.DTOs
         decimal TotalAmount,
         decimal RefundedAmount,
         string? Note,
+        bool IsHistorical,
+        bool IsStockProcessed,
         string? InvoicePath,
         DateTimeOffset? InvoiceUploadedUtc,
         string? ReceiptPath,

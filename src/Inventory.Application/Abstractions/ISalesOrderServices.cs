@@ -77,6 +77,10 @@ namespace Inventory.Application.Abstractions
         Task RefundAsync(RefundSalesOrderRequest req, UserContext user, CancellationToken ct = default);
 
         Task AddPaymentAsync(long orderId, Inventory.Application.DTOs.Payment.CreatePaymentRequest req, UserContext user, CancellationToken ct = default);
-
+        
+        /// <summary>
+        /// Manually triggers stock deduction for a historical order that was created without stock impact.
+        /// </summary>
+        Task ActivateStockAsync(long orderId, UserContext user, CancellationToken ct = default);
     }
 }

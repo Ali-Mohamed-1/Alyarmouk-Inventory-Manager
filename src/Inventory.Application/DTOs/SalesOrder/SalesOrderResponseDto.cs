@@ -62,6 +62,9 @@ namespace Inventory.Application.DTOs.SalesOrder
         public decimal VatAmount { get; init; }
         public decimal ManufacturingTaxAmount { get; init; }
         public decimal TotalAmount { get; init; }
+
+        public bool IsHistorical { get; init; }
+        public bool IsStockProcessed { get; init; }
         
         /// <summary>
         /// Total amount that has been refunded for this order.

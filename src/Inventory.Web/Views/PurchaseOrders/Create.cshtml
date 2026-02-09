@@ -44,10 +44,7 @@
 
                         <div class="mb-4">
                             <label asp-for="ReceiptExpenses" class="form-label fw-black text-uppercase small">Receipt / Shipping Expenses</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-black text-white">$</span>
-                                <input asp-for="ReceiptExpenses" type="number" step="0.01" class="form-control fw-bold" value="0.00" />
-                            </div>
+                            <input asp-for="ReceiptExpenses" type="number" step="0.01" class="form-control fw-bold small" value="0.00" />
                         </div>
 
                         <div class="mb-0">
@@ -119,12 +116,31 @@
                         <div class="row g-4 align-items-end">
                             <div class="col-md-5">
                                 <div class="neo-card p-3 bg-light mb-0 border-2">
-                                    <p class="small text-muted mb-0 fw-bold">
-                                        Financial totals (including taxes and receipt expenses) are finalized on the server.
-                                    </p>
+                                    <p class="small text-muted mb-0 fw-bold">FINAL TOTAL WILL BE RECALCULATED ON SERVER CORE.</p>
                                 </div>
                             </div>
                             <div class="col-md-7">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="fw-black text-uppercase small">SUBTOTAL:</span>
+                                    <span id="displaySubtotal" class="fw-black">$0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="fw-black text-uppercase small text-muted">VAT (14%):</span>
+                                    <span id="displayVat" class="fw-black text-muted">$0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="fw-black text-uppercase small text-muted">MAN. TAX (1%):</span>
+                                    <span id="displayManTax" class="fw-black text-muted">$0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="fw-black text-uppercase small text-muted">RECEIPT EXPENSES:</span>
+                                    <span id="displayReceiptExp" class="fw-black text-muted">$0.00</span>
+                                </div>
+
+                                <div class="d-flex justify-content-between mb-4 border-top border-2 pt-2">
+                                    <span class="fw-black text-uppercase fs-5">EST. GRAND TOTAL:</span>
+                                    <span id="displayTotal" class="fw-black fs-4 text-success">$0.00</span>
+                                </div>
                                 <button type="submit" class="neo-btn neo-btn-primary w-100 py-3 fw-black fs-5">
                                     <i class="bi bi-download me-2"></i> RECEIVE STOCK
                                 </button>
@@ -247,13 +263,10 @@
                     </div>
                 </td>
                 <td class="align-top">
-                    <input name="Lines[${idx}].Quantity" type="number" step="0.01" min="0.0001" class="form-control fw-black text-center" value="1.00" required>
+                    <input name="Lines[${idx}].Quantity" type="number" step="0.01" min="0.0001" class="form-control fw-black text-center item-qty" onchange="calculateTotals()" value="1.00" required>
                 </td>
                 <td class="align-top">
-                    <div class="input-group">
-                        <span class="input-group-text bg-black text-white">$</span>
-                        <input name="Lines[${idx}].UnitPrice" id="price-input-${idx}" type="number" step="0.01" min="0" class="form-control fw-black text-center" value="0.00" required>
-                    </div>
+                    <input name="Lines[${idx}].UnitPrice" id="price-input-${idx}" type="number" step="0.01" min="0" class="form-control fw-black text-center small item-price" onchange="calculateTotals()" value="0.00" required>
                 </td>
                 <td class="text-end pe-4 align-top">
                     <button type="button" class="neo-btn neo-btn-danger btn-sm py-1" onclick="removePoLineItem(${idx})">
@@ -326,7 +339,46 @@
             if (document.querySelectorAll('#po-line-items-container tr').length === 0) {
                 document.getElementById('po-empty-state').style.display = 'block';
             }
+            calculateTotals();
         }
+
+        function calculateTotals() {
+            const round = (val) => Math.round(val * 100) / 100;
+
+            let subtotal = 0;
+            const qtys = document.querySelectorAll('.item-qty');
+            const prices = document.querySelectorAll('.item-price');
+            for (let i = 0; i < qtys.length; i++) {
+                subtotal += (parseFloat(qtys[i].value) || 0) * (parseFloat(prices[i].value) || 0);
+            }
+            subtotal = round(subtotal);
+            
+            const receiptExp = round(parseFloat(document.querySelector('[name="ReceiptExpenses"]').value) || 0);
+            const applyVat = document.querySelector('[name="ApplyVat"]').checked;
+            const applyManTax = document.querySelector('[name="ApplyManufacturingTax"]').checked;
+
+            let vat = 0;
+            let manTax = 0;
+
+            if (applyVat) vat = round(subtotal * 0.14);
+            if (applyManTax) manTax = round(subtotal * 0.01);
+
+            const grandTotal = round(subtotal + vat - manTax + receiptExp);
+
+            document.getElementById('displaySubtotal').textContent = formatCurrency(subtotal);
+            document.getElementById('displayVat').textContent = formatCurrency(vat);
+            document.getElementById('displayManTax').textContent = (manTax > 0 ? "-" : "") + formatCurrency(manTax);
+            document.getElementById('displayReceiptExp').textContent = formatCurrency(receiptExp);
+            document.getElementById('displayTotal').textContent = formatCurrency(grandTotal);
+
+        }
+
+        function formatCurrency(a) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(a); }
+
+        document.querySelectorAll('[name="ApplyVat"], [name="ApplyManufacturingTax"], [name="ReceiptExpenses"]').forEach(input => {
+            input.addEventListener('change', calculateTotals);
+            if (input.name === "ReceiptExpenses") input.addEventListener('input', calculateTotals);
+        });
     </script>
 }
 
