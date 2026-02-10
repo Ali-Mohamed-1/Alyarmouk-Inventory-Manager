@@ -11,6 +11,8 @@ using Inventory.Application.DTOs;
 using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Inventory.Application.Exceptions;
+
 using Inventory.Domain.Constants;
 
 namespace Inventory.Infrastructure.Services
@@ -50,33 +52,12 @@ namespace Inventory.Infrastructure.Services
                 .Where(x => x.TotalOnHand <= x.ReorderPoint)
                 .CountAsync(ct);
 
-            // Get stock by category
-            // This is a bit more complex to translate to batches efficiently in one query due to grouping
-            // We'll calculate it by joining products and batches
-            var stockByCategory = await _db.Products
-                .AsNoTracking()
-                .Where(p => p.IsActive)
-                .Join(_db.categories, p => p.CategoryId, c => c.Id, (p, c) => new { p, c })
-                .Select(x => new
-                {
-                    CategoryName = x.c.Name,
-                    Stock = _db.ProductBatches.Where(b => b.ProductId == x.p.Id).Sum(b => (decimal?)b.OnHand) ?? 0m
-                })
-                .GroupBy(x => x.CategoryName)
-                .Select(g => new DashboardStockByCategoryPointDto
-                {
-                    CategoryName = g.Key,
-                    OnHand = g.Sum(x => x.Stock)
-                })
-                .OrderBy(x => x.CategoryName)
-                .ToListAsync(ct);
 
             return new DashboardResponseDto
             {
                 TotalProducts = totalProducts,
                 TotalOnHand = totalOnHand,
-                LowStockCount = lowStockCount,
-                StockByCategory = stockByCategory
+                LowStockCount = lowStockCount
             };
         }
 
@@ -89,7 +70,6 @@ namespace Inventory.Infrastructure.Services
                 .Select(p => new
                 {
                     Product = p,
-                    CategoryName = p.Category.Name,
                     TotalOnHand = _db.ProductBatches.Where(b => b.ProductId == p.Id).Sum(b => (decimal?)b.OnHand) ?? 0m
                 })
                 .Where(x => x.TotalOnHand <= x.Product.ReorderPoint)
@@ -99,7 +79,6 @@ namespace Inventory.Infrastructure.Services
                 {
                     ProductId = x.Product.Id,
                     ProductName = x.Product.Name,
-                    CategoryName = x.CategoryName,
                     OnHand = x.TotalOnHand,
                     Unit = x.Product.Unit,
                     ReorderPoint = x.Product.ReorderPoint

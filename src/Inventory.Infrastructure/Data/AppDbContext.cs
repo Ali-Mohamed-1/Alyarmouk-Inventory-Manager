@@ -12,7 +12,6 @@ namespace Inventory.Infrastructure.Data
         }
 
         public DbSet<Product> Products { get; set; }
-        public DbSet<Category> categories { get; set; }
         public DbSet<InventoryTransaction> InventoryTransactions { get; set; }
         public DbSet<StockSnapshot> StockSnapshots { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
@@ -32,10 +31,6 @@ namespace Inventory.Infrastructure.Data
         {
             base.OnModelCreating(builder);
 
-            builder.Entity<Category>(c =>
-            {
-                c.Property(c => c.Name).IsRequired().HasMaxLength(200);
-            });
 
             builder.Entity<Product>(b =>
             {
@@ -46,7 +41,6 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.ReorderPoint).HasPrecision(18, 2);
 
                 b.Property(x => x.RowVersion).IsRowVersion();
-                b.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
             });
 
             builder.Entity<StockSnapshot>(b =>

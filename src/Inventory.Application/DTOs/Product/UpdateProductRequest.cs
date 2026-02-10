@@ -20,7 +20,6 @@ namespace Inventory.Application.DTOs.Product
 
 
 
-        public int CategoryId { get; init; }
         public string Unit { get; init; } = "pcs";
         public decimal ReorderPoint { get; init; }
         public bool IsActive { get; init; }

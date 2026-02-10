@@ -9,9 +9,6 @@ namespace Inventory.Application.DTOs.Product
         public string Name { get; init; } = string.Empty;
 
 
-        public int CategoryId { get; init; }
-        public string CategoryName { get; init; } = string.Empty;
-
         public string Unit { get; init; } = "pcs";
         public decimal ReorderPoint { get; init; }
         public bool IsActive { get; init; }

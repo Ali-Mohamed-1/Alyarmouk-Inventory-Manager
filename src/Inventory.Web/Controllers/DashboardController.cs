@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Inventory.Application.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 
+
 namespace Inventory.Web.Controllers;
 
 public sealed class DashboardController : Controller
@@ -55,9 +56,10 @@ public sealed class DashboardController : Controller
             totalSalesOrders = salesOrders.Count,
             totalPurchaseOrders = purchaseOrders.Count(),
             lowStockCount = dashboard.LowStockCount,
-            totalOnHand = dashboard.TotalOnHand,
-            stockByCategory = dashboard.StockByCategory
+            totalOnHand = dashboard.TotalOnHand
         });
     }
+
 }
+
 

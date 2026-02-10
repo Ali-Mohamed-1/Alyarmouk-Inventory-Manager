@@ -12,6 +12,8 @@ using Microsoft.EntityFrameworkCore;
 using Inventory.Domain.Constants;
 using Inventory.Application.DTOs.Transaction;
 using Inventory.Application.DTOs.Payment;
+using Inventory.Application.Exceptions;
+
 
 namespace Inventory.Infrastructure.Services
 {

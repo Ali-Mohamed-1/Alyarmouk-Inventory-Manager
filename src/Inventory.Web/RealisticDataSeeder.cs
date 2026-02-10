@@ -31,7 +31,6 @@ public static class RealisticDataSeeder
         await ClearDatabaseAsync(db);
 
         // 2. GET SERVICES
-        var categoryParams = services.GetRequiredService<ICategoryServices>();
         var supplierParams = services.GetRequiredService<ISupplierServices>();
         var customerParams = services.GetRequiredService<ICustomerServices>();
         var productParams = services.GetRequiredService<IProductServices>();
@@ -39,11 +38,9 @@ public static class RealisticDataSeeder
         var soParams = services.GetRequiredService<ISalesOrderServices>();
         var inventoryParams = services.GetRequiredService<IInventoryTransactionServices>();
 
-        // 3. MASTER DATA
-        var categories = await SeedCategories(categoryParams, _user);
         var suppliers = await SeedSuppliers(supplierParams, _user);
         var customers = await SeedCustomers(customerParams, _user);
-        var products = await SeedProducts(productParams, categories, _user);
+        var products = await SeedProducts(productParams, _user);
 
         // 3.5 INITIAL STOCK BOOST (Ensure 2-3 batches per product)
         Console.WriteLine("Boosting initial stock for all products...");
@@ -313,23 +310,11 @@ public static class RealisticDataSeeder
         await db.ProductBatches.ExecuteDeleteAsync();
         await db.StockSnapshots.ExecuteDeleteAsync(); 
         await db.Products.ExecuteDeleteAsync();
-        await db.categories.ExecuteDeleteAsync();
         await db.Suppliers.ExecuteDeleteAsync();
         await db.Customers.ExecuteDeleteAsync();
         await db.SaveChangesAsync();
     }
 
-    private static async Task<List<CategoryResponseDto>> SeedCategories(ICategoryServices svc, Inventory.Application.DTOs.UserContext user)
-    {
-        var names = new[] { "Acids", "Bases", "Solvents", "Salts", "Oxidizers", "Reagents", "Indicators", "Buffers" };
-        var list = new List<CategoryResponseDto>();
-        foreach(var n in names)
-        {
-            var id = await svc.CreateAsync(new CreateCategoryRequest { Name = n }, user);
-            list.Add(new CategoryResponseDto { Id = id, Name = n });
-        }
-        return list;
-    }
 
     private static async Task<List<SupplierResponse>> SeedSuppliers(ISupplierServices svc, Inventory.Application.DTOs.UserContext user)
     {
@@ -368,7 +353,7 @@ public static class RealisticDataSeeder
         return list;
     }
 
-    private static async Task<List<ProductResponseDto>> SeedProducts(IProductServices svc, List<CategoryResponseDto> cats, Inventory.Application.DTOs.UserContext user)
+    private static async Task<List<ProductResponseDto>> SeedProducts(IProductServices svc, Inventory.Application.DTOs.UserContext user)
     {
         var products = new[] {
             ("Sodium Hydroxide", "kg"), ("Sulfuric Acid", "L"), ("Ethanol Absolute", "L"), 
@@ -379,10 +364,9 @@ public static class RealisticDataSeeder
         int idx = 1;
         foreach(var (name, unit) in products)
         {
-            var cat = cats[_rng.Next(cats.Count)];
-            var req = new CreateProductRequest { Sku = $"CHM-{idx:000}", Name = name, CategoryId = cat.Id, Unit = unit, ReorderPoint = 50, IsActive = true };
+            var req = new CreateProductRequest { Sku = $"CHM-{idx:000}", Name = name, Unit = unit, ReorderPoint = 50, IsActive = true };
             var id = await svc.CreateAsync(req, user);
-            list.Add(new ProductResponseDto { Id = id, Sku = req.Sku, Name = req.Name, CategoryId = cat.Id, CategoryName = cat.Name, Unit = req.Unit, IsActive = true });
+            list.Add(new ProductResponseDto { Id = id, Sku = req.Sku, Name = req.Name, Unit = req.Unit, IsActive = true });
             idx++;
         }
         return list;

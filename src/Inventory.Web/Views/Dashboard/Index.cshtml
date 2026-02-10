@@ -77,7 +77,6 @@
                     <tr>
                         <th>Name</th>
                         <th>SKU</th>
-                        <th>Category</th>
                         <th class="text-end">Safe Stock</th>
                         <th class="text-end">On Hand</th>
                         <th class="text-end">Reserved</th>
@@ -88,7 +87,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="9" class="text-center py-5">
+                        <td colspan="8" class="text-center py-5">
                             <div class="spinner-border spinner-border-sm me-2" role="status"></div>
                             LOADING PRODUCTS...
                         </td>
@@ -316,12 +315,6 @@
                             <input type="text" id="addSku" name="Sku" class="form-control" required />
                         </div>
                         <div class="col-md-6">
-                            <label for="addCategoryId" class="form-label fw-black text-uppercase small">Category</label>
-                            <select id="addCategoryId" name="CategoryId" class="form-select" required>
-                                <option value="">-- LOADING --</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
                             <label for="addUnit" class="form-label fw-black text-uppercase small">Unit</label>
                             <input type="text" id="addUnit" name="Unit" class="form-control" required />
                         </div>
@@ -432,7 +425,6 @@
                                     <span class="fw-black text-uppercase">${escapeHtml(x.name)}</span>
                                 </td>
                                 <td><code class="fw-bold fs-6">${escapeHtml(x.sku)}</code></td>
-                                <td><span class="text-uppercase small fw-bold">${escapeHtml(x.categoryName)}</span></td>
                                 <td class="text-end">${formatNumber(x.reorderPoint)} ${escapeHtml(x.unit)}</td>
                                 <td class="text-end fw-black">${formatNumber(x.onHand)}</td>
                                 <td class="text-end">${formatNumber(x.reserved)}</td>
@@ -455,7 +447,7 @@
                     })
                     .catch(err => {
                         console.error('Failed to load products:', err);
-                        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-5">FETCH FAILED. REFRESH PAGE.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-5">FETCH FAILED. REFRESH PAGE.</td></tr>';
                     });
             }
 
@@ -473,7 +465,7 @@
                 const detailsRow = document.createElement('tr');
                 detailsRow.className = 'batch-details-row';
                 detailsRow.dataset.productId = String(productId);
-                detailsRow.innerHTML = `<td colspan="9" class="p-4 bg-light">
+                detailsRow.innerHTML = `<td colspan="8" class="p-4 bg-light">
                     <div class="d-flex align-items-center fw-bold">
                         <div class="spinner-border spinner-border-sm me-3" role="status"></div>
                         LOADING BATCHES...
@@ -493,11 +485,11 @@
                     const batches = await resp.json();
 
                     if (!Array.isArray(batches) || batches.length === 0) {
-                        detailsRow.innerHTML = `<td colspan="9" class="p-4 bg-light text-muted fw-bold">NO BATCHES FOUND.</td>`;
+                        detailsRow.innerHTML = `<td colspan="8" class="p-4 bg-light text-muted fw-bold">NO BATCHES FOUND.</td>`;
                         return;
                     }
 
-                    detailsRow.innerHTML = `<td colspan="9" class="p-4 bg-light border-start border-end">
+                    detailsRow.innerHTML = `<td colspan="8" class="p-4 bg-light border-start border-end">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div class="fw-black text-uppercase">Batch Track Records</div>
                             <a href="/Products/AddBatch/${productId}" class="neo-btn neo-btn-sm neo-btn-success"><i class="bi bi-plus-lg"></i> ADD BATCH</a>
@@ -552,7 +544,7 @@
                         });
                     });
                 } catch (e) {
-                    if (e.name !== 'AbortError') detailsRow.innerHTML = `<td colspan="9" class="p-4 text-danger fw-bold">ERROR LOADING BATCHES.</td>`;
+                    if (e.name !== 'AbortError') detailsRow.innerHTML = `<td colspan="8" class="p-4 text-danger fw-bold">ERROR LOADING BATCHES.</td>`;
                 } finally {
                     toggleBtn.disabled = false;
                     pendingRequests.delete(productId);
@@ -567,19 +559,8 @@
                 dropdowns.forEach(d => { if(d) d.innerHTML = options; });
             }
 
-            function loadCategories() {
-                fetch('/Lookups/Categories')
-                    .then(r => r.ok ? r.json() : Promise.reject())
-                    .then(cats => {
-                        const selectAdd = document.getElementById('addCategoryId');
-                        const options = '<option value="">-- SELECT CATEGORY --</option>' +
-                            cats.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-                        if(selectAdd) selectAdd.innerHTML = options;
-                    });
-            }
 
             refreshDashboard();
-            loadCategories();
 
             document.getElementById('btn-receive-stock').addEventListener('click', () => { new bootstrap.Modal(document.getElementById('receiveStockModal')).show(); });
             // Issue/Adjust now use direct links, no modal listeners needed

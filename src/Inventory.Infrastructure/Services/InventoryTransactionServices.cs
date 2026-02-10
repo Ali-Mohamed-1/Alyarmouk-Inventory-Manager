@@ -9,6 +9,8 @@ using Inventory.Application.DTOs.Transaction;
 using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Inventory.Application.Exceptions;
+
 
 namespace Inventory.Infrastructure.Services
 {

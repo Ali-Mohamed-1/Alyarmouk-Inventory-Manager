@@ -7,6 +7,8 @@ using Inventory.Application.Abstractions;
 using Inventory.Application.DTOs.Batches;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Inventory.Application.Exceptions;
+
 
 namespace Inventory.Infrastructure.Services;
 

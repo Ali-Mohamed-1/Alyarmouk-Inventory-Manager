@@ -40,10 +40,8 @@ namespace Inventory.UnitTests
         public async Task AddBatchAsync_ShouldCreateBatch_WhenValid()
         {
             // Arrange
-            var category = new Inventory.Domain.Entities.Category { Id = 1, Name = "Test Category" };
-            _db.categories.Add(category);
             
-            var product = new Product { Name = "Test Product", Sku = "TEST-SKU", CategoryId = 1, IsActive = true };
+            var product = new Product { Name = "Test Product", Sku = "TEST-SKU", IsActive = true };
             _db.Products.Add(product);
             await _db.SaveChangesAsync();
 
@@ -75,10 +73,8 @@ namespace Inventory.UnitTests
         public async Task AddBatchAsync_ShouldCreateTransaction_WhenInitialQuantityProvided()
         {
             // Arrange
-            var category = new Inventory.Domain.Entities.Category { Id = 1, Name = "Test Category" };
-            _db.categories.Add(category);
 
-            var product = new Product { Name = "Test Product 2", Sku = "TEST-SKU-2", CategoryId = 1, IsActive = true };
+            var product = new Product { Name = "Test Product 2", Sku = "TEST-SKU-2", IsActive = true };
             _db.Products.Add(product);
             await _db.SaveChangesAsync();
 
@@ -109,10 +105,8 @@ namespace Inventory.UnitTests
         public async Task AddBatchAsync_ShouldThrow_WhenBatchExists()
         {
             // Arrange
-            var category = new Inventory.Domain.Entities.Category { Id = 1, Name = "Test Category" };
-            _db.categories.Add(category);
 
-            var product = new Product { Name = "Test Product 3", Sku = "TEST-SKU-3", CategoryId = 1, IsActive = true };
+            var product = new Product { Name = "Test Product 3", Sku = "TEST-SKU-3", IsActive = true };
             _db.Products.Add(product);
             await _db.SaveChangesAsync();
 

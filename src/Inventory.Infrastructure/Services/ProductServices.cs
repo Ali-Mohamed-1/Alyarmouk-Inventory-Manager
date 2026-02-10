@@ -10,6 +10,8 @@ using Inventory.Application.DTOs.Transaction;
 using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Inventory.Application.Exceptions;
+
 
 namespace Inventory.Infrastructure.Services
 {
@@ -33,15 +35,12 @@ namespace Inventory.Infrastructure.Services
         {
             return await _db.Products
                 .AsNoTracking()
-                .Include(p => p.Category)
                 .OrderBy(p => p.Name)
                 .Select(p => new ProductResponseDto
                 {
                     Id = p.Id,
                     Sku = p.Sku,
                     Name = p.Name,
-                    CategoryId = p.CategoryId,
-                    CategoryName = p.Category != null ? p.Category.Name : string.Empty,
                     Unit = p.Unit,
                     ReorderPoint = p.ReorderPoint,
                     IsActive = p.IsActive,
@@ -56,15 +55,12 @@ namespace Inventory.Infrastructure.Services
 
             return await _db.Products
                 .AsNoTracking()
-                .Include(p => p.Category)
                 .Where(p => p.Id == id)
                 .Select(p => new ProductResponseDto
                 {
                     Id = p.Id,
                     Sku = p.Sku,
                     Name = p.Name,
-                    CategoryId = p.CategoryId,
-                    CategoryName = p.Category != null ? p.Category.Name : string.Empty,
                     Unit = p.Unit,
                     ReorderPoint = p.ReorderPoint,
                     IsActive = p.IsActive,
@@ -82,15 +78,6 @@ namespace Inventory.Infrastructure.Services
             var normalizedName = NormalizeAndValidateName(req.Name);
             var normalizedUnit = NormalizeUnit(req.Unit);
 
-            if (req.CategoryId <= 0)
-                throw new ValidationException("Category ID must be positive.");
-
-            var categoryExists = await _db.categories
-                .AsNoTracking()
-                .AnyAsync(c => c.Id == req.CategoryId, ct);
-
-            if (!categoryExists)
-                throw new NotFoundException($"Category id {req.CategoryId} was not found.");
 
             var skuExists = await _db.Products
                 .AsNoTracking()
@@ -103,7 +90,6 @@ namespace Inventory.Infrastructure.Services
             {
                 Sku = normalizedSku,
                 Name = normalizedName,
-                CategoryId = req.CategoryId,
                 Unit = normalizedUnit,
                 ReorderPoint = req.ReorderPoint,
                 IsActive = req.IsActive
@@ -132,7 +118,6 @@ namespace Inventory.Infrastructure.Services
                     {
                         Sku = entity.Sku,
                         Name = entity.Name,
-                        CategoryId = entity.CategoryId,
                         Unit = entity.Unit,
                         ReorderPoint = entity.ReorderPoint,
                         IsActive = entity.IsActive
@@ -164,15 +149,6 @@ namespace Inventory.Infrastructure.Services
             var normalizedName = NormalizeAndValidateName(req.Name);
             var normalizedUnit = NormalizeUnit(req.Unit);
 
-            if (req.CategoryId <= 0)
-                throw new ValidationException("Category ID must be positive.");
-
-            var categoryExists = await _db.categories
-                .AsNoTracking()
-                .AnyAsync(c => c.Id == req.CategoryId, ct);
-
-            if (!categoryExists)
-                throw new NotFoundException($"Category id {req.CategoryId} was not found.");
 
             byte[] expectedRowVersion;
             try
@@ -194,7 +170,6 @@ namespace Inventory.Infrastructure.Services
             {
                 Sku = entity.Sku,
                 Name = entity.Name,
-                CategoryId = entity.CategoryId,
                 Unit = entity.Unit,
                 ReorderPoint = entity.ReorderPoint,
                 IsActive = entity.IsActive
@@ -211,7 +186,6 @@ namespace Inventory.Infrastructure.Services
 
             entity.Sku = normalizedSku;
             entity.Name = normalizedName;
-            entity.CategoryId = req.CategoryId;
             entity.Unit = normalizedUnit;
             entity.ReorderPoint = req.ReorderPoint;
             entity.IsActive = req.IsActive;
@@ -220,7 +194,6 @@ namespace Inventory.Infrastructure.Services
             {
                 Sku = entity.Sku,
                 Name = entity.Name,
-                CategoryId = entity.CategoryId,
                 Unit = entity.Unit,
                 ReorderPoint = entity.ReorderPoint,
                 IsActive = entity.IsActive

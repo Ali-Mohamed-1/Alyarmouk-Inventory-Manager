@@ -13,12 +13,15 @@ namespace Inventory.Infrastructure
         {
             services.AddDbContext<AppDbContext>(options =>
             {
-                options.UseSqlServer(config.GetConnectionString("DefaultConnection"));
+                var connectionString = config.GetConnectionString("DefaultConnection")
+                    ?? Environment.GetEnvironmentVariable("ConnectionString")
+                    ?? throw new InvalidOperationException("Connection string not configured");
+
+                options.UseSqlServer(connectionString);
             });
 
             // Application service registrations
             services.AddScoped<IProductServices, ProductServices>();
-            services.AddScoped<ICategoryServices, CategoryServices>();
             services.AddScoped<ICustomerServices, CustomerServices>();
             services.AddScoped<ISalesOrderServices, SalesOrderServices>();
             services.AddScoped<IInventoryServices, InventoryServices>();

@@ -1,19 +1,12 @@
 // Demo data - In a real application, this would come from API calls
 const demoData = {
-    categories: [
-        { id: 1, name: "Acids" },
-        { id: 2, name: "Bases" },
-        { id: 3, name: "Solvents" },
-        { id: 4, name: "Oxidizing Agents" },
-        { id: 5, name: "Organic Compounds" }
-    ],
     products: [
-        { productId: 1, sku: "CHEM-001", productName: "Sodium Hydroxide (NaOH)", categoryId: 2, categoryName: "Bases", onHand: 150, preserved: 25, available: 125 },
-        { productId: 2, sku: "CHEM-002", productName: "Hydrochloric Acid (HCl)", categoryId: 1, categoryName: "Acids", onHand: 300, preserved: 50, available: 250 },
-        { productId: 3, sku: "CHEM-003", productName: "Sulfuric Acid (H2SO4)", categoryId: 1, categoryName: "Acids", onHand: 75, preserved: 10, available: 65 },
-        { productId: 4, sku: "CHEM-004", productName: "Ethanol (C2H5OH)", categoryId: 3, categoryName: "Solvents", onHand: 500, preserved: 100, available: 400 },
-        { productId: 5, sku: "CHEM-005", productName: "Ammonia Solution (NH3)", categoryId: 2, categoryName: "Bases", onHand: 200, preserved: 30, available: 170 },
-        { productId: 6, sku: "CHEM-006", productName: "Potassium Permanganate (KMnO4)", categoryId: 4, categoryName: "Oxidizing Agents", onHand: 120, preserved: 15, available: 105 }
+        { productId: 1, sku: "CHEM-001", productName: "Sodium Hydroxide (NaOH)", onHand: 150, preserved: 25, available: 125 },
+        { productId: 2, sku: "CHEM-002", productName: "Hydrochloric Acid (HCl)", onHand: 300, preserved: 50, available: 250 },
+        { productId: 3, sku: "CHEM-003", productName: "Sulfuric Acid (H2SO4)", onHand: 75, preserved: 10, available: 65 },
+        { productId: 4, sku: "CHEM-004", productName: "Ethanol (C2H5OH)", onHand: 500, preserved: 100, available: 400 },
+        { productId: 5, sku: "CHEM-005", productName: "Ammonia Solution (NH3)", onHand: 200, preserved: 30, available: 170 },
+        { productId: 6, sku: "CHEM-006", productName: "Potassium Permanganate (KMnO4)", onHand: 120, preserved: 15, available: 105 }
     ],
     customers: [
         { id: 1, name: "Pure Chemical Industries", phone: "+962-6-555-0101", email: "sales@alyarmouk-chem.com", createdUtc: "2025-01-15T10:00:00Z" },
@@ -257,9 +250,6 @@ function loadTabData(tabName) {
             break;
             renderTransactions();
             break;
-        case 'categories':
-            renderCategories();
-            break;
         case 'audit':
             renderAuditLogs();
             break;
@@ -280,7 +270,6 @@ function renderProducts() {
         <tr>
             <td><code>${p.sku}</code></td>
             <td><strong>${p.productName}</strong></td>
-            <td><span class="badge badge-info">${p.categoryName}</span></td>
             <td><div class="quantity-badge"><span class="value">${p.onHand.toLocaleString()}</span></div></td>
             <td><div class="quantity-badge"><span class="value text-warning">${p.preserved.toLocaleString()}</span></div></td>
             <td><div class="quantity-badge"><span class="value text-success">${p.available.toLocaleString()}</span></div></td>

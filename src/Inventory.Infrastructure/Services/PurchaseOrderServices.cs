@@ -10,6 +10,8 @@ using Inventory.Domain.Constants;
 using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Inventory.Application.Exceptions;
+
 using Inventory.Application.DTOs.Payment;
 
 namespace Inventory.Infrastructure.Services

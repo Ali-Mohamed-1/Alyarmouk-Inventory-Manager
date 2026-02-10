@@ -44,7 +44,6 @@ public static class TestDataSeeder
         db.FinancialTransactions.RemoveRange(await db.FinancialTransactions.ToListAsync(ct));
         db.AuditLogs.RemoveRange(await db.AuditLogs.ToListAsync(ct));
         db.Products.RemoveRange(await db.Products.ToListAsync(ct));
-        db.categories.RemoveRange(await db.categories.ToListAsync(ct));
         db.Customers.RemoveRange(await db.Customers.ToListAsync(ct));
         db.Suppliers.RemoveRange(await db.Suppliers.ToListAsync(ct));
         await db.SaveChangesAsync(ct);
@@ -52,8 +51,6 @@ public static class TestDataSeeder
 
     private static async Task SeedInternalAsync(AppDbContext db, CancellationToken ct)
     {
-        var category = new Category { Id = 1, Name = "Test Category" };
-        db.categories.Add(category);
 
         var product = new Product
         {
@@ -61,7 +58,6 @@ public static class TestDataSeeder
             Name = "Product A",
             Sku = "SKU-A",
             Unit = "PCS",
-            CategoryId = 1,
             IsActive = true,
             ReorderPoint = 0
         };

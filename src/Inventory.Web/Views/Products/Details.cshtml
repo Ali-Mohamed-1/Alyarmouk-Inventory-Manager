@@ -35,11 +35,7 @@
                         <code class="fs-4 fw-black text-black">@Model.Sku</code>
                     </div>
                     <div class="row g-4 mb-4">
-                        <div class="col-6">
-                            <label class="fw-black text-uppercase small text-muted d-block mb-1">Category</label>
-                            <span class="badge neo-btn-info w-100 py-2">@Model.CategoryName.ToUpper()</span>
-                        </div>
-                        <div class="col-6">
+                        <div class="col-12">
                             <label class="fw-black text-uppercase small text-muted d-block mb-1">Operational State</label>
                             @if (Model.IsActive)
                             {

@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json;
 using Inventory.Infrastructure.Services;
+using Inventory.Application.Exceptions;
+
 
 namespace Inventory.Web.Middleware;
 
