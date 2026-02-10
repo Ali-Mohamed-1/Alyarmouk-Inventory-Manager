@@ -48,14 +48,12 @@ public sealed class DashboardController : Controller
     public async Task<IActionResult> SummaryJson(CancellationToken cancellationToken)
     {
         var dashboard = await _reporting.GetDashboardAsync(cancellationToken);
-        var salesOrders = await _salesOrders.GetRecentAsync(take: 1000, cancellationToken);
-        var purchaseOrders = await _purchaseOrders.GetRecentAsync(count: 1000, cancellationToken);
 
         return Json(new
         {
             totalProducts = dashboard.TotalProducts,
-            totalSalesOrders = salesOrders.Count,
-            totalPurchaseOrders = purchaseOrders.Count(),
+            totalSalesOrders = dashboard.TotalSalesOrders,
+            totalPurchaseOrders = dashboard.TotalPurchaseOrders,
             lowStockCount = dashboard.LowStockCount,
             totalOnHand = dashboard.TotalOnHand
         });

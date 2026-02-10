@@ -108,10 +108,40 @@ namespace Inventory.Infrastructure.Services
         {
             if (req is null) throw new ArgumentNullException(nameof(req));
 
+            decimal currentOnHand = 0;
+            if (req.ProductBatchId.HasValue && req.ProductBatchId.Value > 0)
+            {
+                currentOnHand = await _db.ProductBatches
+                    .Where(b => b.Id == req.ProductBatchId.Value)
+                    .Select(b => b.OnHand)
+                    .FirstOrDefaultAsync(ct);
+            }
+            else if (!string.IsNullOrWhiteSpace(req.BatchNumber))
+            {
+                currentOnHand = await _db.ProductBatches
+                    .Where(b => b.ProductId == req.ProductId && b.BatchNumber == req.BatchNumber)
+                    .Select(b => b.OnHand)
+                    .FirstOrDefaultAsync(ct);
+            }
+            else
+            {
+                 currentOnHand = await GetOnHandAsync(req.ProductId, ct);
+            }
+
+            decimal adjustment = req.Adjustment;
+            // If Adjustment is 0 but NewQuantity is provided (and different from 0 or different from current), 
+            // calculate the adjustment. 
+            // Note: If user actually wanted to adjust BY 0, this logic might be ambiguous, 
+            // but usually Adjust UI means "Set to this level".
+            if (adjustment == 0 && req.NewQuantity != currentOnHand)
+            {
+                adjustment = req.NewQuantity - currentOnHand;
+            }
+
             var txReq = new CreateInventoryTransactionRequest
             {
                 ProductId = req.ProductId,
-                Quantity = req.Adjustment, // If negative, it reduces stock. If positive, it increases.
+                Quantity = adjustment, // If negative, it reduces stock. If positive, it increases.
                 Type = InventoryTransactionType.Adjust,
                 BatchNumber = req.BatchNumber,
                 ProductBatchId = req.ProductBatchId,
@@ -357,16 +387,29 @@ namespace Inventory.Infrastructure.Services
 
         public async Task RefundSalesOrderStockAsync(long salesOrderId, List<RefundLineItem> lines, UserContext user, CancellationToken ct = default)
         {
+            if (lines == null || !lines.Any()) return;
+
             var order = await _db.SalesOrders
                 .AsNoTracking()
                 .FirstOrDefaultAsync(o => o.Id == salesOrderId, ct);
             if (order == null) throw new NotFoundException($"Sales order {salesOrderId} not found.");
 
+            // Batch fetch all product IDs for the requested lines to avoid loop roundtrips
+            var lineIds = lines.Select(l => l.SalesOrderLineId).ToList();
+            var lineProductMapping = await _db.SalesOrderLines
+                .AsNoTracking()
+                .Where(l => lineIds.Contains(l.Id))
+                .Select(l => new { l.Id, l.ProductId })
+                .ToDictionaryAsync(l => l.Id, l => l.ProductId, ct);
+
             foreach (var line in lines)
             {
+                if (!lineProductMapping.TryGetValue(line.SalesOrderLineId, out var productId))
+                    throw new NotFoundException($"Sales order line {line.SalesOrderLineId} not found.");
+
                 var txReq = new CreateInventoryTransactionRequest
                 {
-                    ProductId = await GetProductIdFromLineAsync(line.SalesOrderLineId, ct),
+                    ProductId = productId,
                     Quantity = line.Quantity,
                     Type = InventoryTransactionType.Receive, // Refund = Stock comes back
                     BatchNumber = line.BatchNumber,
@@ -381,18 +424,24 @@ namespace Inventory.Infrastructure.Services
 
         public async Task RefundPurchaseOrderStockAsync(long purchaseOrderId, List<RefundPurchaseLineItem> lines, UserContext user, CancellationToken ct = default)
         {
+            if (lines == null || !lines.Any()) return;
+
              var order = await _db.PurchaseOrders
                 .AsNoTracking()
                 .FirstOrDefaultAsync(o => o.Id == purchaseOrderId, ct);
             if (order == null) throw new NotFoundException($"Purchase order {purchaseOrderId} not found.");
 
+            // Batch fetch all PO lines
+            var lineIds = lines.Select(l => l.PurchaseOrderLineId).ToList();
+            var poLines = await _db.PurchaseOrderLines
+                .AsNoTracking()
+                .Where(l => lineIds.Contains(l.Id))
+                .ToDictionaryAsync(l => l.Id, ct);
+
             foreach (var line in lines)
             {
-                // We need the productId. Helper method or simple query.
-                // Assuming we can get it from the line ID or trust the caller? 
-                // Better to look it up to be safe and correct.
-                var poLine = await _db.PurchaseOrderLines.FindAsync(new object[] { line.PurchaseOrderLineId }, ct);
-                if (poLine == null) throw new NotFoundException($"Purchase Order Line {line.PurchaseOrderLineId} not found.");
+                if (!poLines.TryGetValue(line.PurchaseOrderLineId, out var poLine))
+                    throw new NotFoundException($"Purchase Order Line {line.PurchaseOrderLineId} not found.");
 
                 var txReq = new CreateInventoryTransactionRequest
                 {

@@ -38,8 +38,17 @@
                         <li class="nav-item">
                             <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Activity" ? "active" : "")" asp-area="" asp-controller="Activity" asp-action="Index">TRANSACTIONS</a>
                         </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownHistory" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                HISTORICAL
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="navbarDropdownHistory">
+                                <li><a class="dropdown-item" asp-controller="SalesOrders" asp-action="CreateHistorical">Add Sales Order</a></li>
+                                <li><a class="dropdown-item" asp-controller="PurchaseOrders" asp-action="CreateHistorical">Add Purchase Order</a></li>
+                            </ul>
+                        </li>
                         <li class="nav-item">
-                            <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Notifications" ? "active" : "")" asp-area="" asp-controller="Notifications" asp-action="Index">NOTIFICATIONS</a>
+                            <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Notifications" ? "active" : "")" asp-area="" asp-controller="Notifications" asp-action="Index">DEADLINES</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Financial" ? "active" : "")" asp-area="" asp-controller="Financial" asp-action="Index">FINANCIAL</a>
@@ -79,6 +88,25 @@
         <main role="main" class="pb-5">
             @RenderBody()
         </main>
+    </div>
+
+    <!-- Global Confirmation Modal -->
+    <div class="modal fade" id="appConfirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-3 border-black">
+                <div class="modal-header bg-black text-white border-0">
+                    <h5 class="modal-title fw-black" id="appConfirmModalTitle">CONFIRM ACTION</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="fw-bold mb-3" id="appConfirmModalMessage"></p>
+                </div>
+                <div class="modal-footer border-0 p-3">
+                    <button type="button" class="neo-btn neo-btn-secondary" data-bs-dismiss="modal">CANCEL</button>
+                    <button type="button" class="neo-btn neo-btn-danger" id="appConfirmModalOkBtn">OK</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="toast-container position-fixed bottom-0 end-0 p-3" id="appToastContainer" style="z-index: 1100;"></div>

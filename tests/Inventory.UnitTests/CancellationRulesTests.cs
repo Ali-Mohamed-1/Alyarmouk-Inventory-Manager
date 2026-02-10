@@ -23,7 +23,6 @@ namespace Inventory.UnitTests
         private readonly AppDbContext _db;
         private readonly SalesOrderServices _salesServices;
         private readonly PurchaseOrderServices _purchaseServices;
-        private readonly RefundTests.MockAuditLogWriter _audit;
         private readonly RefundTests.CapturingInventoryServices _inventory;
         private readonly RefundTests.CapturingFinancialServices _financial;
         private readonly UserContext _user;
@@ -38,12 +37,11 @@ namespace Inventory.UnitTests
             _db = new AppDbContext(options);
             _db.Database.EnsureCreated();
 
-            _audit = new RefundTests.MockAuditLogWriter();
             _inventory = new RefundTests.CapturingInventoryServices();
             _financial = new RefundTests.CapturingFinancialServices();
 
-            _salesServices = new SalesOrderServices(_db, _audit, _inventory, _financial);
-            _purchaseServices = new PurchaseOrderServices(_db, _audit, _inventory, _financial);
+            _salesServices = new SalesOrderServices(_db, _inventory, _financial);
+            _purchaseServices = new PurchaseOrderServices(_db, _inventory, _financial);
             _user = new UserContext("test-user", "Test User");
 
             SeedData();

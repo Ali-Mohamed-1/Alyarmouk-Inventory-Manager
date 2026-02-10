@@ -42,6 +42,12 @@ namespace Inventory.Application.Abstractions
         Task AttachReceiptAsync(long orderId, string receiptPath, UserContext user, CancellationToken ct = default);
 
         Task RemoveReceiptAsync(long orderId, UserContext user, CancellationToken ct = default);
+
+        /// <summary>
+        /// Manually triggers stock reception for a historical order that was created without stock impact.
+        /// </summary>
+        Task ActivateStockAsync(long orderId, UserContext user, CancellationToken ct = default);
+
         /// <summary>
         /// Updates payment metadata for an existing purchase order.
         /// </summary>

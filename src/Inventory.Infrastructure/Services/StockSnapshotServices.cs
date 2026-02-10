@@ -16,12 +16,10 @@ namespace Inventory.Infrastructure.Services
     public sealed class StockSnapshotServices : IStockSnapshotServices
     {
         private readonly AppDbContext _db;
-        private readonly IAuditLogWriter _auditWriter;
 
-        public StockSnapshotServices(AppDbContext db, IAuditLogWriter auditWriter)
+        public StockSnapshotServices(AppDbContext db)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
-            _auditWriter = auditWriter ?? throw new ArgumentNullException(nameof(auditWriter));
         }
 
         public async Task<IReadOnlyList<StockSnapshotResponseDto>> GetAllAsync(CancellationToken ct = default)
@@ -150,30 +148,6 @@ namespace Inventory.Infrastructure.Services
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
             {
-                await _db.SaveChangesAsync(ct);
-
-                var afterState = new { OnHand = snapshot.OnHand };
-
-                if (isNew)
-                {
-                    // AUDIT LOG: Record the creation
-                    await _auditWriter.LogCreateAsync<Inventory.Domain.Entities.StockSnapshot>(
-                        snapshot.ProductId,
-                        user,
-                        afterState: afterState,
-                        ct);
-                }
-                else
-                {
-                    // AUDIT LOG: Record the update
-                    await _auditWriter.LogUpdateAsync<Inventory.Domain.Entities.StockSnapshot>(
-                        snapshot.ProductId,
-                        user,
-                        beforeState: beforeState,
-                        afterState: afterState,
-                        ct);
-                }
-
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
             }

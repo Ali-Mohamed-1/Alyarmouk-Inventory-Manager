@@ -14,8 +14,6 @@ namespace Inventory.Application.DTOs.Product
 
 
 
-
-
         public string Unit { get; init; } = "pcs";
 
         [Range(0, 1000000)]

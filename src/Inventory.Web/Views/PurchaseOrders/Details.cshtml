@@ -168,7 +168,51 @@
                         <span class="badge @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received ? "neo-btn-success" : "neo-btn-info") fs-5 p-2 px-3">
                             @Model.Status.ToString().ToUpper()
                         </span>
+                        @if (Model.IsHistorical)
+                        {
+                            <span class="badge bg-warning text-black border border-black ms-2">HISTORICAL</span>
+                        }
                     </div>
+
+                    @if (Model.IsHistorical)
+                    {
+                        <div class="mb-3 p-3 bg-light border border-2 border-black">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-black small text-uppercase">Stock Impact:</span>
+                                @if (Model.IsStockProcessed)
+                                {
+                                    <span class="badge bg-success text-white">PROCESSED</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger text-white">DEFERRED</span>
+                                }
+                            </div>
+                            
+                            @if (!Model.IsStockProcessed)
+                            {
+                                <div class="small fw-bold text-muted mb-2">
+                                    Inventory was not affected during creation. 
+                                    @if(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received)
+                                    {
+                                        <span>Click below to manually add stock now.</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Mark as RECEIVED to enable stock addition.</span>
+                                    }
+                                </div>
+                                @if(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received)
+                                {
+                                    <form asp-action="ActivateStock" asp-route-id="@Model.Id" method="post">
+                                        <button type="submit" class="neo-btn neo-btn-primary w-100 text-uppercase">
+                                            <i class="bi bi-box-seam me-2"></i> Activate Stock Only
+                                        </button>
+                                    </form>
+                                }
+                            }
+                        </div>
+                    }
 
                     @if (Model.Status != Inventory.Domain.Entities.PurchaseOrderStatus.Cancelled)
                     {
@@ -265,7 +309,6 @@
                         </div>
                         @{
                             var canRefundMoneyPo = Model.Status != Inventory.Domain.Entities.PurchaseOrderStatus.Cancelled && 
-                                (Model.PaymentStatus == Inventory.Domain.Entities.PurchasePaymentStatus.Paid || Model.PaymentStatus == Inventory.Domain.Entities.PurchasePaymentStatus.PartiallyPaid) && 
                                 (Model.PaidAmount - Model.RefundedAmount) > 0;
                             var canRefundStockPo = Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received && Model.Lines.Any(l => l.Quantity - l.RefundedQuantity > 0);
                             var showRefundButtonPo = canRefundMoneyPo || canRefundStockPo;
@@ -396,12 +439,16 @@
                         <label class="form-label fw-black text-uppercase small">Order Ref</label>
                         <input type="text" class="form-control fw-bold bg-light" id="poRefundOrderNumber" value="@Model.OrderNumber" readonly />
                     </div>
-                    <div class="col-3">
+                    <div class="col-2">
                         <label class="form-label fw-black text-uppercase small">Total</label>
                         <input type="text" class="form-control fw-bold" id="poRefundOrderTotal" value="@Model.TotalAmount.ToString("N2")" readonly />
                     </div>
-                    <div class="col-3">
-                        <label class="form-label fw-black text-uppercase small text-success">Recovered</label>
+                    <div class="col-2">
+                        <label class="form-label fw-black text-uppercase small">Paid</label>
+                        <input type="text" class="form-control fw-bold text-success" id="poRefundOrderPaid" value="0.00" readonly />
+                    </div>
+                    <div class="col-2">
+                        <label class="form-label fw-black text-uppercase small text-danger">Recovered</label>
                         <input type="text" class="form-control fw-bold" id="poRefundOrderAlreadyRefunded" value="@Model.RefundedAmount.ToString("N2")" readonly />
                     </div>
                 </div>
@@ -605,6 +652,7 @@
             document.getElementById('poRefundOrderId').value = id;
             document.getElementById('poRefundOrderNumber').value = '@Model.OrderNumber';
             document.getElementById('poRefundOrderTotal').value = '@Model.TotalAmount.ToString("N2")';
+            document.getElementById('poRefundOrderPaid').value = '0.00'; // Will be updated by fetch
             document.getElementById('poRefundOrderAlreadyRefunded').value = '@Model.RefundedAmount.ToString("N2")';
             document.getElementById('poRefundAmount').value = '';
             document.getElementById('poRefundReason').value = '';
@@ -622,6 +670,12 @@
                     // Max refundable money is the Net Paid amount. We cannot refund more than what we hold.
                     const remainingRefundableAmount = o.paidAmount || 0;
                     const moneyFullyRefunded = remainingRefundableAmount <= 0;
+
+                    // Update Paid field in header (Gross Paid)
+                    const grossPaid = (o.payments || [])
+                        .filter(p => p.paymentType === 1) // 1 = Payment
+                        .reduce((sum, p) => sum + p.amount, 0);
+                    document.getElementById('poRefundOrderPaid').value = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2 }).format(grossPaid);
 
                     document.getElementById('poRefundMoneySection').style.display = (!canRefundMoney || moneyFullyRefunded) ? 'none' : 'block';
                     document.getElementById('poRefundStockSection').style.display = !canRefundStock ? 'none' : 'block';

@@ -1,0 +1,32 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Inventory.Domain -> H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Domain\bin\Debug\net9.0\Inventory.Domain.dll
+  Inventory.Application -> H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Application\bin\Debug\net9.0\Inventory.Application.dll
+  Inventory.Infrastructure -> H:\Khaled2\Alyarmouk-Inventory-Manager\src\Inventory.Infrastructure\bin\Debug\net9.0\Inventory.Infrastructure.dll
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(37,62): error CS0103: The name 'invServicesMock' does not exist in the current context [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(37,79): error CS0103: The name 'finServicesMock' does not exist in the current context [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(38,68): error CS0103: The name 'invServicesMock' does not exist in the current context [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(38,85): error CS0103: The name 'finServicesMock' does not exist in the current context [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\PaymentInvariantTests.cs(64,80): warning CS8625: Cannot convert null literal to non-nullable reference type. [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\RefundTests.cs(82,31): warning CS8602: Dereference of a possibly null reference. [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\PaymentInvariantTests.cs(176,83): warning CS8625: Cannot convert null literal to non-nullable reference type. [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(294,34): warning CS8602: Dereference of a possibly null reference. [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(348,30): warning CS8602: Dereference of a possibly null reference. [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(409,34): warning CS8602: Dereference of a possibly null reference. [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+
+Build FAILED.
+
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\PaymentInvariantTests.cs(64,80): warning CS8625: Cannot convert null literal to non-nullable reference type. [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\RefundTests.cs(82,31): warning CS8602: Dereference of a possibly null reference. [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\PaymentInvariantTests.cs(176,83): warning CS8625: Cannot convert null literal to non-nullable reference type. [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(294,34): warning CS8602: Dereference of a possibly null reference. [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(348,30): warning CS8602: Dereference of a possibly null reference. [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(409,34): warning CS8602: Dereference of a possibly null reference. [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(37,62): error CS0103: The name 'invServicesMock' does not exist in the current context [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(37,79): error CS0103: The name 'finServicesMock' does not exist in the current context [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(38,68): error CS0103: The name 'invServicesMock' does not exist in the current context [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\TaxCalculationTests.cs(38,85): error CS0103: The name 'finServicesMock' does not exist in the current context [H:\Khaled2\Alyarmouk-Inventory-Manager\tests\Inventory.UnitTests\Inventory.UnitTests.csproj]
+    6 Warning(s)
+    4 Error(s)
+
+Time Elapsed 00:00:01.65

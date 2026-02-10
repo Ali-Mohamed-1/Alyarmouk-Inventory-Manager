@@ -21,12 +21,10 @@ namespace Inventory.Infrastructure.Services
         private const int MaxEmailLength = 200;
         private const int MaxSearchTake = 100; // Prevent excessive queries
         private readonly AppDbContext _db;
-        private readonly IAuditLogWriter _auditWriter;
 
-        public CustomerServices(AppDbContext db, IAuditLogWriter auditWriter)
+        public CustomerServices(AppDbContext db)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
-            _auditWriter = auditWriter ?? throw new ArgumentNullException(nameof(auditWriter));
         }
 
         public async Task<IReadOnlyList<CustomerResponseDto>> GetAllAsync(CancellationToken ct = default)
@@ -137,18 +135,6 @@ namespace Inventory.Infrastructure.Services
             {
                 await _db.SaveChangesAsync(ct);
 
-                // AUDIT LOG: Record the creation
-                await _auditWriter.LogCreateAsync<Inventory.Domain.Entities.Customer>(
-                    entity.Id,
-                    user,
-                    afterState: new
-                    {
-                        Name = entity.Name,
-                        Phone = entity.Phone,
-                        Email = entity.Email,
-                        Address = entity.Address
-                    },
-                    ct);
 
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
@@ -211,13 +197,6 @@ namespace Inventory.Infrastructure.Services
             {
                 await _db.SaveChangesAsync(ct);
 
-                // AUDIT LOG: Record the update
-                await _auditWriter.LogUpdateAsync<Inventory.Domain.Entities.Customer>(
-                    entity.Id,
-                    user,
-                    beforeState: beforeState,
-                    afterState: afterState,
-                    ct);
 
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);

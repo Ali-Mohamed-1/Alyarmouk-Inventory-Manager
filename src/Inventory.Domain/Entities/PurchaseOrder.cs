@@ -41,64 +41,83 @@ public class PurchaseOrder
                 $"Cannot recalculate payment status for PurchaseOrder {Id}: Payments collection is not loaded. " +
                 "Ensure .Include(o => o.Payments) is used when loading the order.");
 
-        var paid = Payments
+        var totalPaid = Payments
             .Where(p => p.PaymentType == PaymentRecordType.Payment)
             .Sum(p => p.Amount);
             
-        var refunded = Payments
+        var totalRefunded = Payments
             .Where(p => p.PaymentType == PaymentRecordType.Refund)
             .Sum(p => p.Amount);
 
-        var netPaid = paid - refunded;
-        var remaining = TotalAmount - netPaid;
+        var netCash = totalPaid - totalRefunded;
 
-        // CRITICAL INVARIANT: Overpayment is illegal
-        if (remaining < 0)
-            throw new InvalidOperationException(
-                $"Invalid payment state for PurchaseOrder {Id}: RemainingAmount ({remaining:C}) is negative. Total: {TotalAmount:C}, Paid: {netPaid:C}");
-
-        // STRICT STATUS DERIVATION
-        if (remaining == 0 && TotalAmount > 0)
+        // PaymentStatus is about Collection/Payment Completion.
+        // Refunds do NOT degrade this status.
+        
+        if (totalPaid == 0)
         {
-            PaymentStatus = PurchasePaymentStatus.Paid;
-        } 
-        else if (netPaid > 0)
+            PaymentStatus = PurchasePaymentStatus.Unpaid;
+        }
+        else if (totalPaid < TotalAmount)
         {
             PaymentStatus = PurchasePaymentStatus.PartiallyPaid;
         }
         else
         {
-            PaymentStatus = PurchasePaymentStatus.Unpaid;
+            PaymentStatus = PurchasePaymentStatus.Paid;
         }
-
-        // Final Invariant Check
-        if (PaymentStatus == PurchasePaymentStatus.Paid && remaining > 0)
-            throw new InvalidOperationException($"Domain Logic Failure: Order {Id} is marked PAID but has remaining balance {remaining:C}.");
+        
+        // Validation of physical reality
+        if (netCash < 0)
+             throw new InvalidOperationException($"Invalid state: PurchaseOrder {Id} has negative NetCash ({netCash:C}). Refunded more than paid.");
     }
 
-    public decimal GetPaidAmount()
+    public decimal GetTotalPaid()
     {
         if (Payments == null) return 0;
-        var paid = Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount);
-        var refunded = Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount);
-        return paid - refunded;
+        return Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount);
     }
 
-    public decimal GetRemainingAmount()
+    public decimal GetTotalRefunded()
     {
-        return TotalAmount - GetPaidAmount();
+        if (Payments == null) return 0;
+        return Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount);
+    }
+
+    public decimal GetNetCash()
+    {
+        return GetTotalPaid() - GetTotalRefunded();
+    }
+
+    /// <summary>
+    /// Money we still need to pay to the supplier.
+    /// Refunds do NOT increase this.
+    /// </summary>
+    public decimal GetPendingAmount()
+    {
+        var paid = GetTotalPaid();
+        return Math.Max(0, TotalAmount - paid);
+    }
+
+    /// <summary>
+    /// Money the supplier owes us (e.g. after a return/refund).
+    /// </summary>
+    public decimal GetRefundDue()
+    {
+        var net = GetNetCash();
+        return Math.Max(0, net - TotalAmount);
     }
 
     public bool IsOverdue() => PaymentDeadline.HasValue && PaymentDeadline.Value < DateTimeOffset.UtcNow && PaymentStatus != PurchasePaymentStatus.Paid;
 
     public decimal GetDeservedAmount()
     {
-        return IsOverdue() ? GetRemainingAmount() : 0;
+        return IsOverdue() ? GetPendingAmount() : 0;
     }
 
     public decimal GetTotalPending()
     {
-        return GetRemainingAmount();
+        return GetPendingAmount();
     }
 
     /// <summary>
@@ -130,6 +149,11 @@ public class PurchaseOrder
     /// For bank transfer payments: unique transfer identifier/reference.
     /// </summary>
     public string? TransferId { get; set; }
+
+    /// <summary>
+    /// Order creation date (local business date).
+    /// </summary>
+    public DateTimeOffset OrderDate { get; set; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public string CreatedByUserId { get; set; } = "";
@@ -169,6 +193,17 @@ public class PurchaseOrder
     public DateTimeOffset? ReceiptUploadedUtc { get; set; }
     
     public List<PurchaseOrderLine> Lines { get; set; } = new();
+
+    /// <summary>
+    /// Indicates if this order was imported as a historical record.
+    /// Historical orders do not affect stock creation-time, only when explicitly activated.
+    /// </summary>
+    public bool IsHistorical { get; set; }
+
+    /// <summary>
+    /// For historical orders, tracks whether the stock impact has been applied.
+    /// </summary>
+    public bool IsStockProcessed { get; set; }
 }
 
 public class PurchaseOrderLine

@@ -67,7 +67,7 @@ namespace Inventory.UnitTests
             var notifications = (await _service.GetActiveNotificationsAsync(CancellationToken.None)).ToList();
 
             // Assert
-            var notif = Assert.Single(notifications.Where(n => n.Type == "Sales"));
+            var notif = Assert.Single(notifications, n => n.Type == "Sales");
             Assert.Equal(so.Id, notif.OrderId);
             Assert.Equal(so.OrderNumber, notif.OrderNumber);
             Assert.Equal("Customer A", notif.CounterpartyName);
@@ -144,7 +144,7 @@ namespace Inventory.UnitTests
             var notifications = (await _service.GetActiveNotificationsAsync(CancellationToken.None)).ToList();
 
             // Assert
-            var notif = Assert.Single(notifications.Where(n => n.Type == "Purchase"));
+            var notif = Assert.Single(notifications, n => n.Type == "Purchase");
             Assert.Equal(po.Id, notif.OrderId);
             Assert.Equal(po.OrderNumber, notif.OrderNumber);
             Assert.Equal("Supplier A", notif.CounterpartyName);

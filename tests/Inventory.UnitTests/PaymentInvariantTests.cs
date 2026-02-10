@@ -37,12 +37,11 @@ namespace Inventory.UnitTests
             _db = new AppDbContext(options);
             _db.Database.EnsureCreated();
 
-            var auditMock = new MockAuditLogWriter();
             var inventoryServices = new CapturingInventoryServices();
             var financialServices = new CapturingFinancialServices();
 
-            _salesServices = new SalesOrderServices(_db, auditMock, inventoryServices, financialServices);
-            _purchaseServices = new PurchaseOrderServices(_db, auditMock, inventoryServices, financialServices);
+            _salesServices = new SalesOrderServices(_db, inventoryServices, financialServices);
+            _purchaseServices = new PurchaseOrderServices(_db, inventoryServices, financialServices);
             _user = new UserContext("test-user", "Test User");
 
             SeedData();
@@ -165,8 +164,8 @@ namespace Inventory.UnitTests
             var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
             
             Assert.Equal(PaymentStatus.PartiallyPaid, order.PaymentStatus);
-            Assert.Equal(50, order.GetPaidAmount());
-            Assert.Equal(50, order.GetRemainingAmount());
+            Assert.Equal(50, order.GetTotalPaid());
+            Assert.Equal(50, order.GetPendingAmount());
         }
 
         // --- PurchaseOrder Invariants ---
@@ -220,7 +219,7 @@ namespace Inventory.UnitTests
              order.RecalculatePaymentStatus();
              
              Assert.NotEqual(PurchasePaymentStatus.Paid, order.PaymentStatus);
-             Assert.Equal(50, order.GetRemainingAmount());
+             Assert.Equal(50, order.GetPendingAmount());
         }
 
         [Fact]
@@ -313,13 +312,6 @@ namespace Inventory.UnitTests
             }
         }
 
-        public class MockAuditLogWriter : IAuditLogWriter
-        {
-            public Task LogCreateAsync<T>(object entityId, UserContext user, object? afterState = null, CancellationToken ct = default) where T : class => Task.CompletedTask;
-            public Task LogUpdateAsync<T>(object entityId, UserContext user, object? beforeState = null, object? afterState = null, CancellationToken ct = default) where T : class => Task.CompletedTask;
-            public Task LogDeleteAsync<T>(object entityId, UserContext user, object? beforeState = null, CancellationToken ct = default) where T : class => Task.CompletedTask;
-            public Task LogAsync(string entityType, string entityId, AuditAction action, UserContext user, string? changesJson = null, CancellationToken ct = default) => Task.CompletedTask;
-        }
 
         [Fact]
         public async Task PurchaseOrder_AddPayment_Partial_SetsStatusToPartiallyPaid()

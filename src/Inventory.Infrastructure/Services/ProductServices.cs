@@ -21,13 +21,11 @@ namespace Inventory.Infrastructure.Services
         private const int MaxNameLength = 200;
         private const int MaxUnitLength = 32;
         private readonly AppDbContext _db;
-        private readonly IAuditLogWriter _auditWriter;
         private readonly IInventoryTransactionServices _inventoryTransactions;
-
-        public ProductServices(AppDbContext db, IAuditLogWriter auditWriter, IInventoryTransactionServices inventoryTransactions)
+ 
+        public ProductServices(AppDbContext db, IInventoryTransactionServices inventoryTransactions)
         {
             _db = db;
-            _auditWriter = auditWriter;
             _inventoryTransactions = inventoryTransactions;
         }
 
@@ -111,19 +109,6 @@ namespace Inventory.Infrastructure.Services
 
                 await _db.SaveChangesAsync(ct);
 
-                await _auditWriter.LogCreateAsync<Inventory.Domain.Entities.Product>(
-                    entity.Id,
-                    user,
-                    afterState: new
-                    {
-                        Sku = entity.Sku,
-                        Name = entity.Name,
-                        Unit = entity.Unit,
-                        ReorderPoint = entity.ReorderPoint,
-                        IsActive = entity.IsActive
-                    },
-                    ct);
-
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
             }
@@ -204,13 +189,6 @@ namespace Inventory.Infrastructure.Services
             {
                 await _db.SaveChangesAsync(ct);
 
-                await _auditWriter.LogUpdateAsync<Inventory.Domain.Entities.Product>(
-                    entity.Id,
-                    user,
-                    beforeState: beforeState,
-                    afterState: afterState,
-                    ct);
-
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
             }
@@ -251,13 +229,6 @@ namespace Inventory.Infrastructure.Services
                 await _db.SaveChangesAsync(ct);
 
                 // AUDIT LOG: Record the update
-                await _auditWriter.LogUpdateAsync<Inventory.Domain.Entities.Product>(
-                    entity.Id,
-                    user,
-                    beforeState: beforeState,
-                    afterState: afterState,
-                    ct);
-
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
             }

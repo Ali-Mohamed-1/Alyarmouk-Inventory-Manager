@@ -105,7 +105,7 @@ public class PurchaseOrderIntegrationTests : IClassFixture<IntegrationTestFixtur
         order.RecalculatePaymentStatus();
         Assert.Equal(5, order.Lines.First().RefundedQuantity);
         Assert.Equal(PurchasePaymentStatus.PartiallyPaid, order.PaymentStatus);
-        Assert.Equal(750, order.GetPaidAmount());
+        Assert.Equal(750, order.GetTotalPaid());
 
         // 5. Refund remaining stock (15)
         await _purchaseServices.RefundAsync(new RefundPurchaseOrderRequest
