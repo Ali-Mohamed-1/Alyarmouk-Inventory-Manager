@@ -5,6 +5,7 @@ using Inventory.Application.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 
 
+
 namespace Inventory.Web.Controllers;
 
 public sealed class DashboardController : Controller

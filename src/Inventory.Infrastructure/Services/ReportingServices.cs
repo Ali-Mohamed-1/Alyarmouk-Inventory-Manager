@@ -309,7 +309,7 @@ namespace Inventory.Infrastructure.Services
 
             // Bank Balance (Global / Running Total)
             // Rule: Base + All Revenue - All Expenses - Net Taxes (Global)
-            const decimal BaseBankBalance = 100.0m;
+            const decimal BaseBankBalance = 0m;
 
             // 1. All Time Revenue (and Tax components)
             var allRevenue = await (from t in _db.FinancialTransactions
