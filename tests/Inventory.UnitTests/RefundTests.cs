@@ -36,12 +36,11 @@ namespace Inventory.UnitTests
             _db = new AppDbContext(options);
             _db.Database.EnsureCreated();
 
-            var auditMock = new MockAuditLogWriter();
             _inventoryServices = new CapturingInventoryServices();
             _financialServices = new CapturingFinancialServices();
 
-            _salesServices = new SalesOrderServices(_db, auditMock, _inventoryServices, _financialServices);
-            _purchaseServices = new PurchaseOrderServices(_db, auditMock, _inventoryServices, _financialServices);
+            _salesServices = new SalesOrderServices(_db, _inventoryServices, _financialServices);
+            _purchaseServices = new PurchaseOrderServices(_db, _inventoryServices, _financialServices);
 
             _user = new UserContext("test-user", "Test User");
 
@@ -288,10 +287,10 @@ namespace Inventory.UnitTests
                  Amount = 20
              }, _user);
 
-             // Assert: Net Paid should be 30 (50 - 20)
+             // Assert: Net Cash should be 30 (50 - 20)
              var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
              Assert.Equal(20, order.RefundedAmount);
-             Assert.Equal(30, order.GetPaidAmount());
+             Assert.Equal(30, order.GetNetCash());
              Assert.Equal(PaymentStatus.PartiallyPaid, order.PaymentStatus);
         }
 
@@ -354,8 +353,8 @@ namespace Inventory.UnitTests
             _db.ChangeTracker.Clear();
             var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
             Assert.Equal(PaymentStatus.PartiallyPaid, order.PaymentStatus);
-            Assert.Equal(300, order.GetPaidAmount());
-            Assert.Equal(700, order.GetRemainingAmount());
+            Assert.Equal(300, order.GetTotalPaid());
+            Assert.Equal(700, order.GetPendingAmount());
         }
 
         [Fact]
@@ -393,8 +392,8 @@ namespace Inventory.UnitTests
             _db.ChangeTracker.Clear();
             var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
             Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
-            Assert.Equal(1000, order.GetPaidAmount());
-            Assert.Equal(0, order.GetRemainingAmount());
+            Assert.Equal(1000, order.GetTotalPaid());
+            Assert.Equal(0, order.GetPendingAmount());
             Assert.Equal(3, order.Payments.Count(p => p.PaymentType == PaymentRecordType.Payment));
         }
 
@@ -431,8 +430,8 @@ namespace Inventory.UnitTests
             // Assert full payment
             var orderFull = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
             Assert.Equal(PaymentStatus.Paid, orderFull.PaymentStatus);
-            Assert.Equal(1000, orderFull.GetPaidAmount());
-            Assert.Equal(0, orderFull.GetRemainingAmount());
+            Assert.Equal(1000, orderFull.GetTotalPaid());
+            Assert.Equal(0, orderFull.GetPendingAmount());
         }
 
         [Fact]
@@ -475,11 +474,11 @@ namespace Inventory.UnitTests
             }, _user);
             _db.ChangeTracker.Clear();
 
-            // Assert: Status should downgrade
+            // Assert: Status should NOT downgrade (PaymentStatus reflects collection, not net position)
             var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId);
-            Assert.Equal(PaymentStatus.PartiallyPaid, order.PaymentStatus);
-            Assert.Equal(70, order.GetPaidAmount());  // 100 paid - 30 refunded
-            Assert.Equal(30, order.GetRemainingAmount());
+            Assert.Equal(PaymentStatus.Paid, order.PaymentStatus); // Still Paid (collected 100)
+            Assert.Equal(70, order.GetNetCash());  // 100 paid - 30 refunded
+            Assert.Equal(0, order.GetPendingAmount()); // Nothing pending (already collected full amount)
         }
 
         private async Task<long> CreateSalesOrderWithTotalAsync(decimal total)
@@ -607,12 +606,5 @@ namespace Inventory.UnitTests
         }
     }
 
-    public class MockAuditLogWriter : IAuditLogWriter
-    {
-        public Task LogCreateAsync<T>(object entityId, UserContext user, object? afterState = null, CancellationToken ct = default) where T : class => Task.CompletedTask;
-        public Task LogUpdateAsync<T>(object entityId, UserContext user, object? beforeState = null, object? afterState = null, CancellationToken ct = default) where T : class => Task.CompletedTask;
-        public Task LogDeleteAsync<T>(object entityId, UserContext user, object? beforeState = null, CancellationToken ct = default) where T : class => Task.CompletedTask;
-        public Task LogAsync(string entityType, string entityId, AuditAction action, UserContext user, string? changesJson = null, CancellationToken ct = default) => Task.CompletedTask;
-    }
 }
 }

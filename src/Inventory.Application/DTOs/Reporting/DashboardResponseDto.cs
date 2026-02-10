@@ -7,14 +7,5 @@ namespace Inventory.Application.DTOs.Reporting
         public int LowStockCount { get; init; }
         public int TotalSalesOrders { get; init; }
         public int TotalPurchaseOrders { get; init; }
-
-        public IReadOnlyList<DashboardStockByCategoryPointDto> StockByCategory { get; init; } =
-            Array.Empty<DashboardStockByCategoryPointDto>();
-    }
-
-    public record DashboardStockByCategoryPointDto
-    {
-        public string CategoryName { get; init; } = string.Empty;
-        public decimal OnHand { get; init; }
     }
 }

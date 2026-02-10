@@ -1,88 +1,94 @@
-@model Inventory.Application.DTOs.SalesOrder.CreateSalesOrderRequest
+@model Inventory.Application.DTOs.PurchaseOrder.CreatePurchaseOrderRequest
 @{
-    ViewData["Title"] = "Create Sales Order";
-    var customers = ViewBag.Customers as IEnumerable<Inventory.Application.DTOs.Customer.CustomerResponseDto> ?? new List<Inventory.Application.DTOs.Customer.CustomerResponseDto>();
+    ViewData["Title"] = "Record Historical Purchase Order";
+    var suppliers = ViewBag.Suppliers as IEnumerable<Inventory.Application.DTOs.Supplier.SupplierDropdownResponse> ?? new List<Inventory.Application.DTOs.Supplier.SupplierDropdownResponse>();
+    var products = ViewBag.Products as IEnumerable<Inventory.Application.DTOs.Product.ProductResponseDto> ?? new List<Inventory.Application.DTOs.Product.ProductResponseDto>();
 }
 
 <style>
-    /* Hide number input arrows/spinners */
-    /* Chrome, Safari, Edge, Opera */
-    input::-webkit-outer-spin-button, 
-    input::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-
-    /* Firefox */
-    input[type=number] {
-      -moz-appearance: textfield;
-    }
+    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
 </style>
 
 <div class="container-fluid py-3">
+    <div class="alert alert-warning border-3 fw-bold mb-4">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        HISTORICAL MODE: Recording past purchase. Stock will NOT be added to inventory upon creation. You must manually activate stock later if desired.
+    </div>
+
     <div class="d-flex justify-content-between align-items-center mb-5">
-        <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Issue New <span class="text-primary">Sales Order</span></h1>
+        <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Record <span class="text-warning">Historical Purchase</span></h1>
         
-        <div>
-            <a asp-controller="Dashboard" asp-action="Index" class="text-decoration-none text-muted small fw-bold mb-2 d-block">
-                <i class="bi bi-arrow-left me-1"></i> BACK
+        <div class="ms-auto">
+            <a asp-controller="RecordHistory" asp-action="Index" class="text-decoration-none text-muted small fw-bold mb-0">
+                <i class="bi bi-arrow-left me-1"></i> BACK TO HISTORY
             </a>
-            <h1 class="display-5 fw-black text-uppercase mb-0">New Sales Order</h1>
-        </div>
-        <div class="d-flex align-items-center gap-3">
-            <!-- This div was empty in the provided snippet, keeping it as is or removing if not needed -->
         </div>
     </div>
 
     <form asp-action="Create" method="post" id="createOrderForm">
         @Html.AntiForgeryToken()
+        <input type="hidden" name="IsHistorical" value="true" />
+        <input type="hidden" name="ConnectToReceiveStock" value="false" />
+
         <div class="row g-5">
-            <!-- Left Side: Order Params & Financials -->
+            <!-- Left Side -->
             <div class="col-lg-3">
                 <div class="neo-card p-0 overflow-hidden mb-4">
-                    <div class="p-3 bg-black text-white">
-                        <h5 class="mb-0 fw-black text-uppercase small">Order Parameters</h5>
+                    <div class="p-3 bg-warning text-dark">
+                        <h5 class="mb-0 fw-black text-uppercase small">Historical Record Params</h5>
                     </div>
                     <div class="p-4" style="background: white;">
                         <div class="mb-4">
-                            <label asp-for="CustomerId" class="form-label fw-black text-uppercase small">Target Customer</label>
-                            <select asp-for="CustomerId" class="form-select fw-bold" required>
-                                <option value="">-- SELECT CUSTOMER --</option>
-                                @foreach (var c in customers)
+                            <label asp-for="SupplierId" class="form-label fw-black text-uppercase small">Supplier</label>
+                            <select asp-for="SupplierId" class="form-select fw-bold" required>
+                                <option value="">-- SELECT SUPPLIER --</option>
+                                @foreach (var s in suppliers)
                                 {
-                                    <option value="@c.Id">@c.Name.ToUpper()</option>
+                                    <option value="@s.Id">@s.Name.ToUpper()</option>
                                 }
                             </select>
-                            <span asp-validation-for="CustomerId" class="text-danger small fw-bold"></span>
+                            <span asp-validation-for="SupplierId" class="text-danger small fw-bold"></span>
                         </div>
 
                         <div class="mb-4">
-                            <label asp-for="OrderDate" class="form-label fw-black text-uppercase small">Order Timestamp</label>
-                            <input asp-for="OrderDate" type="date" class="form-control fw-bold" value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                            <label asp-for="OrderDate" class="form-label fw-black text-uppercase small">Original Order Date</label>
+                            <input asp-for="OrderDate" type="date" class="form-control fw-bold" required />
+                            <span asp-validation-for="OrderDate" class="text-danger small fw-bold"></span>
+                        </div>
+                        
+                        <div class="mb-4">
+                             <label name="Status" class="form-label fw-black text-uppercase small">Historical Status</label>
+                             <select name="Status" class="form-select fw-bold">
+                                 <option value="Received" selected>RECEIVED (Stock In Hand)</option>
+                                 <option value="Pending">PENDING (Not Received)</option>
+                             </select>
+                             <div class="form-text small">
+                                 "Received" implies you physically received execution in the past. Stock impact is deferred.
+                             </div>
                         </div>
 
                         <div class="mb-4">
-                            <label asp-for="DueDate" class="form-label fw-black text-uppercase small">Deadline / Due Date</label>
-                            <input asp-for="DueDate" type="date" class="form-control fw-bold" value="@DateTime.Today.AddDays(7).ToString("yyyy-MM-dd")" required />
-                            <span asp-validation-for="DueDate" class="text-danger small fw-bold"></span>
+                            <label asp-for="DueDate" class="form-label fw-black text-uppercase small">Payment Deadline</label>
+                            <input asp-for="DueDate" type="date" class="form-control fw-bold" />
                         </div>
 
                         <div class="mb-0">
-                            <label asp-for="Note" class="form-label fw-black text-uppercase small">Operational Notes</label>
-                            <textarea asp-for="Note" class="form-control fw-bold" rows="3" placeholder="Additional context..."></textarea>
+                            <label asp-for="Note" class="form-label fw-black text-uppercase small">Legacy Notes</label>
+                            <textarea asp-for="Note" class="form-control fw-bold" rows="3" placeholder="Original PO ref..."></textarea>
                         </div>
                     </div>
                 </div>
 
-                <!-- Payment Details -->
+                <!-- Financials -->
                 <div class="neo-card p-0 overflow-hidden mb-4" style="background: var(--neo-yellow);">
-                    <div class="p-3 bg-black text-white">
-                        <h5 class="mb-0 fw-black text-uppercase small">Financial Context</h5>
+                    <div class="p-3 bg-warning text-dark">
+                        <h5 class="mb-0 fw-black text-uppercase small">Settlement Record</h5>
                     </div>
-                    <div class="p-4 bg-dark">
+                     <div class="p-4 bg-dark">
                         <div class="mb-4">
-                            <label asp-for="PaymentMethod" class="form-label fw-black text-uppercase small text-white">Method of Settlement</label>
-                            <select asp-for="PaymentMethod" class="form-select fw-black" id="paymentMethodSelect" onchange="togglePaymentFields()">
+                            <label asp-for="PaymentMethod" class="form-label fw-black text-uppercase small text-white">Method</label>
+                            <select asp-for="PaymentMethod" class="form-select fw-black">
                                 <option value="1">CASH</option>
                                 <option value="2">CHECK / CHEQUE</option>
                                 <option value="3">BANK TRANSFER</option>
@@ -90,44 +96,26 @@
                         </div>
 
                         <div class="mb-4">
-                            <label asp-for="PaymentStatus" class="form-label fw-black text-uppercase small text-white">Initial Pay Status</label>
+                            <label asp-for="PaymentStatus" class="form-label fw-black text-uppercase small text-white">Payment Status</label>
                             <select asp-for="PaymentStatus" class="form-select fw-black text-center">
-                                <option value="0">PENDING</option>
-                                <option value="1">PAID UPON ISSUANCE</option>
+                                <option value="1">PAID</option> <!-- 1 is Paid for PO -->
+                                <option value="0">UNPAID</option>
                             </select>
                         </div>
 
-                        <!-- Check Fields -->
-                        <div id="checkFields" style="display: none;" class="neo-card p-4 bg-white mb-4 border-2">
-                            <h6 class="fw-black text-uppercase small mb-4 border-bottom border-2 pb-2">Check Details</h6>
-                            <div class="form-check mb-3">
-                                <input asp-for="CheckReceived" class="form-check-input" type="checkbox" id="checkReceived">
-                                <label class="form-check-label fw-bold small ms-2" for="checkReceived">RECEIVED</label>
-                            </div>
-                            <div class="mb-0">
-                                <label asp-for="CheckReceivedDate" class="form-label fw-bold small text-muted">RECEIVE DATE</label>
-                                <input asp-for="CheckReceivedDate" type="date" class="form-control fw-bold">
-                            </div>
-                        </div>
-
-                        <!-- Bank Transfer Fields -->
-                        <div id="bankFields" style="display: none;" class="neo-card p-4 bg-white mb-4 border-2">
-                            <h6 class="fw-black text-uppercase small mb-4 border-bottom border-2 pb-2">Transfer Details</h6>
-                            <div class="mb-0">
-                                <label asp-for="TransferId" class="form-label fw-bold small text-muted">REFERENCE ID / TRACE</label>
-                                <input asp-for="TransferId" class="form-control fw-bold" placeholder="e.g. TR-999999">
-                                <span asp-validation-for="TransferId" class="text-danger small fw-bold"></span>
-                            </div>
+                        <div class="mb-4">
+                            <label asp-for="ReceiptExpenses" class="form-label fw-black text-uppercase small text-white">Receipt Expenses</label>
+                            <input asp-for="ReceiptExpenses" type="number" step="0.01" class="form-control fw-black bg-white small" placeholder="0.00" />
                         </div>
 
                         <div class="neo-card p-3 bg-white mb-0 border-2">
-                            <div class="form-check mb-3">
-                                <input asp-for="ApplyVat" class="form-check-input" type="checkbox" checked>
-                                <label class="form-check-label fw-black text-uppercase small ms-2" asp-for="ApplyVat">Apply VAT (14%)</label>
+                            <div class="form-check mb-2">
+                                <input asp-for="ApplyVat" class="form-check-input" type="checkbox" checked onchange="calculateTotals()">
+                                <label class="form-check-label fw-black small ms-2" asp-for="ApplyVat">Apply VAT (14%)</label>
                             </div>
                             <div class="form-check mb-0">
-                                <input asp-for="ApplyManufacturingTax" class="form-check-input" type="checkbox" checked>
-                                <label class="form-check-label fw-black text-uppercase small ms-2" asp-for="ApplyManufacturingTax">Apply MAN. Tax (1%)</label>
+                                <input asp-for="ApplyManufacturingTax" class="form-check-input" type="checkbox" checked onchange="calculateTotals()">
+                                <label class="form-check-label fw-black small ms-2" asp-for="ApplyManufacturingTax">Apply MAN. Tax (1%)</label>
                             </div>
                         </div>
                     </div>
@@ -137,13 +125,17 @@
             <!-- Right Side: Order Items -->
             <div class="col-lg-9">
                 <div class="neo-card p-0 h-100 d-flex flex-column">
-                    <div class="p-3 bg-black text-white d-flex justify-content-between align-items-center">
+                    <div class="p-3 bg-warning text-dark d-flex justify-content-between align-items-center">
                         <h5 class="mb-0 fw-black text-uppercase small">Inventory Line Items</h5>
                         <button type="button" class="neo-btn neo-btn-success btn-sm" onclick="addLineItem()">
                             <i class="bi bi-plus-lg"></i> ADD ITEM
                         </button>
                     </div>
                     <div class="p-0 flex-grow-1" style="background: white;">
+                        <div class="alert alert-info border-0 rounded-0 mb-0 small">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Select existing batches if possible. If stock was different in the past, ensure you have a batch to reference, or select any batch if you don't intend to activate stock for inventory tracking.
+                        </div>
                         <div class="w-100" style="min-height: 300px; overflow: visible;">
                             <table class="table table-hover align-middle mb-0" id="itemsTable">
                                 <thead class="table-dark text-white small text-uppercase fw-black">
@@ -151,7 +143,7 @@
                                         <th style="width: 40%; min-width: 300px;" class="ps-4">PRODUCT RECORD</th>
                                         <th style="width: 25%; min-width: 200px;">BATCH / LOT</th>
                                         <th style="width: 15%">QUANTITY</th>
-                                        <th style="width: 15%">UNIT PRICE</th>
+                                        <th style="width: 15%">UNIT COST</th>
                                         <th style="width: 5%" class="text-end pe-4">TRASH</th>
                                     </tr>
                                 </thead>
@@ -187,12 +179,17 @@
                                     <span class="fw-black text-uppercase small text-muted">MAN. TAX (1%):</span>
                                     <span id="displayManTax" class="fw-black text-muted">$0.00</span>
                                 </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="fw-black text-uppercase small text-muted">RECEIPT EXPENSES:</span>
+                                    <span id="displayReceiptExp" class="fw-black text-muted">$0.00</span>
+                                </div>
+
                                 <div class="d-flex justify-content-between mb-4 border-top border-2 pt-2">
                                     <span class="fw-black text-uppercase fs-5">EST. GRAND TOTAL:</span>
                                     <span id="displayTotal" class="fw-black fs-4 text-success">$0.00</span>
                                 </div>
-                                <button type="submit" class="neo-btn neo-btn-primary w-100 py-3 fw-black fs-5">
-                                    <i class="bi bi-check2-circle me-2"></i> EXECUTE ORDER
+                                <button type="submit" class="neo-btn neo-btn-warning w-100 py-3 fw-black fs-5">
+                                    <i class="bi bi-check2-circle me-2"></i> RECORD PURCHASE
                                 </button>
                             </div>
                         </div>
@@ -231,18 +228,15 @@
             try {
                 const response = await fetch(`/api/products/${productId}/batches`);
                 const allBatches = await response.json();
-                // Filter out zero stock batches
-                return allBatches.filter(b => (b.onHand && b.onHand > 0));
+                return allBatches; // For purchases, show all, even 0 stock batches if they exist
             } catch (error) {
                 console.error('Error loading batches:', error);
                 return [];
             }
         }
 
-        // Custom Dropdown Helper
         function setupDropdown(input, list, items, onSelect, itemRenderer) {
             const show = () => {
-                // Close others
                 document.querySelectorAll('.searchable-dropdown .dropdown-menu.show').forEach(m => m !== list && m.classList.remove('show'));
                 
                 list.innerHTML = '';
@@ -257,10 +251,10 @@
                         const li = document.createElement('li');
                         li.className = 'dropdown-item small py-2 border-bottom';
                         li.style.cursor = 'pointer';
-                        li.style.whiteSpace = 'normal'; // Allow text wrapping
+                        li.style.whiteSpace = 'normal';
                         li.innerHTML = rendered.html;
                         li.onclick = () => {
-                            input.value = rendered.text; // Set display value
+                            input.value = rendered.text;
                             onSelect(item);
                             list.classList.remove('show');
                         };
@@ -275,7 +269,8 @@
         }
 
         function addLineItem() {
-            if (products.length === 0) return;
+            if (products.length === 0 && lineCount > 0) return; // Prevent adding if products not loaded yet
+            
             const container = document.getElementById('lineItemsContainer');
             const emptyState = document.getElementById('emptyState');
             emptyState.style.display = 'none';
@@ -283,13 +278,11 @@
             const idx = lineCount++;
             const row = document.createElement('tr'); row.id = `line-row-${idx}`;
             
-            // Generate HTML structure
             row.innerHTML = `
                 <td class="ps-4 py-3 align-top">
                     <div class="searchable-dropdown position-relative" id="product-dropdown-${idx}">
                         <input type="text" class="form-control fw-black text-uppercase" placeholder="SEARCH PRODUCT..." id="product-search-${idx}" autocomplete="off">
                         <input type="hidden" name="Lines[${idx}].ProductId" id="product-id-input-${idx}" required>
-                         <input type="hidden" name="Lines[${idx}].ProductName" id="product-name-input-${idx}">
                         <ul class="dropdown-menu w-100 shadow-lg border-0 rounded-0" id="product-list-${idx}" style="max-height: 300px; overflow-y: auto;"></ul>
                     </div>
                 </td>
@@ -297,7 +290,6 @@
                     <div class="searchable-dropdown position-relative" id="batch-dropdown-${idx}">
                         <input type="text" class="form-control fw-bold small" placeholder="SELECT BATCH" id="batch-search-${idx}" disabled autocomplete="off">
                         <input type="hidden" name="Lines[${idx}].BatchNumber" id="batch-number-input-${idx}" required>
-                        <input type="hidden" name="Lines[${idx}].ProductBatchId" id="batch-id-input-${idx}">
                         <ul class="dropdown-menu w-100 shadow-lg border-0 rounded-0" id="batch-list-${idx}" style="max-height: 300px; overflow-y: auto;"></ul>
                     </div>
                 </td>
@@ -315,25 +307,33 @@
             `;
             container.appendChild(row);
 
-            // Bind Product Dropdown
             const pInput = document.getElementById(`product-search-${idx}`);
             const pList = document.getElementById(`product-list-${idx}`);
             
+            // If products aren't loaded yet, we'll need to wait
+            if (products.length === 0) {
+                 // Skip dropdown setup until loaded
+            } else {
+                setupProductDropdown(idx);
+            }
+
+            calculateTotals();
+        }
+
+        function setupProductDropdown(idx) {
+            const pInput = document.getElementById(`product-search-${idx}`);
+            const pList = document.getElementById(`product-list-${idx}`);
+
             setupDropdown(pInput, pList, products, async (product) => {
-                // On Product Select
                 document.getElementById(`product-id-input-${idx}`).value = product.productId;
-                document.getElementById(`product-name-input-${idx}`).value = product.name;
                 document.getElementById(`price-input-${idx}`).value = "0.00";
                 
-                // Reset Batch
                 const bInput = document.getElementById(`batch-search-${idx}`);
                 const bList = document.getElementById(`batch-list-${idx}`);
                 bInput.value = '';
                 bInput.disabled = true;
                 document.getElementById(`batch-number-input-${idx}`).value = '';
-                document.getElementById(`batch-id-input-${idx}`).value = '';
                 
-                // Load Batches
                 const batches = await fetchBatches(product.productId);
                 
                 if (batches.length > 0) {
@@ -341,34 +341,34 @@
                     bInput.placeholder = "SELECT BATCH...";
                     
                     setupDropdown(bInput, bList, batches, (batch) => {
-                        // On Batch Select
                         document.getElementById(`batch-number-input-${idx}`).value = batch.batchNumber;
-                        document.getElementById(`batch-id-input-${idx}`).value = batch.id;
-                        
-                        // Auto-load Price (handle camelCase or PascalCase)
-                        const price = batch.unitPrice || batch.UnitPrice || 0;
-                        document.getElementById(`price-input-${idx}`).value = price.toFixed(2);
+                        const cost = batch.unitCost || batch.UnitCost || 0;
+                        document.getElementById(`price-input-${idx}`).value = cost.toFixed(2);
                         calculateTotals();
                     }, (batch) => {
-                        // Batch Renderer
+                        const cost = batch.unitCost || batch.UnitCost || 0;
                         return {
                             text: batch.batchNumber,
                             html: `
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="fw-bold">${batch.batchNumber}</span>
-                                    <span class="badge bg-dark text-white rounded-pill">Qty: ${batch.onHand}</span>
+                                    <span class="badge bg-dark text-white rounded-pill">Stock: ${batch.onHand}</span>
                                 </div>
-                                <div class="small text-muted">Price: $${(batch.unitPrice||0).toFixed(2)}</div>
+                                <div class="small text-muted">Cost: $${cost.toFixed(2)}</div>
                             `
                         };
                     });
                 } else {
-                    bInput.placeholder = "NO STOCK AVAILABLE";
+                    bInput.disabled = false;
+                    bInput.placeholder = "NEW BATCH (OR TYPE)";
+                    // Allow typing manual batch if none exist
+                    bInput.onchange = () => {
+                        document.getElementById(`batch-number-input-${idx}`).value = bInput.value;
+                    };
                 }
 
                 calculateTotals();
             }, (product) => {
-                // Product Renderer
                 return {
                     text: product.name.toUpperCase(),
                     html: `
@@ -380,8 +380,6 @@
                     `
                 };
             });
-
-            calculateTotals();
         }
 
         function removeLineItem(idx) {
@@ -403,6 +401,7 @@
             }
             subtotal = round(subtotal);
             
+            const receiptExp = round(parseFloat(document.querySelector('[name="ReceiptExpenses"]').value) || 0);
             const applyVat = document.querySelector('[name="ApplyVat"]').checked;
             const applyManTax = document.querySelector('[name="ApplyManufacturingTax"]').checked;
 
@@ -412,26 +411,29 @@
             if (applyVat) vat = round(subtotal * 0.14);
             if (applyManTax) manTax = round(subtotal * 0.01);
 
-            // Man Tax is subtracted
-            const grandTotal = round(subtotal + vat - manTax);
+            const grandTotal = round(subtotal + vat - manTax + receiptExp);
 
             document.getElementById('displaySubtotal').textContent = formatCurrency(subtotal);
             document.getElementById('displayVat').textContent = formatCurrency(vat);
             document.getElementById('displayManTax').textContent = (manTax > 0 ? "-" : "") + formatCurrency(manTax);
+            document.getElementById('displayReceiptExp').textContent = formatCurrency(receiptExp);
             document.getElementById('displayTotal').textContent = formatCurrency(grandTotal);
-        }
 
-        function togglePaymentFields() {
-            const method = document.getElementById('paymentMethodSelect').value;
-            document.getElementById('checkFields').style.display = (method === '2') ? 'block' : 'none';
-            document.getElementById('bankFields').style.display = (method === '3') ? 'block' : 'none';
         }
 
         function formatCurrency(a) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(a); }
 
-        loadProducts();
-        document.querySelectorAll('[name="ApplyVat"], [name="ApplyManufacturingTax"]').forEach(input => {
+        (async function() {
+            await loadProducts();
+            // After loading, ensure any existing line item dropdowns are bound
+            for(let i=0; i<lineCount; i++) {
+                if(document.getElementById(`product-search-${i}`)) setupProductDropdown(i);
+            }
+        })();
+
+        document.querySelectorAll('[name="ApplyVat"], [name="ApplyManufacturingTax"], [name="ReceiptExpenses"]').forEach(input => {
             input.addEventListener('change', calculateTotals);
+            if (input.name === "ReceiptExpenses") input.addEventListener('input', calculateTotals);
         });
     </script>
 }

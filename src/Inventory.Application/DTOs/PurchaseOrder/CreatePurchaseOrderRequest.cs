@@ -14,10 +14,21 @@ namespace Inventory.Application.DTOs.PurchaseOrder
         public string? Note { get; set; }
 
         public DateTimeOffset? DueDate { get; set; }
+        public DateTimeOffset? OrderDate { get; set; }
         public bool ConnectToReceiveStock { get; set; } = true;
 
         public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.Cash; // Default to Cash
         public PurchasePaymentStatus PaymentStatus { get; set; } = PurchasePaymentStatus.Unpaid; // Default to Unpaid
+
+        /// <summary>
+        /// Indicates if this order is a historical record.
+        /// </summary>
+        public bool IsHistorical { get; set; }
+
+        /// <summary>
+        /// Explicitly set status (e.g. for historical orders). Defaults to Pending.
+        /// </summary>
+        public PurchaseOrderStatus? Status { get; set; }
 
         // Tax Configuration
         public bool IsTaxInclusive { get; set; } = false;

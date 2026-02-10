@@ -15,12 +15,10 @@ namespace Inventory.Infrastructure.Services
     public sealed class SupplierServices : ISupplierServices
     {
         private readonly AppDbContext _db;
-        private readonly IAuditLogWriter _auditWriter;
 
-        public SupplierServices(AppDbContext db, IAuditLogWriter auditWriter)
+        public SupplierServices(AppDbContext db)
         {
             _db = db;
-            _auditWriter = auditWriter;
         }
 
         public async Task<IEnumerable<SupplierResponse>> GetAllAsync(CancellationToken ct = default)
@@ -56,7 +54,6 @@ namespace Inventory.Infrastructure.Services
             _db.Suppliers.Add(supplier);
             await _db.SaveChangesAsync(ct);
 
-            await _auditWriter.LogCreateAsync<Supplier>(supplier.Id, user, supplier, ct);
 
             return supplier.Id;
         }
@@ -76,7 +73,6 @@ namespace Inventory.Infrastructure.Services
 
             await _db.SaveChangesAsync(ct);
 
-            await _auditWriter.LogUpdateAsync<Supplier>(id, user, before, supplier, ct);
         }
 
         public async Task SetActiveAsync(int id, bool isActive, UserContext user, CancellationToken ct = default)
@@ -89,7 +85,6 @@ namespace Inventory.Infrastructure.Services
 
             await _db.SaveChangesAsync(ct);
 
-            await _auditWriter.LogUpdateAsync<Supplier>(id, user, before, new { IsActive = isActive }, ct);
         }
 
         public async Task<IEnumerable<SupplierDropdownResponse>> GetForDropdownAsync(CancellationToken ct = default)
@@ -168,10 +163,6 @@ namespace Inventory.Infrastructure.Services
 
             await _db.SaveChangesAsync(ct);
             
-            // Log update? 
-            // Since it's a relation change, tracking it in generic AuditLog might be tricky without custom handling.
-            // For now, we'll skip detailed relation auditing or log a generic update.
-            await _auditWriter.LogUpdateAsync<Supplier>(supplierId, user, null, new { ProductCount = productsToAdd.Count }, ct);
         }
 
         private static SupplierResponse MapToResponse(Supplier s)

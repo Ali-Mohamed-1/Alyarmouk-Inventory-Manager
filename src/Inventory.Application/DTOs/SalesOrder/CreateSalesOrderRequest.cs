@@ -68,6 +68,18 @@ namespace Inventory.Application.DTOs.SalesOrder
         public bool ApplyVat { get; init; } = true;
         public bool ApplyManufacturingTax { get; init; } = true;
 
+
+
+        /// <summary>
+        /// Indicates if this order is a historical record.
+        /// </summary>
+        public bool IsHistorical { get; init; }
+
+        /// <summary>
+        /// Explicitly set status (e.g. for historical orders). Defaults to Pending.
+        /// </summary>
+        public SalesOrderStatus? Status { get; init; }
+
         [Required]
         [MinLength(1, ErrorMessage = "An order must have at least one line item.")]
         public List<CreateSalesOrderLineRequest> Lines { get; init; } = new();

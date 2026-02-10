@@ -36,10 +36,6 @@
                     </div>
                     <div class="row g-4 mb-4">
                         <div class="col-6">
-                            <label class="fw-black text-uppercase small text-muted d-block mb-1">Category</label>
-                            <span class="badge neo-btn-info w-100 py-2">@Model.CategoryName.ToUpper()</span>
-                        </div>
-                        <div class="col-6">
                             <label class="fw-black text-uppercase small text-muted d-block mb-1">Operational State</label>
                             @if (Model.IsActive)
                             {
@@ -72,18 +68,6 @@
                 </div>
             </div>
 
-            <div class="neo-card p-0 overflow-hidden">
-                <div class="p-4 bg-black text-white">
-                    <h5 class="mb-0 fw-black text-uppercase">Movement Audit Log</h5>
-                </div>
-                <div class="p-5 text-center" style="background: white;">
-                    <div class="py-5">
-                        <i class="bi bi-clock-history text-muted" style="font-size: 3rem; opacity: 0.3;"></i>
-                        <p class="mt-4 fw-bold text-muted">HISTORICAL DATA TRACE IS CURRENTLY OFFLINE FOR THIS NODE.</p>
-                        <p class="small text-muted mb-0">TRANSACTION SYNC WILL APPEAR AUTOMATICALLY ON NEXT REVISION.</p>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>

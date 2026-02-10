@@ -12,10 +12,8 @@ namespace Inventory.Infrastructure.Data
         }
 
         public DbSet<Product> Products { get; set; }
-        public DbSet<Category> categories { get; set; }
         public DbSet<InventoryTransaction> InventoryTransactions { get; set; }
         public DbSet<StockSnapshot> StockSnapshots { get; set; }
-        public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<Supplier> Suppliers { get; set; }
         public DbSet<Customer> Customers { get; set; }
         public DbSet<SalesOrder> SalesOrders { get; set; }
@@ -27,15 +25,12 @@ namespace Inventory.Infrastructure.Data
         public DbSet<RefundTransaction> RefundTransactions { get; set; }
         public DbSet<RefundTransactionLine> RefundTransactionLines { get; set; }
         public DbSet<PaymentRecord> PaymentRecords { get; set; }
+        public DbSet<BankSystemSettings> BankSystemSettings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
 
-            builder.Entity<Category>(c =>
-            {
-                c.Property(c => c.Name).IsRequired().HasMaxLength(200);
-            });
 
             builder.Entity<Product>(b =>
             {
@@ -46,7 +41,6 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.ReorderPoint).HasPrecision(18, 2);
 
                 b.Property(x => x.RowVersion).IsRowVersion();
-                b.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
             });
 
             builder.Entity<StockSnapshot>(b =>
@@ -71,16 +65,6 @@ namespace Inventory.Infrastructure.Data
                 b.HasOne(x => x.ProductBatch).WithMany().HasForeignKey(x => x.ProductBatchId).OnDelete(DeleteBehavior.Restrict);
             });
 
-            builder.Entity<AuditLog>(b =>
-            {
-                b.Property(x => x.EntityType).HasMaxLength(100).IsRequired();
-                b.Property(x => x.EntityId).HasMaxLength(100).IsRequired();
-                b.Property(x => x.UserId).HasMaxLength(450).IsRequired();
-                b.Property(x => x.UserDisplayName).HasMaxLength(200).IsRequired();
-                b.Property(x => x.ChangesJson).HasMaxLength(4000);
-                b.HasIndex(x => x.TimestampUtc);
-                b.HasIndex(x => new { x.EntityType, x.EntityId });
-            });
 
             builder.Entity<Customer>(b =>
             {
@@ -157,6 +141,7 @@ namespace Inventory.Infrastructure.Data
                 b.Property(o => o.VatAmount).HasPrecision(18, 2);
                 b.Property(o => o.ManufacturingTaxAmount).HasPrecision(18, 2);
                 b.Property(o => o.ReceiptExpenses).HasPrecision(18, 2);
+                b.Property(o => o.OrderDate).IsRequired();
                 b.Property(o => o.RefundedAmount).HasPrecision(18, 2);
 
                 b.HasOne(o => o.Supplier)
