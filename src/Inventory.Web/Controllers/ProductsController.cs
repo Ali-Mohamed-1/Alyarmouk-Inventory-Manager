@@ -10,7 +10,7 @@ namespace Inventory.Web.Controllers;
 public sealed class ProductsController : Controller
 {
     private readonly IProductServices _products;
-    
+
     public ProductsController(IProductServices products)
     {
         _products = products;
@@ -35,7 +35,7 @@ public sealed class ProductsController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Create(CancellationToken cancellationToken)
+    public IActionResult Create()
     {
         return View(new CreateProductRequest());
     }

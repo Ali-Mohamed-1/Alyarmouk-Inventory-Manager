@@ -42,7 +42,6 @@ public static class TestDataSeeder
         db.ProductBatches.RemoveRange(await db.ProductBatches.ToListAsync(ct));
         db.StockSnapshots.RemoveRange(await db.StockSnapshots.ToListAsync(ct));
         db.FinancialTransactions.RemoveRange(await db.FinancialTransactions.ToListAsync(ct));
-        db.AuditLogs.RemoveRange(await db.AuditLogs.ToListAsync(ct));
         db.Products.RemoveRange(await db.Products.ToListAsync(ct));
         db.Customers.RemoveRange(await db.Customers.ToListAsync(ct));
         db.Suppliers.RemoveRange(await db.Suppliers.ToListAsync(ct));
@@ -51,7 +50,6 @@ public static class TestDataSeeder
 
     private static async Task SeedInternalAsync(AppDbContext db, CancellationToken ct)
     {
-
         var product = new Product
         {
             Id = 1,

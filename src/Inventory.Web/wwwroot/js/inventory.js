@@ -1,5 +1,6 @@
 // Demo data - In a real application, this would come from API calls
 const demoData = {
+    categories: [],
     products: [
         { productId: 1, sku: "CHEM-001", productName: "Sodium Hydroxide (NaOH)", onHand: 150, preserved: 25, available: 125 },
         { productId: 2, sku: "CHEM-002", productName: "Hydrochloric Acid (HCl)", onHand: 300, preserved: 50, available: 250 },
@@ -763,30 +764,6 @@ function renderTransactions() {
     `).join('');
 }
 
-// Categories Functions
-function renderCategories() {
-    const tbody = document.querySelector('#categoriesTable tbody');
-    if (!tbody) return;
-
-    if (demoData.categories.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No categories found</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = demoData.categories.map(c => {
-        const productCount = demoData.products.filter(p => p.categoryId === c.id).length;
-        return `
-            <tr>
-                <td>${c.id}</td>
-                <td><strong>${c.name}</strong></td>
-                <td><span class="badge badge-info">${productCount} product(s)</span></td>
-                <td>
-                    <button class="btn btn-outline btn-sm" onclick="editCategory(${c.id})">Edit</button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-}
 
 function showCreateCategoryModal() {
     document.getElementById('createCategoryModal').style.display = 'flex';

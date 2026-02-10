@@ -28,8 +28,6 @@ namespace Inventory.Infrastructure
             services.AddScoped<IInventoryTransactionServices, InventoryTransactionServices>();
             services.AddScoped<IStockSnapshotServices, StockSnapshotServices>();
             services.AddScoped<IReportingServices, ReportingServices>();
-            services.AddScoped<IAuditLogServices, AuditLogServices>();
-            services.AddScoped<IAuditLogWriter, AuditLogWriter>();
             services.AddScoped<ISupplierServices, SupplierServices>();
             services.AddScoped<IPurchaseOrderServices, PurchaseOrderServices>();
             services.AddScoped<IProductBatchServices, ProductBatchServices>();
