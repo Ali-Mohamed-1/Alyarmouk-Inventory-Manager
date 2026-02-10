@@ -40,17 +40,17 @@ public sealed class ExceptionHandlingMiddleware
 
         switch (ex)
         {
-            case ValidationException validationEx:
+            case Application.Exceptions.ValidationException validationEx:
                 userMessage = validationEx.Message;
                 statusCode = HttpStatusCode.BadRequest;
                 _logger.LogWarning(validationEx, "ValidationException");
                 break;
-            case NotFoundException notFoundEx:
+            case Application.Exceptions.NotFoundException notFoundEx:
                 userMessage = notFoundEx.Message;
                 statusCode = HttpStatusCode.NotFound;
                 _logger.LogWarning(notFoundEx, "NotFoundException");
                 break;
-            case ConflictException conflictEx:
+            case Application.Exceptions.ConflictException conflictEx:
                 userMessage = conflictEx.Message;
                 statusCode = HttpStatusCode.Conflict;
                 _logger.LogWarning(conflictEx, "ConflictException");
