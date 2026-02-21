@@ -41,14 +41,26 @@ public sealed class SalesOrdersController : Controller
     public async Task<IActionResult> Create(CancellationToken cancellationToken)
     {
         ViewBag.Customers = await _customers.GetForDropdownAsync(cancellationToken);
-        return View(new CreateSalesOrderRequest());
+        var now = DateTimeOffset.UtcNow;
+        return View(new CreateSalesOrderRequest 
+        { 
+            OrderDate = now,
+            DueDate = now.AddMonths(1)
+        });
     }
 
     [HttpGet]
     public async Task<IActionResult> CreateHistorical(CancellationToken cancellationToken)
     {
         ViewBag.Customers = await _customers.GetForDropdownAsync(cancellationToken);
-        return View(new CreateSalesOrderRequest { IsHistorical = true, Status = Inventory.Domain.Entities.SalesOrderStatus.Done });
+        var now = DateTimeOffset.UtcNow;
+        return View(new CreateSalesOrderRequest 
+        { 
+            IsHistorical = true, 
+            Status = Inventory.Domain.Entities.SalesOrderStatus.Done,
+            OrderDate = now,
+            DueDate = now.AddMonths(1)
+        });
     }
 
     [HttpPost]

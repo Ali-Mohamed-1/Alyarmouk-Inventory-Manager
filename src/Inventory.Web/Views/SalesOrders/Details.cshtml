@@ -166,13 +166,13 @@
             </div>
 
             <!-- Status Info -->
-            <div class="neo-card p-0 overflow-hidden mb-4 border-4 @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done ? "border-success" : "border-info") no-print">
-                <div class="p-3 @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done ? "bg-success text-white" : "bg-info text-black")">
+            <div class="neo-card p-0 overflow-hidden mb-4 border-4 @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done ? "border-success" : (Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Cancelled ? "border-danger" : "border-info")) no-print">
+                <div class="p-3 @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done ? "bg-success text-white" : (Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Cancelled ? "bg-danger text-white" : "bg-info text-black"))">
                     <h5 class="mb-0 fw-black text-uppercase small">Inherent Status</h5>
                 </div>
                 <div class="p-4 bg-white">
                     <div class="d-flex justify-content-between align-items-center mb-4">
-                        <span class="badge @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done ? "neo-btn-success" : "neo-btn-info") fs-5 p-2 px-3">
+                        <span class="badge @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Done ? "neo-btn-success" : (Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Cancelled ? "neo-btn-danger" : "neo-btn-info")) fs-5 p-2 px-3">
                             @Model.Status.ToString().ToUpper()
                         </span>
                         @if (Model.IsHistorical)
@@ -339,15 +339,13 @@
                 </a>
             </div>
             <div class="d-flex align-items-center gap-3">
-                             <div class="d-flex justify-content-between small opacity-75">
-                                 <span>PAYMENT METADATA</span>
-                                 <a href="javascript:void(0)" class="text-black no-print" onclick="openEditPaymentInfoModal()">EDIT INFO</a>
+                                 <a href="javascript:void(0)" class="text-black no-print @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Cancelled ? "d-none" : "")" onclick="openEditPaymentInfoModal()">EDIT INFO</a>
                              </div>
                         </div>
                         
                         <div class="col-12 mt-1">
                              <div class="d-flex justify-content-between small opacity-75">
-                                 <a href="javascript:void(0)" class="text-black no-print" onclick="openEditDueDateModal()">EDIT</a>
+                                 <a href="javascript:void(0)" class="text-black no-print @(Model.Status == Inventory.Domain.Entities.SalesOrderStatus.Cancelled ? "d-none" : "")" onclick="openEditDueDateModal()">EDIT</a>
                              </div>
                         </div>
                     </div>

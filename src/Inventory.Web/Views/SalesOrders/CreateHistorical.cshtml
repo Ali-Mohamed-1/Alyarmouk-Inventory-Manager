@@ -61,13 +61,13 @@
 
                         <div class="mb-4">
                             <label asp-for="OrderDate" class="form-label fw-black text-uppercase small">Original Order Date</label>
-                            <input asp-for="OrderDate" type="date" class="form-control fw-bold" required />
+                            <input asp-for="OrderDate" type="date" class="form-control fw-bold" id="OrderDateInput" value="@Model.OrderDate?.ToString("yyyy-MM-dd")" required />
                             <span asp-validation-for="OrderDate" class="text-danger small fw-bold"></span>
                         </div>
 
                         <div class="mb-4">
                             <label asp-for="DueDate" class="form-label fw-black text-uppercase small">Payment Deadline</label>
-                            <input asp-for="DueDate" type="date" class="form-control fw-bold" required />
+                            <input asp-for="DueDate" type="date" class="form-control fw-bold" id="DueDateInput" value="@Model.DueDate?.ToString("yyyy-MM-dd")" required />
                             <span asp-validation-for="DueDate" class="text-danger small fw-bold"></span>
                         </div>
                         
@@ -447,5 +447,32 @@
         document.querySelectorAll('[name="ApplyVat"], [name="ApplyManufacturingTax"]').forEach(input => {
             input.addEventListener('change', calculateTotals);
         });
+
+        // Deadline auto-calculation logic
+        let deadlineManuallyChanged = false;
+        const orderDateInput = document.getElementById('OrderDateInput');
+        const dueDateInput = document.getElementById('DueDateInput');
+
+        if (orderDateInput && dueDateInput) {
+            orderDateInput.addEventListener('change', function() {
+                if (!deadlineManuallyChanged) {
+                    const orderDate = new Date(this.value);
+                    if (!isNaN(orderDate.getTime())) {
+                        const dueDate = new Date(orderDate);
+                        dueDate.setMonth(dueDate.getMonth() + 1);
+                        
+                        // Format to yyyy-MM-dd
+                        const year = dueDate.getFullYear();
+                        const month = String(dueDate.getMonth() + 1).padStart(2, '0');
+                        const day = String(dueDate.getDate()).padStart(2, '0');
+                        dueDateInput.value = `${year}-${month}-${day}`;
+                    }
+                }
+            });
+
+            dueDateInput.addEventListener('change', function() {
+                deadlineManuallyChanged = true;
+            });
+        }
     </script>
 }

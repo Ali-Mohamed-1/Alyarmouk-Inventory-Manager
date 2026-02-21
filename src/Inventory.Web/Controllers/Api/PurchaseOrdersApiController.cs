@@ -11,10 +11,12 @@ namespace Inventory.Web.Controllers.Api;
 public class PurchaseOrdersApiController : ControllerBase
 {
     private readonly IPurchaseOrderServices _purchaseOrderServices;
+    private readonly IWebHostEnvironment _env;
 
-    public PurchaseOrdersApiController(IPurchaseOrderServices purchaseOrderServices)
+    public PurchaseOrdersApiController(IPurchaseOrderServices purchaseOrderServices, IWebHostEnvironment env)
     {
         _purchaseOrderServices = purchaseOrderServices;
+        _env = env;
     }
 
     [HttpPost]
@@ -31,7 +33,7 @@ public class PurchaseOrdersApiController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<PurchaseOrderResponse>> GetById(int id, CancellationToken ct)
+    public async Task<ActionResult<PurchaseOrderResponse>> GetById(long id, CancellationToken ct)
     {
         var order = await _purchaseOrderServices.GetByIdAsync(id, ct);
         if (order is null)
@@ -78,19 +80,17 @@ public class PurchaseOrdersApiController : ControllerBase
     [HttpPost("{id}/invoice")]
     public async Task<IActionResult> UploadInvoice(long id, IFormFile file, CancellationToken ct)
     {
-        if (file == null || file.Length == 0)
-            return BadRequest("No file uploaded.");
-
-        if (file.ContentType != "application/pdf")
-            return BadRequest("Only PDF files are allowed.");
+        var validationError = ValidateFile(file);
+        if (validationError != null) return BadRequest(validationError);
 
         // Ensure directory exists
-        var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "purchase-orders", "invoices");
+        var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "purchase-orders", "invoices");
         if (!Directory.Exists(uploadsFolder))
             Directory.CreateDirectory(uploadsFolder);
 
-        // Generate filename: PO-{id}-INV-{Guid}.pdf
-        var fileName = $"PO-{id}-INV-{Guid.NewGuid()}.pdf";
+        // Secure filename: {Guid}_{SanitizedName}
+        var sanitizedName = Path.GetFileName(file.FileName).Replace(" ", "_");
+        var fileName = $"{Guid.NewGuid()}_{sanitizedName}";
         var filePath = Path.Combine(uploadsFolder, fileName);
 
         using (var stream = new FileStream(filePath, FileMode.Create))
@@ -98,7 +98,7 @@ public class PurchaseOrdersApiController : ControllerBase
             await file.CopyToAsync(stream, ct);
         }
 
-        // Relative path for storage (e.g. /uploads/purchase-orders/invoices/...)
+        // Relative path for storage
         var relativePath = $"/uploads/purchase-orders/invoices/{fileName}";
         var user = GetUserContext();
 
@@ -130,7 +130,7 @@ public class PurchaseOrdersApiController : ControllerBase
         {
             // Convert relative web path to absolute system path
             var relativePath = order.InvoicePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", relativePath);
+            var fullPath = Path.Combine(_env.WebRootPath, relativePath);
             
             if (System.IO.File.Exists(fullPath))
             {
@@ -146,19 +146,17 @@ public class PurchaseOrdersApiController : ControllerBase
     [HttpPost("{id}/receipt")]
     public async Task<IActionResult> UploadReceipt(long id, IFormFile file, CancellationToken ct)
     {
-        if (file == null || file.Length == 0)
-            return BadRequest("No file uploaded.");
-
-        if (file.ContentType != "application/pdf")
-            return BadRequest("Only PDF files are allowed.");
+        var validationError = ValidateFile(file);
+        if (validationError != null) return BadRequest(validationError);
 
         // Ensure directory exists
-        var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "purchase-orders", "receipts");
+        var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "purchase-orders", "receipts");
         if (!Directory.Exists(uploadsFolder))
             Directory.CreateDirectory(uploadsFolder);
 
-        // Generate filename: PO-{id}-RCPT-{Guid}.pdf
-        var fileName = $"PO-{id}-RCPT-{Guid.NewGuid()}.pdf";
+        // Secure filename: {Guid}_{SanitizedName}
+        var sanitizedName = Path.GetFileName(file.FileName).Replace(" ", "_");
+        var fileName = $"{Guid.NewGuid()}_{sanitizedName}";
         var filePath = Path.Combine(uploadsFolder, fileName);
 
         using (var stream = new FileStream(filePath, FileMode.Create))
@@ -198,7 +196,7 @@ public class PurchaseOrdersApiController : ControllerBase
         {
             // Convert relative web path to absolute system path
             var relativePath = order.ReceiptPath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", relativePath);
+            var fullPath = Path.Combine(_env.WebRootPath, relativePath);
 
             if (System.IO.File.Exists(fullPath))
             {
@@ -231,6 +229,32 @@ public class PurchaseOrdersApiController : ControllerBase
         var user = GetUserContext();
         await _purchaseOrderServices.UpdatePaymentInfoAsync(id, request, user, ct);
         return Ok();
+    }
+
+    private string? ValidateFile(IFormFile? file)
+    {
+        if (file == null || file.Length == 0)
+            return "No file uploaded.";
+
+        if (file.Length > 10 * 1024 * 1024)
+            return "File size exceeds 10MB limit.";
+
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".pdf", ".doc", ".docx" };
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!allowedExtensions.Contains(extension))
+            return "Invalid file type. Allowed: JPG, PNG, WEBP, PDF, DOC, DOCX.";
+
+        var allowedMimeTypes = new[] 
+        { 
+            "image/jpeg", "image/png", "image/webp", 
+            "application/pdf", 
+            "application/msword", 
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
+        };
+        if (!allowedMimeTypes.Contains(file.ContentType))
+            return "Invalid MIME type.";
+
+        return null;
     }
 
     private UserContext GetUserContext()

@@ -159,13 +159,13 @@
             </div>
 
             <!-- Status Info (No Print) -->
-            <div class="neo-card p-0 overflow-hidden mb-4 border-4 @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received ? "border-success" : "border-info") no-print">
-                <div class="p-3 @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received ? "bg-success text-white" : "bg-info text-black")">
+            <div class="neo-card p-0 overflow-hidden mb-4 border-4 @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received ? "border-success" : (Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Cancelled ? "border-danger" : "border-info")) no-print">
+                <div class="p-3 @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received ? "bg-success text-white" : (Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Cancelled ? "bg-danger text-white" : "bg-info text-black"))">
                     <h5 class="mb-0 fw-black text-uppercase small">Current Status</h5>
                 </div>
                 <div class="p-4 bg-white">
                     <div class="d-flex justify-content-between align-items-center mb-4">
-                        <span class="badge @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received ? "neo-btn-success" : "neo-btn-info") fs-5 p-2 px-3">
+                        <span class="badge @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Received ? "neo-btn-success" : (Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Cancelled ? "neo-btn-danger" : "neo-btn-info")) fs-5 p-2 px-3">
                             @Model.Status.ToString().ToUpper()
                         </span>
                         @if (Model.IsHistorical)
@@ -327,14 +327,14 @@
                             </div>
                         }
                         
-                        <div class="col-12 mt-1">
+                        <div class="col-12 mt-1 @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Cancelled ? "d-none" : "")">
                              <div class="d-flex justify-content-between small opacity-75">
                                  <span>DEADLINE: @(Model.PaymentDeadline.HasValue ? Model.PaymentDeadline.Value.ToString("MMM dd").ToUpper() : "N/A")</span>
                                  <a href="javascript:void(0)" class="text-black no-print" onclick="openEditPaymentDeadlineModal()">EDIT</a>
                              </div>
                         </div>
 
-                        <div class="col-12 mt-1">
+                        <div class="col-12 mt-1 @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Cancelled ? "d-none" : "")">
                              <div class="d-flex justify-content-between small opacity-75">
                                  <span>PAYMENT METADATA</span>
                                  <a href="javascript:void(0)" class="text-black no-print" onclick="openEditPaymentInfoModal()">EDIT INFO</a>
