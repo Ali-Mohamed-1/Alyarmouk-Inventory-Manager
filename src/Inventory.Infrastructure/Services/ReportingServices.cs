@@ -139,6 +139,7 @@ namespace Inventory.Infrastructure.Services
             var query = _db.SalesOrders
                 .AsNoTracking()
                 .Where(o => o.CustomerId == customerId && 
+                           o.Status != SalesOrderStatus.Cancelled &&
                            (o.PaymentStatus == PaymentStatus.Pending || o.PaymentStatus == PaymentStatus.PartiallyPaid));
 
             // Total Pending: sum of all unpaid/partially-paid orders remaining balances
@@ -172,6 +173,7 @@ namespace Inventory.Infrastructure.Services
             var salesTransactions = await (from t in _db.FinancialTransactions
                                            join so in _db.SalesOrders on t.SalesOrderId equals so.Id
                                            where t.Type == FinancialTransactionType.Revenue &&
+                                                 so.Status != SalesOrderStatus.Cancelled &&
                                                  t.TimestampUtc >= fromUtc &&
                                                  t.TimestampUtc <= toUtc
                                            select new
@@ -222,6 +224,7 @@ namespace Inventory.Infrastructure.Services
             var purchaseTransactions = await (from t in _db.FinancialTransactions
                                               join po in _db.PurchaseOrders on t.PurchaseOrderId equals po.Id
                                               where t.Type == FinancialTransactionType.Expense &&
+                                                    po.Status != PurchaseOrderStatus.Cancelled &&
                                                     !t.IsInternalExpense &&
                                                     t.TimestampUtc >= fromUtc &&
                                                     t.TimestampUtc <= toUtc
@@ -315,12 +318,14 @@ namespace Inventory.Infrastructure.Services
 
             var totalRevenue = await _db.FinancialTransactions
                 .AsNoTracking()
-                .Where(t => t.Type == FinancialTransactionType.Revenue)
+                .Where(t => t.Type == FinancialTransactionType.Revenue && 
+                            (t.SalesOrderId == null || t.SalesOrder.Status != SalesOrderStatus.Cancelled))
                 .SumAsync(t => (decimal?)t.Amount, ct) ?? 0m;
 
             var totalExpenses = await _db.FinancialTransactions
                 .AsNoTracking()
-                .Where(t => t.Type == FinancialTransactionType.Expense)
+                .Where(t => t.Type == FinancialTransactionType.Expense &&
+                            (t.PurchaseOrderId == null || t.PurchaseOrder.Status != PurchaseOrderStatus.Cancelled))
                 .SumAsync(t => (decimal?)t.Amount, ct) ?? 0m;
 
             var bankBalance = BaseBankBalance + totalRevenue - totalExpenses;

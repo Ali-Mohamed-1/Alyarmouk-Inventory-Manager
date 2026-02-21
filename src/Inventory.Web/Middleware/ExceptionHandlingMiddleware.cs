@@ -29,6 +29,11 @@ public sealed class ExceptionHandlingMiddleware
         }
         catch (Exception ex)
         {
+            if (context.Response.HasStarted)
+            {
+                _logger.LogWarning(ex, "Exception occurred but response has already started. Cannot handle gracefully.");
+                throw; // Re-throw so the app/runtime handles it (likely a connection reset or log)
+            }
             await HandleExceptionAsync(context, ex);
         }
     }

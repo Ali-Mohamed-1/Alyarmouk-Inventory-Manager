@@ -36,6 +36,7 @@ namespace Inventory.Infrastructure.Services
         {
             return await _db.PurchaseOrders
                 .Include(o => o.Payments)
+                .Where(o => o.Status != PurchaseOrderStatus.Cancelled)
                 .OrderByDescending(o => o.CreatedUtc)
                 .Take(count)
                 .Select(o => MapToResponse(o))
@@ -59,7 +60,7 @@ namespace Inventory.Infrastructure.Services
                 .AsNoTracking()
                 .Include(o => o.Lines)
                 .Include(o => o.Payments)
-                .Where(o => o.SupplierId == supplierId)
+                .Where(o => o.SupplierId == supplierId && o.Status != PurchaseOrderStatus.Cancelled)
                 .OrderByDescending(o => o.CreatedUtc)
                 .Select(o => MapToResponse(o))
                 .ToListAsync(ct);
@@ -341,16 +342,17 @@ namespace Inventory.Infrastructure.Services
             var netCash = order.GetNetCash();
             if (netCash != 0)
             {
-                throw new ValidationException($"Order cannot be cancelled while we hold money. Net Cash: {netCash:C}. Please refund/collect difference first.");
+                throw new ValidationException($"Order cannot be cancelled while there is a financial imbalance. Net Cash: {netCash:C}. All payments must be fully refunded before cancellation.");
             }
 
-            // Stock condition: if order was Received, all quantities must be fully refunded
+            // Stock condition: all quantities must be fully reversed (RefundedQuantity == Quantity)
+            // CRITICAL: We only enforce this if order was RECEIVED (issued).
             if (order.Status == PurchaseOrderStatus.Received)
             {
                 var remainingStockQuantity = order.Lines.Sum(l => l.Quantity - l.RefundedQuantity);
                 if (remainingStockQuantity > 0)
                 {
-                    throw new ValidationException($"[Detail] You must fully refund stock before cancelling. RemainingStock: {remainingStockQuantity}");
+                    throw new ValidationException($"Order cannot be cancelled while stock movement exists. Remaining stock to be reversed: {remainingStockQuantity}. Please process a full stock return first.");
                 }
             }
 
@@ -901,43 +903,44 @@ namespace Inventory.Infrastructure.Services
             var totalPaid = o.GetTotalPaid();
             var pending = o.GetPendingAmount();
             
-            return new PurchaseOrderResponse(
-                o.Id,
-                o.OrderNumber,
-                o.SupplierId,
-                o.SupplierNameSnapshot,
-                o.CreatedUtc,
-                o.PaymentDeadline,
-                o.Status,
-                o.PaymentStatus,
-                o.CreatedByUserDisplayName,
-                o.IsTaxInclusive,
-                o.ApplyVat,
-                o.ApplyManufacturingTax,
-                o.Subtotal,
-                o.VatAmount,
-                o.ManufacturingTaxAmount,
-                o.ReceiptExpenses,
-                o.TotalAmount,
-                o.RefundedAmount,
-                o.Note,
-                o.IsHistorical,
-                o.IsStockProcessed,
-                o.InvoicePath,
-                o.InvoiceUploadedUtc,
-                o.ReceiptPath,
-                o.ReceiptUploadedUtc,
-                o.PaymentMethod,
-                o.CheckReceived,
-                o.CheckReceivedDate,
-                o.CheckCashed,
-                o.CheckCashedDate,
-                o.TransferId,
-                totalPaid, // PaidAmount now reflects Collection
-                pending,   // RemainingAmount now reflects Pending
-                o.GetDeservedAmount(),
-                o.IsOverdue(),
-                o.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new PaymentRecordDto
+            return new PurchaseOrderResponse
+            {
+                Id = o.Id,
+                OrderNumber = o.OrderNumber,
+                SupplierId = o.SupplierId,
+                SupplierName = o.SupplierNameSnapshot,
+                CreatedUtc = o.CreatedUtc,
+                PaymentDeadline = o.PaymentDeadline,
+                Status = o.Status,
+                PaymentStatus = o.PaymentStatus,
+                CreatedByUserDisplayName = o.CreatedByUserDisplayName,
+                IsTaxInclusive = o.IsTaxInclusive,
+                ApplyVat = o.ApplyVat,
+                ApplyManufacturingTax = o.ApplyManufacturingTax,
+                Subtotal = o.Subtotal,
+                VatAmount = o.VatAmount,
+                ManufacturingTaxAmount = o.ManufacturingTaxAmount,
+                ReceiptExpenses = o.ReceiptExpenses,
+                TotalAmount = o.TotalAmount,
+                RefundedAmount = o.RefundedAmount,
+                Note = o.Note,
+                IsHistorical = o.IsHistorical,
+                IsStockProcessed = o.IsStockProcessed,
+                InvoicePath = o.InvoicePath,
+                InvoiceUploadedUtc = o.InvoiceUploadedUtc,
+                ReceiptPath = o.ReceiptPath,
+                ReceiptUploadedUtc = o.ReceiptUploadedUtc,
+                PaymentMethod = o.PaymentMethod,
+                CheckReceived = o.CheckReceived,
+                CheckReceivedDate = o.CheckReceivedDate,
+                CheckCashed = o.CheckCashed,
+                CheckCashedDate = o.CheckCashedDate,
+                TransferId = o.TransferId,
+                PaidAmount = totalPaid,
+                RemainingAmount = pending,
+                DeservedAmount = o.GetDeservedAmount(),
+                IsOverdue = o.IsOverdue(),
+                Payments = o.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new PaymentRecordDto
                 {
                     Id = p.Id,
                     Amount = p.Amount,
@@ -948,7 +951,7 @@ namespace Inventory.Infrastructure.Services
                     Note = p.Note,
                     CreatedByUserId = p.CreatedByUserId
                 }).ToList(),
-                o.Lines.Select(l => new PurchaseOrderLineResponse(
+                Lines = o.Lines.Select(l => new PurchaseOrderLineResponse(
                     l.Id,
                     l.ProductId,
                     l.ProductNameSnapshot,
@@ -961,14 +964,12 @@ namespace Inventory.Infrastructure.Services
                     l.LineVatAmount,
                     l.LineManufacturingTaxAmount,
                     l.LineTotal,
-                    l.RefundedQuantity)).ToList())
-            {
+                    l.RefundedQuantity)).ToList(),
                 TotalPaid = totalPaid,
                 TotalRefunded = o.GetTotalRefunded(),
                 NetCash = o.GetNetCash(),
                 PendingAmount = pending,
-                RefundDue = o.GetRefundDue(),
-                RemainingAmount = pending
+                RefundDue = o.GetRefundDue()
             };
         }
 

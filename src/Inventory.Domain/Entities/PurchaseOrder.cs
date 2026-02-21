@@ -54,11 +54,11 @@ public class PurchaseOrder
         // PaymentStatus is about Collection/Payment Completion.
         // Refunds do NOT degrade this status.
         
-        if (totalPaid == 0)
+        if (netCash <= 0)
         {
             PaymentStatus = PurchasePaymentStatus.Unpaid;
         }
-        else if (totalPaid < TotalAmount)
+        else if (netCash < TotalAmount)
         {
             PaymentStatus = PurchasePaymentStatus.PartiallyPaid;
         }
@@ -89,14 +89,10 @@ public class PurchaseOrder
         return GetTotalPaid() - GetTotalRefunded();
     }
 
-    /// <summary>
-    /// Money we still need to pay to the supplier.
-    /// Refunds do NOT increase this.
-    /// </summary>
     public decimal GetPendingAmount()
     {
-        var paid = GetTotalPaid();
-        return Math.Max(0, TotalAmount - paid);
+        var net = GetNetCash();
+        return Math.Max(0, TotalAmount - net);
     }
 
     /// <summary>

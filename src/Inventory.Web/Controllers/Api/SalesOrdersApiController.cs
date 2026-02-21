@@ -10,10 +10,12 @@ namespace Inventory.Web.Controllers.Api;
 public class SalesOrdersApiController : ControllerBase
 {
     private readonly ISalesOrderServices _salesOrderServices;
+    private readonly IWebHostEnvironment _env;
 
-    public SalesOrdersApiController(ISalesOrderServices salesOrderServices)
+    public SalesOrdersApiController(ISalesOrderServices salesOrderServices, IWebHostEnvironment env)
     {
         _salesOrderServices = salesOrderServices;
+        _env = env;
     }
 
     private UserContext GetUserContext()
@@ -24,7 +26,7 @@ public class SalesOrdersApiController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<SalesOrderResponseDto>> GetById(int id, CancellationToken ct)
+    public async Task<ActionResult<SalesOrderResponseDto>> GetById(long id, CancellationToken ct)
     {
         var order = await _salesOrderServices.GetByIdAsync(id, ct);
         if (order is null)
@@ -35,21 +37,19 @@ public class SalesOrdersApiController : ControllerBase
     }
 
     [HttpPost("{id}/invoice")]
-    public async Task<IActionResult> UploadInvoice(int id, IFormFile file, CancellationToken ct)
+    public async Task<IActionResult> UploadInvoice(long id, IFormFile file, CancellationToken ct)
     {
-        if (file == null || file.Length == 0)
-            return BadRequest("No file uploaded.");
-
-        if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase))
-            return BadRequest("Only PDF files are allowed.");
+        var validationError = ValidateFile(file);
+        if (validationError != null) return BadRequest(validationError);
 
         // Ensure directory exists
-        var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "orders", "invoices");
+        var uploadPath = Path.Combine(_env.WebRootPath, "uploads", "orders", "invoices");
         if (!Directory.Exists(uploadPath))
             Directory.CreateDirectory(uploadPath);
 
-        // Generate unique filename
-        var fileName = $"INV-{id}-{Guid.NewGuid()}.pdf";
+        // Secure filename: {Guid}_{SanitizedName}
+        var sanitizedName = Path.GetFileName(file.FileName).Replace(" ", "_");
+        var fileName = $"{Guid.NewGuid()}_{sanitizedName}";
         var filePath = Path.Combine(uploadPath, fileName);
 
         using (var stream = new FileStream(filePath, FileMode.Create))
@@ -61,13 +61,21 @@ public class SalesOrdersApiController : ControllerBase
         var relativePath = $"/uploads/orders/invoices/{fileName}";
         var user = GetUserContext();
 
-        await _salesOrderServices.AttachInvoiceAsync(id, relativePath, user, ct);
+        try
+        {
+            await _salesOrderServices.AttachInvoiceAsync(id, relativePath, user, ct);
+        }
+        catch (Exception)
+        {
+            if (System.IO.File.Exists(filePath)) System.IO.File.Delete(filePath);
+            throw;
+        }
 
         return Ok(new { path = relativePath });
     }
 
     [HttpDelete("{id}/invoice")]
-    public async Task<IActionResult> DeleteInvoice(int id, CancellationToken ct)
+    public async Task<IActionResult> DeleteInvoice(long id, CancellationToken ct)
     {
         var user = GetUserContext();
         
@@ -77,7 +85,8 @@ public class SalesOrdersApiController : ControllerBase
 
         if (!string.IsNullOrEmpty(order.InvoicePath))
         {
-            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", order.InvoicePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+            var relativePath = order.InvoicePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+            var fullPath = Path.Combine(_env.WebRootPath, relativePath);
             if (System.IO.File.Exists(fullPath))
             {
                 System.IO.File.Delete(fullPath);
@@ -90,21 +99,19 @@ public class SalesOrdersApiController : ControllerBase
     }
 
     [HttpPost("{id}/receipt")]
-    public async Task<IActionResult> UploadReceipt(int id, IFormFile file, CancellationToken ct)
+    public async Task<IActionResult> UploadReceipt(long id, IFormFile file, CancellationToken ct)
     {
-        if (file == null || file.Length == 0)
-            return BadRequest("No file uploaded.");
-
-        if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase))
-            return BadRequest("Only PDF files are allowed.");
+        var validationError = ValidateFile(file);
+        if (validationError != null) return BadRequest(validationError);
 
         // Ensure directory exists
-        var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "orders", "receipts");
+        var uploadPath = Path.Combine(_env.WebRootPath, "uploads", "orders", "receipts");
         if (!Directory.Exists(uploadPath))
             Directory.CreateDirectory(uploadPath);
 
-        // Generate unique filename
-        var fileName = $"REC-{id}-{Guid.NewGuid()}.pdf";
+        // Secure filename: {Guid}_{SanitizedName}
+        var sanitizedName = Path.GetFileName(file.FileName).Replace(" ", "_");
+        var fileName = $"{Guid.NewGuid()}_{sanitizedName}";
         var filePath = Path.Combine(uploadPath, fileName);
 
         using (var stream = new FileStream(filePath, FileMode.Create))
@@ -116,13 +123,21 @@ public class SalesOrdersApiController : ControllerBase
         var relativePath = $"/uploads/orders/receipts/{fileName}";
         var user = GetUserContext();
 
-        await _salesOrderServices.AttachReceiptAsync(id, relativePath, user, ct);
+        try
+        {
+            await _salesOrderServices.AttachReceiptAsync(id, relativePath, user, ct);
+        }
+        catch (Exception)
+        {
+            if (System.IO.File.Exists(filePath)) System.IO.File.Delete(filePath);
+            throw;
+        }
 
         return Ok(new { path = relativePath });
     }
 
     [HttpDelete("{id}/receipt")]
-    public async Task<IActionResult> DeleteReceipt(int id, CancellationToken ct)
+    public async Task<IActionResult> DeleteReceipt(long id, CancellationToken ct)
     {
         var user = GetUserContext();
         
@@ -132,7 +147,8 @@ public class SalesOrdersApiController : ControllerBase
 
         if (!string.IsNullOrEmpty(order.ReceiptPath))
         {
-            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", order.ReceiptPath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+            var relativePath = order.ReceiptPath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+            var fullPath = Path.Combine(_env.WebRootPath, relativePath);
             if (System.IO.File.Exists(fullPath))
             {
                 System.IO.File.Delete(fullPath);
@@ -145,7 +161,7 @@ public class SalesOrdersApiController : ControllerBase
     }
 
     [HttpPut("{id}/payment")]
-    public async Task<IActionResult> UpdatePaymentInfo(int id, [FromBody] UpdateSalesOrderPaymentRequest request, CancellationToken ct)
+    public async Task<IActionResult> UpdatePaymentInfo(long id, [FromBody] UpdateSalesOrderPaymentRequest request, CancellationToken ct)
     {
         if (id != request.OrderId)
             return BadRequest("Order ID mismatch.");
@@ -196,5 +212,30 @@ public class SalesOrdersApiController : ControllerBase
         await _salesOrderServices.AddPaymentAsync(id, request, user, ct);
         
         return Ok();
+    }
+    private string? ValidateFile(IFormFile? file)
+    {
+        if (file == null || file.Length == 0)
+            return "No file uploaded.";
+
+        if (file.Length > 10 * 1024 * 1024)
+            return "File size exceeds 10MB limit.";
+
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".pdf", ".doc", ".docx" };
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!allowedExtensions.Contains(extension))
+            return "Invalid file type. Allowed: JPG, PNG, WEBP, PDF, DOC, DOCX.";
+
+        var allowedMimeTypes = new[] 
+        { 
+            "image/jpeg", "image/png", "image/webp", 
+            "application/pdf", 
+            "application/msword", 
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
+        };
+        if (!allowedMimeTypes.Contains(file.ContentType))
+            return "Invalid MIME type.";
+
+        return null;
     }
 }

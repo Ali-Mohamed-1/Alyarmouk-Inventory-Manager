@@ -496,7 +496,7 @@ namespace Inventory.Infrastructure.Services
                 .AsNoTracking()
                 .Include(o => o.Lines)
                 .Include(o => o.Payments)
-                .Where(o => o.CustomerId == customerId)
+                .Where(o => o.CustomerId == customerId && o.Status != SalesOrderStatus.Cancelled)
                 .OrderByDescending(o => o.CreatedUtc)
                 .Take(take)
                 .Select(o => new SalesOrderResponseDto
@@ -594,6 +594,7 @@ namespace Inventory.Infrastructure.Services
                 .AsNoTracking()
                 .Include(o => o.Lines)
                 .Include(o => o.Payments)
+                .Where(o => o.Status != SalesOrderStatus.Cancelled)
                 .OrderByDescending(o => o.CreatedUtc)
                 .Take(take)
                 .Select(o => new SalesOrderResponseDto
@@ -705,21 +706,22 @@ namespace Inventory.Infrastructure.Services
             if (order.Status == SalesOrderStatus.Cancelled)
                 throw new ValidationException("Order is already cancelled.");
 
-            // Money condition: no net paid amount (ledger-based)
             // Money condition: no net money held (ledger-based)
             var netCash = order.GetNetCash();
             if (netCash != 0)
             {
-                throw new ValidationException($"Order cannot be cancelled while we hold money. Net Cash: {netCash:C}. Please refund/collect difference first.");
+                throw new ValidationException($"Order cannot be cancelled while there is a financial imbalance. Net Cash: {netCash:C}. All payments must be fully refunded before cancellation.");
             }
 
-            // Stock condition: if order was completed (Done), all quantities must be fully refunded
+            // Stock condition: all quantities must be fully reversed (RefundedQuantity == Quantity)
+            // CRITICAL: We only enforce this if order was DONE (issued). 
+            // If it was PENDING, stock is just reserved and CancelAsync (or the trigger) should handle releasing reservations.
             if (order.Status == SalesOrderStatus.Done)
             {
                 var remainingStockQuantity = order.Lines.Sum(l => l.Quantity - l.RefundedQuantity);
                 if (remainingStockQuantity > 0)
                 {
-                    throw new ValidationException("You must fully refund stock and money before cancelling this order.");
+                    throw new ValidationException($"Order cannot be cancelled while stock movement exists. Remaining stock to be reversed: {remainingStockQuantity}. Please process a full stock return first.");
                 }
             }
 

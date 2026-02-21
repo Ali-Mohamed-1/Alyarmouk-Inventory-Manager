@@ -77,15 +77,15 @@ public  class SalesOrder
         // PaymentStatus describes COLLECTION progress only.
         // Refunds DO NOT degrade PaymentStatus.
         
-        if (totalPaid == 0)
+        if (netCash <= 0)
         {
             PaymentStatus = PaymentStatus.Pending;
         }
-        else if (totalPaid < TotalAmount)
+        else if (netCash < TotalAmount)
         {
             PaymentStatus = PaymentStatus.PartiallyPaid;
         }
-        else // totalPaid >= TotalAmount
+        else // netCash >= TotalAmount
         {
             PaymentStatus = PaymentStatus.Paid;
         }
@@ -112,14 +112,10 @@ public  class SalesOrder
         return GetTotalPaid() - GetTotalRefunded();
     }
 
-    /// <summary>
-    /// Money we still need to collect to reach the Order Total.
-    /// Refunds do NOT increase this.
-    /// </summary>
     public decimal GetPendingAmount()
     {
-        var paid = GetTotalPaid();
-        return Math.Max(0, TotalAmount - paid);
+        var net = GetNetCash();
+        return Math.Max(0, TotalAmount - net);
     }
 
     /// <summary>

@@ -48,7 +48,12 @@ public sealed class PurchaseOrdersController : Controller
     {
         ViewBag.Suppliers = await _suppliers.GetForDropdownAsync(cancellationToken);
         ViewBag.Products = await _products.GetAllAsync(cancellationToken);
-        return View(new CreatePurchaseOrderRequest());
+        var now = DateTimeOffset.UtcNow;
+        return View(new CreatePurchaseOrderRequest
+        { 
+            OrderDate = now,
+            DueDate = now.AddMonths(1)
+        });
     }
 
     [HttpGet]
@@ -56,11 +61,14 @@ public sealed class PurchaseOrdersController : Controller
     {
         ViewBag.Suppliers = await _suppliers.GetForDropdownAsync(cancellationToken);
         ViewBag.Products = await _products.GetAllAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
         return View(new CreatePurchaseOrderRequest 
         { 
             IsHistorical = true, 
             Status = Inventory.Domain.Entities.PurchaseOrderStatus.Received,
-            ConnectToReceiveStock = false // Explicitly false, though CreateAsync ignores it for historical if logic is correct
+            ConnectToReceiveStock = false,
+            OrderDate = now,
+            DueDate = now.AddMonths(1)
         });
     }
 
