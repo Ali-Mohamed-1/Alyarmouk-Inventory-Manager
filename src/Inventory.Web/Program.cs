@@ -52,6 +52,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+/*
 // Database migrations on startup
 if (app.Environment.IsProduction())
 {
@@ -59,6 +60,7 @@ if (app.Environment.IsProduction())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
 }
+*/
 
 // Only seed in development
 if (app.Environment.IsDevelopment())
