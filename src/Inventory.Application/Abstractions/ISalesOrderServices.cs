@@ -43,6 +43,7 @@ namespace Inventory.Application.Abstractions
         /// </summary>
         Task UpdateStatusAsync(long orderId, UpdateSalesOrderStatusRequest req, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default);
         Task UpdateDueDateAsync(long orderId, DateTimeOffset newDate, UserContext user, CancellationToken ct = default);
+        Task UpdateOrderDateAsync(long orderId, DateTimeOffset newDate, UserContext user, CancellationToken ct = default);
 
         /// <summary>
         /// Attaches or updates an Invoice PDF file reference for an existing sales order.

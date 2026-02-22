@@ -95,7 +95,7 @@
                             <div class="row g-4">
                                 <div class="col-md-6 border-end border-2">
                                     <h6 class="fw-black text-uppercase small mb-3">General Details</h6>
-                                    <div class="mb-2"><strong>DATE:</strong> <span id="view-order-date"></span></div>
+                                    <div class="mb-2"><strong>DATE:</strong> <span id="view-order-date"></span> <button class="neo-btn btn-sm py-0 ms-2" style="font-size: 0.7rem;" onclick="openOrderDateModal()">EDIT</button></div>
                                     <div class="mb-2 d-flex align-items-center gap-2">
                                         <strong>STATUS:</strong> <span id="view-order-status"></span>
                                         <button class="neo-btn btn-sm py-0 ms-2" style="font-size: 0.7rem;" onclick="openEditStatusModal()">EDIT</button>
@@ -210,6 +210,28 @@
 <input type="file" id="receiptUploadInput" accept="application/pdf" style="display:none" onchange="performUpload('receipt')" />
 
 <!-- MODALS -->
+
+<!-- Edit Order Date Modal -->
+<div class="modal fade" id="editOrderDateModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small text-white">Edit Order Date</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">New Order Date</label>
+                    <input type="date" class="form-control fw-black text-center" id="newOrderDateInput">
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" id="btn-save-order-date" onclick="saveOrderDate()">UPDATE</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Create Supplier Modal -->
 <div class="modal fade" id="createSupplierModal" tabindex="-1">
@@ -1186,6 +1208,40 @@
             function escapeHtml(t) { if(!t) return''; const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
             function formatCurrency(a) { return new Intl.NumberFormat('en-US', { style:'currency', currency:'USD' }).format(a); }
             function formatDate(i) { return new Date(i).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }); }
+
+            window.openOrderDateModal = () => {
+                const o = window.currentDetailOrder; if (!o) return;
+                const date = new Date(o.createdUtc || o.orderDate);
+                const dateString = date.toISOString().split('T')[0];
+                document.getElementById('newOrderDateInput').value = dateString;
+                new bootstrap.Modal(document.getElementById('editOrderDateModal')).show();
+            };
+
+            window.saveOrderDate = async () => {
+                const btn = document.getElementById('btn-save-order-date');
+                const o = window.currentDetailOrder; if (!o) return;
+                const newDate = document.getElementById('newOrderDateInput').value;
+                if (!newDate) return;
+
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+                try {
+                    const r = await fetch(`/api/purchase-orders/${o.id}/date`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value },
+                        body: JSON.stringify(new Date(newDate).toISOString())
+                    });
+                    if (!r.ok) {
+                        const err = await r.text();
+                        throw new Error(err || 'Failed to update date');
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('editOrderDateModal')).hide();
+                    await loadOrderDetails(o.id);
+                    if (currentSupplierId) await viewHistory(currentSupplierId);
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message); }
+                finally { btn.disabled = false; btn.innerText = 'UPDATE'; }
+            };
 
             init();
         })();

@@ -67,6 +67,14 @@ public class PurchaseOrdersApiController : ControllerBase
         return Ok();
     }
 
+    [HttpPut("{id}/date")]
+    public async Task<IActionResult> UpdateOrderDate(long id, [FromBody] DateTimeOffset newDate, CancellationToken ct)
+    {
+        var user = GetUserContext();
+        await _purchaseOrderServices.UpdateOrderDateAsync(id, newDate, user, ct);
+        return Ok();
+    }
+
     [HttpPost("{id}/refund")]
     public async Task<IActionResult> Refund(long id, [FromBody] RefundPurchaseOrderRequest request, CancellationToken ct)
     {
