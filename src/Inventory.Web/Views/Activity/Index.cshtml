@@ -76,7 +76,7 @@
                         <div class="col-md-6 border-end border-2">
                             <h6 class="fw-black text-uppercase small mb-3">General Details</h6>
                             <div class="mb-2"><strong>CUSTOMER:</strong> <span id="so-detail-customer"></span></div>
-                            <div class="mb-2"><strong>DATE:</strong> <span id="so-detail-date"></span></div>
+                            <div class="mb-2"><strong>DATE:</strong> <span id="so-detail-date"></span> <button class="neo-btn btn-sm py-0 ms-2" style="font-size: 0.7rem;" onclick="openSoDateModal()">EDIT</button></div>
                             <div class="mb-2 d-flex align-items-center gap-2">
                                 <strong>STATUS:</strong> <span id="so-detail-status"></span>
                                 <button class="neo-btn btn-sm py-0 ms-2" style="font-size: 0.7rem;" onclick="openSoStatusModal()">EDIT</button>
@@ -185,7 +185,7 @@
                         <div class="col-md-6 border-end border-2">
                             <h6 class="fw-black text-uppercase small mb-3">General Details</h6>
                             <div class="mb-2"><strong>SUPPLIER:</strong> <span id="po-detail-supplier"></span></div>
-                            <div class="mb-2"><strong>DATE:</strong> <span id="po-detail-date"></span></div>
+                            <div class="mb-2"><strong>DATE:</strong> <span id="po-detail-date"></span> <button class="neo-btn btn-sm py-0 ms-2" style="font-size: 0.7rem;" onclick="openPoDateModal()">EDIT</button></div>
                             <div class="mb-2 d-flex align-items-center gap-2">
                                 <strong>STATUS:</strong> <span id="po-detail-status"></span>
                                 <button class="neo-btn btn-sm py-0 ms-2" style="font-size: 0.7rem;" onclick="openPoStatusModal()">EDIT</button>
@@ -726,6 +726,50 @@
             <div class="modal-footer">
                 <button class="neo-btn" data-bs-dismiss="modal">CANCEL</button>
                 <button class="neo-btn neo-btn-danger" onclick="processPoRefund()">EXECUTE REFUND</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SO: Edit Date Modal -->
+<div class="modal fade" id="soDateModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content border-4 border-black">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Edit Order Date</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">New Order Date</label>
+                    <input type="date" class="form-control fw-bold" id="soNewOrderDate">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm" id="btn-save-so-date" onclick="saveSoDate()">SAVE DATE</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PO: Edit Date Modal -->
+<div class="modal fade" id="poDateModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content border-4 border-black">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small">Edit Order Date</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-black text-uppercase small">New Order Date</label>
+                    <input type="date" class="form-control fw-bold" id="poNewOrderDate">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm" id="btn-save-po-date" onclick="savePoDate()">SAVE DATE</button>
             </div>
         </div>
     </div>
@@ -1651,6 +1695,73 @@
             window.switchInvView = (v) => {
                 document.getElementById('inv-list-view').style.display = v==='list'?'block':'none';
                 document.getElementById('inv-detail-view').style.display = v==='detail'?'block':'none';
+            };
+
+            window.openSoDateModal = () => {
+                const o = window.currentSoOrder; if (!o) return;
+                // Use only the date part (YYYY-MM-DD)
+                const date = new Date(o.orderDate);
+                const dateString = date.toISOString().split('T')[0];
+                document.getElementById('soNewOrderDate').value = dateString;
+                new bootstrap.Modal(document.getElementById('soDateModal')).show();
+            };
+
+            window.saveSoDate = async () => {
+                const btn = document.getElementById('btn-save-so-date');
+                const newDate = document.getElementById('soNewOrderDate').value;
+                if (!newDate) return;
+
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+                try {
+                    const r = await fetch(`/api/sales-orders/${window.currentSoId}/date`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value },
+                        body: JSON.stringify(new Date(newDate).toISOString())
+                    });
+                    if (!r.ok) {
+                        const err = await r.text();
+                        throw new Error(err || 'Failed to update date');
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('soDateModal')).hide();
+                    await viewSoDetails(window.currentSoId);
+                    loadSalesOrders();
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message); }
+                finally { btn.disabled = false; btn.innerText = 'SAVE DATE'; }
+            };
+
+            window.openPoDateModal = () => {
+                const o = window.currentPoOrder; if (!o) return;
+                const date = new Date(o.orderDate);
+                const dateString = date.toISOString().split('T')[0];
+                document.getElementById('poNewOrderDate').value = dateString;
+                new bootstrap.Modal(document.getElementById('poDateModal')).show();
+            };
+
+            window.savePoDate = async () => {
+                const btn = document.getElementById('btn-save-po-date');
+                const newDate = document.getElementById('poNewOrderDate').value;
+                if (!newDate) return;
+
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+                try {
+                    const r = await fetch(`/api/purchase-orders/${window.currentPoId}/date`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value },
+                        body: JSON.stringify(new Date(newDate).toISOString())
+                    });
+                    if (!r.ok) {
+                        const err = await r.text();
+                        throw new Error(err || 'Failed to update date');
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('poDateModal')).hide();
+                    await viewPoDetails(window.currentPoId);
+                    loadPurchaseOrders();
+                } catch (e) { if (window.appMessages) window.appMessages.showError(e.message); }
+                finally { btn.disabled = false; btn.innerText = 'SAVE DATE'; }
             };
 
             init();

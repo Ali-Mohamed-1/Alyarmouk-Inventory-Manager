@@ -457,6 +457,34 @@ namespace Inventory.Infrastructure.Services
             }
         }
 
+        public async Task UpdateOrderDateAsync(long id, DateTimeOffset newDate, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id), "Order ID must be positive.");
+
+            var order = await _db.PurchaseOrders.FirstOrDefaultAsync(o => o.Id == id, ct);
+            if (order is null)
+                throw new NotFoundException($"Purchase order id {id} was not found.");
+
+            if (order.Status == PurchaseOrderStatus.Cancelled)
+                throw new ValidationException("Cannot modify the date of a cancelled order.");
+
+            if (order.OrderDate == newDate) return;
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                order.OrderDate = newDate;
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+        }
+
         public async Task AddPaymentAsync(long orderId, Inventory.Application.DTOs.Payment.CreatePaymentRequest req, UserContext user, CancellationToken ct = default)
         {
             ValidateUser(user);

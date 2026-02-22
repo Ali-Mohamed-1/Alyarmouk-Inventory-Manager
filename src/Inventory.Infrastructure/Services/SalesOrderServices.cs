@@ -857,15 +857,41 @@ namespace Inventory.Infrastructure.Services
             {
                 var previousDate = salesOrder.DueDate;
                 salesOrder.DueDate = newDate;
-
                 await _db.SaveChangesAsync(ct);
-
                 await transaction.CommitAsync(ct);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 await transaction.RollbackAsync(ct);
-                throw new ConflictException("Could not update due date.", ex);
+                throw;
+            }
+        }
+
+        public async Task UpdateOrderDateAsync(long orderId, DateTimeOffset newDate, UserContext user, CancellationToken ct = default)
+        {
+            ValidateUser(user);
+            if (orderId <= 0) throw new ArgumentOutOfRangeException(nameof(orderId), "Order ID must be positive.");
+
+            var salesOrder = await _db.SalesOrders.FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            if (salesOrder is null)
+                throw new NotFoundException($"Sales order id {orderId} was not found.");
+
+            if (salesOrder.Status == SalesOrderStatus.Cancelled)
+                throw new ValidationException("Cannot modify the date of a cancelled order.");
+
+            if (salesOrder.OrderDate == newDate) return;
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                salesOrder.OrderDate = newDate;
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
             }
         }
 
