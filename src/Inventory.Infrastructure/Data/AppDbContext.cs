@@ -94,6 +94,7 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.VatAmount).HasPrecision(18, 2);
                 b.Property(x => x.ManufacturingTaxAmount).HasPrecision(18, 2);
                 b.Property(x => x.TotalAmount).HasPrecision(18, 2);
+                b.Property(x => x.RefundedAmount).HasPrecision(18, 2);
                 b.HasIndex(x => x.CreatedUtc);
                 b.HasIndex(x => x.Status);
                 b.HasIndex(x => x.PaymentStatus);
@@ -111,6 +112,7 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.LineVatAmount).HasPrecision(18, 2);
                 b.Property(x => x.LineManufacturingTaxAmount).HasPrecision(18, 2);
                 b.Property(x => x.LineTotal).HasPrecision(18, 2);
+                b.Property(x => x.RefundedQuantity).HasPrecision(18, 2);
                 b.HasIndex(x => x.SalesOrderId);
                 b.HasOne(x => x.SalesOrder).WithMany(o => o.Lines).HasForeignKey(x => x.SalesOrderId).OnDelete(DeleteBehavior.Cascade);
                 b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
@@ -161,6 +163,7 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.LineVatAmount).HasPrecision(18, 2);
                 b.Property(x => x.LineManufacturingTaxAmount).HasPrecision(18, 2);
                 b.Property(x => x.LineTotal).HasPrecision(18, 2);
+                b.Property(x => x.RefundedQuantity).HasPrecision(18, 2);
                 b.HasIndex(x => x.PurchaseOrderId);
                 b.HasOne(x => x.PurchaseOrder).WithMany(o => o.Lines).HasForeignKey(x => x.PurchaseOrderId).OnDelete(DeleteBehavior.Cascade);
                 b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
@@ -247,6 +250,11 @@ namespace Inventory.Infrastructure.Data
                  .WithMany(o => o.Payments)
                  .HasForeignKey(x => x.PurchaseOrderId)
                  .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<BankSystemSettings>(b =>
+            {
+                b.Property(x => x.BankBaseBalance).HasPrecision(18, 2);
             });
         }
 
