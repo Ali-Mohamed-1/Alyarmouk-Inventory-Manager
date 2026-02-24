@@ -129,24 +129,38 @@ namespace Inventory.Infrastructure.Services
                 .Where(s => productIdsList.Contains(s.ProductId))
                 .ToListAsync(ct);
 
-            // Verify sufficient stock for all products (Optional at creation, but good to check)
-            /* 
-            // We can keep this as a soft check or remove it if we want to allow drafting orders without stock
-            foreach (var kvp in lineItems)
+            // Verify sufficient stock for all products if not historical
+            if (!req.IsHistorical)
             {
-                var productId = kvp.Key.ProductId;
-                var quantity = kvp.Value.Quantity;
-
-                var snapshot = stockSnapshots.FirstOrDefault(s => s.ProductId == productId);
-                var availableStock = snapshot?.OnHand ?? 0;
-
-                if (availableStock < quantity)
+                foreach (var lineReq in req.Lines)
                 {
-                    var product = products.First(p => p.Id == productId);
-                    throw new ValidationException($"Insufficient stock for product '{product.Name}'. Available: {availableStock}, Requested: {quantity}");
+                    var productId = lineReq.ProductId;
+                    var quantity = lineReq.Quantity;
+                    var batchNum = (lineReq.BatchNumber ?? "").Trim();
+                    
+                    // Look up batch
+                    ProductBatch? batch = null;
+                    if (lineReq.ProductBatchId.HasValue && lineReq.ProductBatchId.Value > 0)
+                    {
+                        batch = await _db.ProductBatches.FindAsync(new object[] { lineReq.ProductBatchId.Value }, ct);
+                    }
+                    else
+                    {
+                        batch = await _db.ProductBatches.FirstOrDefaultAsync(b => b.ProductId == productId && b.BatchNumber == batchNum, ct);
+                    }
+
+                    decimal onHand = batch?.OnHand ?? 0;
+                    decimal reserved = batch?.Reserved ?? 0;
+                    decimal available = onHand - reserved;
+
+                    if (available < quantity)
+                    {
+                        var product = products.First(p => p.Id == productId);
+                        throw new ValidationException($"Insufficient stock for product '{product.Name}' (Batch: '{batchNum}'). Available: {available}, Requested: {quantity}");
+                    }
                 }
             }
-            */
+
 
             // Generate unique order number
             var orderNumber = await GenerateUniqueOrderNumberAsync(ct);

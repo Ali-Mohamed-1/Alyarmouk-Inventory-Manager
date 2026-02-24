@@ -468,4 +468,34 @@ public class SalesOrderIntegrationTests : IClassFixture<IntegrationTestFixture>,
             _salesServices.UpdateStatusAsync(orderId, new UpdateSalesOrderStatusRequest { OrderId = orderId, Status = SalesOrderStatus.Cancelled }, _user, ct: ct));
         Assert.Contains("cancel", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
+    [Fact]
+    public async Task SalesOrder_CannotCreate_WithInsufficientBatchStock()
+    {
+        var ct = CancellationToken.None;
+        await TestDataSeeder.ResetAndSeedAsync(_db, ct);
+
+        // 1. Find a batch with known stock (BATCH-001 has 50 OnHand, 0 Reserved)
+        var batch = await _db.ProductBatches.FirstAsync(b => b.BatchNumber == "BATCH-001", ct);
+        Assert.Equal(50, batch.OnHand);
+        Assert.Equal(0, batch.Reserved);
+
+        // 2. Try to create sales order with 51 units (Available is 50)
+        var createReq = new CreateSalesOrderRequest
+        {
+            CustomerId = 1,
+            DueDate = DateTimeOffset.UtcNow.AddDays(7),
+            PaymentMethod = PaymentMethod.Cash,
+            PaymentStatus = PaymentStatus.Pending,
+            IsTaxInclusive = false,
+            ApplyVat = false,
+            ApplyManufacturingTax = false,
+            Lines = new List<CreateSalesOrderLineRequest>
+            {
+                new() { ProductId = 1, Quantity = 51, UnitPrice = 100, BatchNumber = "BATCH-001" }
+            }
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(() => _salesServices.CreateAsync(createReq, _user, ct));
+        Assert.Contains("Insufficient stock", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }
