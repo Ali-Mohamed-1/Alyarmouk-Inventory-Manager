@@ -303,32 +303,46 @@ namespace Inventory.Infrastructure.Services
             var net_vat = sales_vat - purchase_vat;
             var net_man_tax = sales_man_tax - purchase_man_tax;
 
-            var net_profit = operating_profit - net_vat - net_man_tax;
+            var net_profit = operating_profit; // Do not subtract taxes from P&L Net Profit
 
             // Purchase Payments (Period)
             var purchasePaymentsTotal = purchaseTransactions.Sum(p => p.TxAmount);
 
             // Bank Balance (Global / Running Total)
-            // Rule: Base + All Revenue - All Expenses (Strict Cash Basis from Ledger)
-            // FinancialTransactions table is the Single Source of Truth for money movement.
-            // It allows for accurate bank reconciliation because it records actual payments/refunds.
-            
+            // Strict Cash Basis from PaymentRecord and internal expenses
             var bankSettings = await _db.BankSystemSettings.AsNoTracking().FirstOrDefaultAsync(ct);
             var BaseBankBalance = bankSettings?.BankBaseBalance ?? 0m;
 
-            var totalRevenue = await _db.FinancialTransactions
+            var totalPaid = await _db.PaymentRecords
                 .AsNoTracking()
-                .Where(t => t.Type == FinancialTransactionType.Revenue && 
-                            (t.SalesOrderId == null || t.SalesOrder.Status != SalesOrderStatus.Cancelled))
+                .Where(p => p.PaymentType == PaymentRecordType.Payment && p.OrderType == OrderType.SalesOrder)
+                .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+
+            var totalRefunded = await _db.PaymentRecords
+                .AsNoTracking()
+                .Where(p => p.PaymentType == PaymentRecordType.Refund && p.OrderType == OrderType.SalesOrder)
+                .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+
+            var netCashReceived = totalPaid - totalRefunded;
+
+            var supplierPaid = await _db.PaymentRecords
+                .AsNoTracking()
+                .Where(p => p.PaymentType == PaymentRecordType.Payment && p.OrderType == OrderType.PurchaseOrder)
+                .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+
+            var supplierRefunded = await _db.PaymentRecords
+                .AsNoTracking()
+                .Where(p => p.PaymentType == PaymentRecordType.Refund && p.OrderType == OrderType.PurchaseOrder)
+                .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+                
+            supplierPaid -= supplierRefunded; // Net cash out to suppliers
+
+            var totalExpensesPaid = await _db.FinancialTransactions
+                .AsNoTracking()
+                .Where(t => t.Type == FinancialTransactionType.Expense && t.IsInternalExpense)
                 .SumAsync(t => (decimal?)t.Amount, ct) ?? 0m;
 
-            var totalExpenses = await _db.FinancialTransactions
-                .AsNoTracking()
-                .Where(t => t.Type == FinancialTransactionType.Expense &&
-                            (t.PurchaseOrderId == null || t.PurchaseOrder.Status != PurchaseOrderStatus.Cancelled))
-                .SumAsync(t => (decimal?)t.Amount, ct) ?? 0m;
-
-            var bankBalance = BaseBankBalance + totalRevenue - totalExpenses;
+            var bankBalance = BaseBankBalance + netCashReceived - supplierPaid - totalExpensesPaid;
 
             return new FinancialSummaryResponseDto
             {
