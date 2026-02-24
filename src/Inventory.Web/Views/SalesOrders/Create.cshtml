@@ -345,18 +345,37 @@
                         document.getElementById(`batch-number-input-${idx}`).value = batch.batchNumber;
                         document.getElementById(`batch-id-input-${idx}`).value = batch.id;
                         
+                        // Enforce available stock limit
+                        const available = batch.onHand - (batch.reserved || 0);
+                        const qtyInput = row.querySelector('.item-qty');
+                        qtyInput.max = available;
+                        if (parseFloat(qtyInput.value) > available) {
+                            qtyInput.value = available.toFixed(2);
+                        }
+
+                        // Add listener to prevent entering more than available
+                        qtyInput.addEventListener('input', function() {
+                            const val = parseFloat(this.value);
+                            const max = parseFloat(this.max);
+                            if (val > max) {
+                                this.value = max.toFixed(2);
+                                calculateTotals();
+                            }
+                        });
+                        
                         // Auto-load Price (handle camelCase or PascalCase)
                         const price = batch.unitPrice || batch.UnitPrice || 0;
                         document.getElementById(`price-input-${idx}`).value = price.toFixed(2);
                         calculateTotals();
                     }, (batch) => {
                         // Batch Renderer
+                        const available = batch.onHand - (batch.reserved || 0);
                         return {
                             text: batch.batchNumber,
                             html: `
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="fw-bold">${batch.batchNumber}</span>
-                                    <span class="badge bg-dark text-white rounded-pill">Qty: ${batch.onHand}</span>
+                                    <span class="badge bg-dark text-white rounded-pill">Avail: ${available}</span>
                                 </div>
                                 <div class="small text-muted">Price: $${(batch.unitPrice||0).toFixed(2)}</div>
                             `
