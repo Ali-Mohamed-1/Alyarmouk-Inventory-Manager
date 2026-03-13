@@ -117,6 +117,10 @@
                                 <option value="">-- LOADING SUPPLIERS --</option>
                             </select>
                         </div>
+                        <div class="col-md-2">
+                            <label for="receiveDate" class="form-label fw-black text-uppercase small">Order Date</label>
+                            <input type="date" id="receiveDate" name="OrderDate" class="form-control border-2 border-black" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                        </div>
                         <div class="col-md-3">
                             <label for="receiveDueDate" class="form-label fw-black text-uppercase small">Payment Deadline</label>
                             <input type="date" id="receiveDueDate" name="DueDate" class="form-control border-2 border-black" value="@DateTime.Today.AddDays(14).ToString("yyyy-MM-dd")" />

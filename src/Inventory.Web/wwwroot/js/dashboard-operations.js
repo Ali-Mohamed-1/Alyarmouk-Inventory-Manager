@@ -260,10 +260,16 @@
         btnSubmit.disabled = true;
         btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>PROCESSING...';
 
+        const receiveDateRaw = document.getElementById('receiveDate').value;
+        const orderDateIso = receiveDateRaw
+            ? new Date(receiveDateRaw + 'T00:00:00').toISOString()
+            : null;
+
         const payload = {
             supplierId: parseInt(supplierSelect.value),
             note: document.getElementById('receiveNote').value,
             dueDate: document.getElementById('receiveDueDate').value || null,
+            orderDate: orderDateIso,
             connectToReceiveStock: true,
             isTaxInclusive: false, // Updated to Base Price model
             applyVat: document.getElementById('receiveApplyVat').checked,
