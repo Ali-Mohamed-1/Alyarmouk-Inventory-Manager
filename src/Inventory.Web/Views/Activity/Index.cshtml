@@ -1032,7 +1032,7 @@
                     <tr>
                         <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
                         <td>${escapeHtml(o.supplierName)}</td>
-                        <td class="small fw-bold">${formatDate(o.createdUtc)}</td>
+                        <td class="small fw-bold">${formatDate(o.orderDate)}</td>
                         <td class="small fw-bold ${o.paymentDeadline && new Date(o.paymentDeadline) < new Date() && o.paymentStatus !== 1 ? 'text-danger' : ''}">${o.paymentDeadline ? formatDate(o.paymentDeadline) : '-'}</td>
                         <td>${getPoStatusBadge(o.status)}</td>
                         <td>${getPaymentBadge(o.paymentStatus)}</td>
@@ -1056,7 +1056,7 @@
                     document.getElementById('po-detail-number').innerText = o.orderNumber;
                     document.getElementById('btn-print-po-activity').href = `/PurchaseOrders/Details/${o.id}`;
                     document.getElementById('po-detail-supplier').innerText = o.supplierName || 'UNKNOWN';
-                    document.getElementById('po-detail-date').innerText = formatDate(o.createdUtc);
+                    document.getElementById('po-detail-date').innerText = formatDate(o.orderDate);
                     document.getElementById('po-detail-status').innerHTML = getPoStatusBadge(o.status);
                     document.getElementById('po-detail-payment').innerHTML = getPaymentBadge(o.paymentStatus);
                     document.getElementById('po-detail-deadline').innerText = o.paymentDeadline ? formatDate(o.paymentDeadline) : 'N/A';

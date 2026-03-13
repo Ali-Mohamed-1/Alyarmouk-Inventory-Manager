@@ -37,7 +37,7 @@
                         <tr>
                             <td class="ps-4"><code class="fw-black fs-6 text-black">@item.OrderNumber</code></td>
                             <td class="fw-black text-uppercase">@item.SupplierName</td>
-                            <td class="small fw-bold">@item.CreatedUtc.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
+                            <td class="small fw-bold">@item.OrderDate.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
                             <td class="text-end fw-black text-primary">@item.TotalAmount.ToString("C2")</td>
                             <td class="text-end pe-4">
                                 <a asp-action="Details" asp-route-id="@item.Id" class="neo-btn btn-sm">VIEW</a>

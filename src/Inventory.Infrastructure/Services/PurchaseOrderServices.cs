@@ -37,7 +37,8 @@ namespace Inventory.Infrastructure.Services
             return await _db.PurchaseOrders
                 .Include(o => o.Payments)
                 .Where(o => o.Status != PurchaseOrderStatus.Cancelled)
-                .OrderByDescending(o => o.CreatedUtc)
+                .OrderByDescending(o => o.OrderDate)
+                .ThenByDescending(o => o.CreatedUtc)
                 .Take(count)
                 .Select(o => MapToResponse(o))
                 .ToListAsync(ct);
@@ -61,7 +62,8 @@ namespace Inventory.Infrastructure.Services
                 .Include(o => o.Lines)
                 .Include(o => o.Payments)
                 .Where(o => o.SupplierId == supplierId && o.Status != PurchaseOrderStatus.Cancelled)
-                .OrderByDescending(o => o.CreatedUtc)
+                .OrderByDescending(o => o.OrderDate)
+                .ThenByDescending(o => o.CreatedUtc)
                 .Select(o => MapToResponse(o))
                 .ToListAsync(ct);
         }
@@ -937,6 +939,7 @@ namespace Inventory.Infrastructure.Services
                 OrderNumber = o.OrderNumber,
                 SupplierId = o.SupplierId,
                 SupplierName = o.SupplierNameSnapshot,
+                OrderDate = o.OrderDate,
                 CreatedUtc = o.CreatedUtc,
                 PaymentDeadline = o.PaymentDeadline,
                 Status = o.Status,
