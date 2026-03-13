@@ -53,7 +53,7 @@
 
                         <div class="mb-4">
                             <label asp-for="OrderDate" class="form-label fw-black text-uppercase small">Original Order Date</label>
-                            <input asp-for="OrderDate" type="date" class="form-control fw-bold" id="OrderDateInput" value="@Model.OrderDate?.ToString("yyyy-MM-dd")" required />
+                            <input asp-for="OrderDate" asp-format="{0:yyyy-MM-dd}" type="date" class="form-control fw-bold" id="OrderDateInput" required />
                             <span asp-validation-for="OrderDate" class="text-danger small fw-bold"></span>
                         </div>
                         

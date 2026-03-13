@@ -1580,7 +1580,7 @@ function calculateProfitability(fromDate, toDate) {
     // Revenue from sales orders
     const revenue = demoData.orders
         .filter(o => {
-            const orderDate = new Date(o.createdUtc);
+            const orderDate = new Date(o.orderDate);
             return orderDate >= fromDate && orderDate <= toDate;
         })
         .reduce((sum, o) => sum + o.totalAmount, 0);
@@ -1588,7 +1588,7 @@ function calculateProfitability(fromDate, toDate) {
     // Cost of goods sold from purchase orders
     const costOfGoodsSold = (demoData.purchaseOrders || [])
         .filter(po => {
-            const orderDate = new Date(po.createdUtc);
+            const orderDate = new Date(po.orderDate);
             return orderDate >= fromDate && orderDate <= toDate;
         })
         .reduce((sum, po) => sum + po.totalAmount, 0);
@@ -1621,7 +1621,7 @@ function calculateTaxLiabilities(fromDate, toDate) {
     // VAT Collected from sales orders
     const vatCollected = demoData.orders
         .filter(o => {
-            const orderDate = new Date(o.createdUtc);
+            const orderDate = new Date(o.orderDate);
             return orderDate >= fromDate && orderDate <= toDate;
         })
         .reduce((sum, o) => {
@@ -1633,7 +1633,7 @@ function calculateTaxLiabilities(fromDate, toDate) {
     // VAT Paid on purchase orders (only tax-inclusive)
     const vatPaid = (demoData.purchaseOrders || [])
         .filter(po => {
-            const orderDate = new Date(po.createdUtc);
+            const orderDate = new Date(po.orderDate);
             return orderDate >= fromDate && orderDate <= toDate && po.isTaxInclusive;
         })
         .reduce((sum, po) => sum + (po.vatAmount || 0), 0);
@@ -1641,7 +1641,7 @@ function calculateTaxLiabilities(fromDate, toDate) {
     // Manufacturing Tax Collected
     const manufacturingTaxCollected = demoData.orders
         .filter(o => {
-            const orderDate = new Date(o.createdUtc);
+            const orderDate = new Date(o.orderDate);
             return orderDate >= fromDate && orderDate <= toDate;
         })
         .reduce((sum, o) => {
@@ -1652,7 +1652,7 @@ function calculateTaxLiabilities(fromDate, toDate) {
     // Manufacturing Tax Paid
     const manufacturingTaxPaid = (demoData.purchaseOrders || [])
         .filter(po => {
-            const orderDate = new Date(po.createdUtc);
+            const orderDate = new Date(po.orderDate);
             return orderDate >= fromDate && orderDate <= toDate && po.isTaxInclusive;
         })
         .reduce((sum, po) => sum + (po.manufacturingTaxAmount || 0), 0);

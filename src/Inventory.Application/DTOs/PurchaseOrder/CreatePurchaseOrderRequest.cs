@@ -14,7 +14,9 @@ namespace Inventory.Application.DTOs.PurchaseOrder
         public string? Note { get; set; }
 
         public DateTimeOffset? DueDate { get; set; }
-        public DateTimeOffset? OrderDate { get; set; }
+
+        [Required]
+        public DateTimeOffset OrderDate { get; set; }
         public bool ConnectToReceiveStock { get; set; } = true;
 
         public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.Cash; // Default to Cash

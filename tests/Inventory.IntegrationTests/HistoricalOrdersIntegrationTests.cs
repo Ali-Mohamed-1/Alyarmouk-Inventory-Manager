@@ -89,9 +89,11 @@ public class HistoricalOrdersIntegrationTests : IClassFixture<IntegrationTestFix
         await TestDataSeeder.ResetAndSeedAsync(_db, ct);
 
         // 1. Create Purchase Order (Received, Paid, No Taxes)
+        var expectedOrderDate = DateTimeOffset.UtcNow.AddDays(-5);
         var createReq = new CreatePurchaseOrderRequest
         {
             SupplierId = 1,
+            OrderDate = expectedOrderDate,
             DueDate = DateTimeOffset.UtcNow.AddDays(7),
             IsHistorical = true,
             Status = PurchaseOrderStatus.Received,
@@ -117,6 +119,7 @@ public class HistoricalOrdersIntegrationTests : IClassFixture<IntegrationTestFix
         Assert.Equal(PurchasePaymentStatus.Paid, order.PaymentStatus);
         Assert.Equal(800, order.TotalAmount);
         Assert.Equal(800, order.GetTotalPaid());
+        Assert.Equal(expectedOrderDate, order.OrderDate);
     }
 
     [Fact]
@@ -486,5 +489,87 @@ public class HistoricalOrdersIntegrationTests : IClassFixture<IntegrationTestFix
         Assert.Equal(1000, order.TotalAmount);
         Assert.Equal(1000, order.GetTotalPaid());
         Assert.Single(order.Payments);
+    }
+
+    [Fact]
+    public async Task Category1_PurchaseOrder_MissingOrderDate_ThrowsValidation()
+    {
+        var ct = CancellationToken.None;
+        await TestDataSeeder.ResetAndSeedAsync(_db, ct);
+
+        var createReq = new CreatePurchaseOrderRequest
+        {
+            SupplierId = 1,
+            // Intentionally pass default(DateTimeOffset) to simulate missing OrderDate
+            OrderDate = default,
+            DueDate = DateTimeOffset.UtcNow.AddDays(7),
+            Lines = new List<CreatePurchaseOrderLineRequest>
+            {
+                new() { ProductId = 1, Quantity = 1, UnitPrice = 50 }
+            }
+        };
+
+        await Assert.ThrowsAsync<Inventory.Infrastructure.Services.ValidationException>(
+            () => _purchaseServices.CreateAsync(createReq, _user, ct));
+    }
+
+    [Fact]
+    public async Task Category9_InventoryTransactionTimestamp_MatchesOrderDate()
+    {
+        var ct = CancellationToken.None;
+        await TestDataSeeder.ResetAndSeedAsync(_db, ct);
+
+        // 1. Purchase Order (6 months ago)
+        var sixMonthsAgo = DateTimeOffset.UtcNow.AddMonths(-6);
+        var purchaseReq = new CreatePurchaseOrderRequest
+        {
+            SupplierId = 1,
+            OrderDate = sixMonthsAgo,
+            DueDate = sixMonthsAgo.AddDays(7),
+            IsHistorical = true,
+            Status = PurchaseOrderStatus.Pending, // Start as pending
+            Lines = new List<CreatePurchaseOrderLineRequest> 
+            { 
+                new() { ProductId = 1, Quantity = 10, UnitPrice = 80, BatchNumber = "BATCH-HIST-TIMETEST" } 
+            }
+        };
+        var poId = await _purchaseServices.CreateAsync(purchaseReq, _user, ct);
+
+        // Transition status to Received to trigger stock processing
+        await _purchaseServices.UpdateStatusAsync(poId, new UpdatePurchaseOrderStatusRequest { OrderId = poId, Status = PurchaseOrderStatus.Received }, _user, ct);
+
+        // Verify Inventory Transaction Timestamp
+        _db.ChangeTracker.Clear();
+        var poTransaction = await _db.InventoryTransactions.FirstOrDefaultAsync(t => t.BatchNumber == "BATCH-HIST-TIMETEST", ct);
+        Assert.NotNull(poTransaction);
+        Assert.Equal(sixMonthsAgo, poTransaction.TimestampUtc);
+
+        // 2. Sales Order (3 months ago)
+        var threeMonthsAgo = DateTimeOffset.UtcNow.AddMonths(-3);
+        var salesReq = new CreateSalesOrderRequest
+        {
+            CustomerId = 1,
+            OrderDate = threeMonthsAgo,
+            DueDate = threeMonthsAgo.AddDays(7),
+            IsHistorical = true,
+            Status = SalesOrderStatus.Done, // Done status triggers processing if activated
+            Lines = new List<CreateSalesOrderLineRequest> 
+            { 
+                new() { ProductId = 1, Quantity = 5, UnitPrice = 120, BatchNumber = "BATCH-001" } 
+            }
+        };
+        var soId = await _salesServices.CreateAsync(salesReq, _user, ct);
+        
+        // Manual Activation
+        await _salesServices.ActivateStockAsync(soId, _user, ct);
+
+        // Verify Inventory Transaction Timestamp
+        _db.ChangeTracker.Clear();
+        var soTransaction = await _db.InventoryTransactions
+            .Where(t => t.BatchNumber == "BATCH-001" && t.QuantityDelta < 0)
+            .OrderByDescending(t => t.Id)
+            .FirstAsync(ct);
+            
+        Assert.Equal(threeMonthsAgo, soTransaction.TimestampUtc);
     }
 }

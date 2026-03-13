@@ -77,6 +77,9 @@ namespace Inventory.Infrastructure.Services
             if (req.Lines is null || req.Lines.Count == 0)
                 throw new ValidationException("Purchase order must have at least one line item.");
 
+            if (req.OrderDate == default)
+                throw new ValidationException("Order date is required.");
+
             // Verify supplier exists
             var supplier = await _db.Suppliers
                 .AsNoTracking()
@@ -139,7 +142,7 @@ namespace Inventory.Infrastructure.Services
                     SupplierId = req.SupplierId,
                     SupplierNameSnapshot = supplier.Name,
                     CreatedUtc = DateTimeOffset.UtcNow,
-                    OrderDate = req.OrderDate ?? DateTimeOffset.UtcNow,
+                    OrderDate = req.OrderDate,
                     CreatedByUserId = user.UserId,
                     CreatedByUserDisplayName = user.UserDisplayName,
                     // Treat the incoming DueDate as the initial supplier payment deadline
@@ -169,6 +172,14 @@ namespace Inventory.Infrastructure.Services
                 // Add to DB context to generate ID
                 _db.PurchaseOrders.Add(purchaseOrder);
                 await _db.SaveChangesAsync(ct);
+
+                // If historical and already Received, process stock immediately using OrderDate
+                if (purchaseOrder.IsHistorical && purchaseOrder.Status == PurchaseOrderStatus.Received)
+                {
+                    await _inventoryServices.ProcessPurchaseOrderStockAsync(purchaseOrder.Id, user, purchaseOrder.OrderDate, ct);
+                    purchaseOrder.IsStockProcessed = true;
+                    await _db.SaveChangesAsync(ct);
+                }
 
                 decimal totalVat = 0;
                 decimal totalManTax = 0;
@@ -407,7 +418,7 @@ namespace Inventory.Infrastructure.Services
                     {
                         if (!order.IsStockProcessed)
                         {
-                            await _inventoryServices.ProcessPurchaseOrderStockAsync(order.Id, user, order.CreatedUtc, ct);
+                            await _inventoryServices.ProcessPurchaseOrderStockAsync(order.Id, user, order.OrderDate, ct);
                             order.IsStockProcessed = true;
                         }
                     }
@@ -831,8 +842,8 @@ namespace Inventory.Infrastructure.Services
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
             {
-                // Process stock using the Order Date (CreatedUtc) as the timestamp
-                await _inventoryServices.ProcessPurchaseOrderStockAsync(order.Id, user, order.CreatedUtc, ct);
+                // Process stock using the Order Date as the timestamp
+                await _inventoryServices.ProcessPurchaseOrderStockAsync(order.Id, user, order.OrderDate, ct);
                 
                 order.IsStockProcessed = true;
                 await _db.SaveChangesAsync(ct);
@@ -938,6 +949,7 @@ namespace Inventory.Infrastructure.Services
                 SupplierId = o.SupplierId,
                 SupplierName = o.SupplierNameSnapshot,
                 CreatedUtc = o.CreatedUtc,
+                OrderDate = o.OrderDate,
                 PaymentDeadline = o.PaymentDeadline,
                 Status = o.Status,
                 PaymentStatus = o.PaymentStatus,

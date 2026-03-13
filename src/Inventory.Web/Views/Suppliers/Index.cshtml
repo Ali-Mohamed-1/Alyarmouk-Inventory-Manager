@@ -674,7 +674,7 @@
                         return `
                         <tr>
                             <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
-                            <td class="small fw-bold">${formatDate(o.orderDate || o.createdUtc)}</td>
+                            <td class="small fw-bold">${formatDate(o.orderDate)}</td>
                             <td class="small fw-bold ${o.paymentDeadline && new Date(o.paymentDeadline) < new Date() && o.paymentStatus !== 1 ? 'text-danger' : ''}">${o.paymentDeadline ? formatDate(o.paymentDeadline) : '-'}</td>
                             <td>${getStatusBadge(o.status)}</td>
                             <td>${getPayBadge(o.paymentStatus)}</td>
@@ -720,7 +720,7 @@
 
                     document.getElementById('view-order-number').innerText = o.orderNumber;
                     document.getElementById('btn-print-po').href = `/PurchaseOrders/Details/${o.id}`;
-                    document.getElementById('view-order-date').innerText = formatDate(o.orderDate || o.createdUtc);
+                    document.getElementById('view-order-date').innerText = formatDate(o.orderDate);
                     document.getElementById('view-order-status').innerHTML = getStatusBadge(o.status);
                     document.getElementById('view-payment-status').innerHTML = getPayBadge(o.paymentStatus);
                     document.getElementById('view-order-note').innerText = o.note || 'NO NOTES PROVIDED.';
@@ -1211,7 +1211,7 @@
 
             window.openOrderDateModal = () => {
                 const o = window.currentDetailOrder; if (!o) return;
-                const date = new Date(o.orderDate || o.createdUtc);
+                const date = new Date(o.orderDate);
                 const dateString = date.toISOString().split('T')[0];
                 document.getElementById('newOrderDateInput').value = dateString;
                 new bootstrap.Modal(document.getElementById('editOrderDateModal')).show();
