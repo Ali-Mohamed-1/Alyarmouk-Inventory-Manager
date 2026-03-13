@@ -148,9 +148,8 @@ public class PurchaseOrder
 
     /// <summary>
     /// Order creation date (local business date).
-    /// Must be explicitly provided by the caller; it is no longer defaulted to CreatedUtc.
     /// </summary>
-    public DateTimeOffset OrderDate { get; set; }
+    public DateTimeOffset OrderDate { get; set; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public string CreatedByUserId { get; set; } = "";

@@ -229,7 +229,6 @@ namespace Inventory.UnitTests
             var req = new CreatePurchaseOrderRequest
             {
                 SupplierId = 1,
-                OrderDate = DateTimeOffset.UtcNow,
                 DueDate = DateTimeOffset.UtcNow.AddDays(30),
                 PaymentMethod = PaymentMethod.Cash,
                 PaymentStatus = PurchasePaymentStatus.Paid, 

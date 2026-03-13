@@ -159,7 +159,6 @@
                 var req = new CreatePurchaseOrderRequest
                 {
                     SupplierId = 1,
-                    OrderDate = DateTimeOffset.UtcNow,
                     IsTaxInclusive = false,
                     ApplyVat = true,
                     ApplyManufacturingTax = true,
@@ -306,7 +305,6 @@
             var req = new CreatePurchaseOrderRequest
             {
                 SupplierId = 9999, // Non-existent
-                    OrderDate = DateTimeOffset.UtcNow,
                 Lines = new List<CreatePurchaseOrderLineRequest> { new() { ProductId = 1, Quantity = 1, UnitPrice = 100 } }
             };
 
