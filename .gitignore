@@ -429,3 +429,4 @@ FodyWeavers.xsd
 /src/Inventory.Web/build_log.txt
 /cleanup.sql
 /src/Inventory.Web/appsettings.Production.json
+/src/Inventory.Api/Properties/launchSettings.json
