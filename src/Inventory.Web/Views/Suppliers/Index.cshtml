@@ -1211,7 +1211,7 @@
 
             window.openOrderDateModal = () => {
                 const o = window.currentDetailOrder; if (!o) return;
-                const date = new Date(o.orderDate || o.createdUtc);
+                const date = new Date(o.orderDate);
                 const dateString = date.toISOString().split('T')[0];
                 document.getElementById('newOrderDateInput').value = dateString;
                 new bootstrap.Modal(document.getElementById('editOrderDateModal')).show();

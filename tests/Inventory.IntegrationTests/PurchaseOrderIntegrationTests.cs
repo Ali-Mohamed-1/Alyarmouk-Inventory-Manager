@@ -52,6 +52,7 @@ public class PurchaseOrderIntegrationTests : IClassFixture<IntegrationTestFixtur
         var createReq = new CreatePurchaseOrderRequest
         {
             SupplierId = 1,
+            OrderDate = DateTimeOffset.UtcNow,
             DueDate = DateTimeOffset.UtcNow.AddDays(7),
             PaymentMethod = PaymentMethod.Cash,
             PaymentStatus = PurchasePaymentStatus.Unpaid,

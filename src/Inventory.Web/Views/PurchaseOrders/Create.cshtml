@@ -38,13 +38,13 @@
 
                         <div class="mb-4">
                             <label asp-for="OrderDate" class="form-label fw-black text-uppercase small">Order Date</label>
-                            <input asp-for="OrderDate" type="date" class="form-control fw-bold" id="OrderDateInput" value="@Model.OrderDate?.ToString("yyyy-MM-dd")" />
+                            <input asp-for="OrderDate" asp-format="{0:yyyy-MM-dd}" type="date" class="form-control fw-bold" id="OrderDateInput" required />
                             <span asp-validation-for="OrderDate" class="text-danger small fw-bold"></span>
                         </div>
 
                         <div class="mb-4">
                             <label asp-for="DueDate" class="form-label fw-black text-uppercase small">Payment Deadline</label>
-                            <input asp-for="DueDate" type="date" class="form-control fw-bold" id="DueDateInput" value="@Model.DueDate?.ToString("yyyy-MM-dd")" />
+                            <input asp-for="DueDate" asp-format="{0:yyyy-MM-dd}" type="date" class="form-control fw-bold" id="DueDateInput" />
                             <span asp-validation-for="DueDate" class="text-danger small fw-bold"></span>
                         </div>
 
