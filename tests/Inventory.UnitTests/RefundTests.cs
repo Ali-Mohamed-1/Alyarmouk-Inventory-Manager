@@ -216,7 +216,6 @@ namespace Inventory.UnitTests
             var createReq = new CreatePurchaseOrderRequest
             {
                 SupplierId = 1,
-                OrderDate = DateTimeOffset.UtcNow,
                 IsTaxInclusive = false,
                 ApplyVat = false,
                 ApplyManufacturingTax = false,
@@ -530,7 +529,6 @@ namespace Inventory.UnitTests
             var createReq = new CreatePurchaseOrderRequest
             {
                 SupplierId = 1,
-                OrderDate = DateTimeOffset.UtcNow,
                 IsTaxInclusive = false,
                 ApplyVat = false,
                 ApplyManufacturingTax = false,
