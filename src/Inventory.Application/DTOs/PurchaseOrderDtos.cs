@@ -20,7 +20,6 @@ namespace Inventory.Application.DTOs
         public string SupplierName { get; init; } = "";
         public DateTimeOffset OrderDate { get; init; }
         public DateTimeOffset CreatedUtc { get; init; }
-        public DateTimeOffset OrderDate { get; init; }
          public DateTimeOffset? PaymentDeadline { get; init; }
         public PurchaseOrderStatus Status { get; init; }
         public PurchasePaymentStatus PaymentStatus { get; init; }
