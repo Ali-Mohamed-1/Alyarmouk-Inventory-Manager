@@ -110,21 +110,24 @@
             </div>
             <div class="modal-body p-4">
                 <form id="receiveStockForm">
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-4">
+                    <div class="row g-3 mb-4 align-items-end">
+                        <div class="col-md-3">
                             <label for="receiveSupplierId" class="form-label fw-black text-uppercase small">Supplier</label>
                             <select id="receiveSupplierId" name="SupplierId" class="form-select border-2 border-black" required>
                                 <option value="">-- LOADING SUPPLIERS --</option>
                             </select>
                         </div>
+
                         <div class="col-md-2">
                             <label for="receiveDate" class="form-label fw-black text-uppercase small">Order Date</label>
                             <input type="date" id="receiveDate" name="OrderDate" class="form-control border-2 border-black" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
                         </div>
-                        <div class="col-md-3">
-                            <label for="receiveDueDate" class="form-label fw-black text-uppercase small">Payment Deadline</label>
+
+                        <div class="col-md-2">
+                            <label for="receiveDueDate" class="form-label fw-black text-uppercase small">Payment</label>
                             <input type="date" id="receiveDueDate" name="DueDate" class="form-control border-2 border-black" value="@DateTime.Today.AddDays(14).ToString("yyyy-MM-dd")" />
                         </div>
+
                         <div class="col-md-5">
                             <label for="receiveNote" class="form-label fw-black text-uppercase small">Notes</label>
                             <input type="text" id="receiveNote" name="Note" class="form-control border-2 border-black" placeholder="Order remarks...">

@@ -952,7 +952,6 @@ namespace Inventory.Infrastructure.Services
                 SupplierName = o.SupplierNameSnapshot,
                 OrderDate = o.OrderDate,
                 CreatedUtc = o.CreatedUtc,
-                OrderDate = o.OrderDate,
                 PaymentDeadline = o.PaymentDeadline,
                 Status = o.Status,
                 PaymentStatus = o.PaymentStatus,
