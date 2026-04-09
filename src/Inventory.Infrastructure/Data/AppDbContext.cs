@@ -26,6 +26,8 @@ namespace Inventory.Infrastructure.Data
         public DbSet<RefundTransactionLine> RefundTransactionLines { get; set; }
         public DbSet<PaymentRecord> PaymentRecords { get; set; }
         public DbSet<BankSystemSettings> BankSystemSettings { get; set; }
+        public DbSet<SupplierSalesOrder> SupplierSalesOrders { get; set; }
+        public DbSet<SupplierSalesOrderLine> SupplierSalesOrderLines { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -202,6 +204,8 @@ namespace Inventory.Infrastructure.Data
                 b.HasIndex(x => x.PurchaseOrderId);
                 b.HasOne(x => x.SalesOrder).WithMany().HasForeignKey(x => x.SalesOrderId).OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.PurchaseOrder).WithMany().HasForeignKey(x => x.PurchaseOrderId).OnDelete(DeleteBehavior.Restrict);
+                b.HasIndex(x => x.SupplierSalesOrderId);
+                b.HasOne(x => x.SupplierSalesOrder).WithMany().HasForeignKey(x => x.SupplierSalesOrderId).OnDelete(DeleteBehavior.Restrict);
                 b.HasMany(x => x.Lines).WithOne(x => x.RefundTransaction).HasForeignKey(x => x.RefundTransactionId).OnDelete(DeleteBehavior.Cascade);
             });
 
@@ -215,6 +219,7 @@ namespace Inventory.Infrastructure.Data
                 b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.SalesOrderLine).WithMany().HasForeignKey(x => x.SalesOrderLineId).OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.PurchaseOrderLine).WithMany().HasForeignKey(x => x.PurchaseOrderLineId).OnDelete(DeleteBehavior.Restrict);
+                b.HasOne(x => x.SupplierSalesOrderLine).WithMany().HasForeignKey(x => x.SupplierSalesOrderLineId).OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.ProductBatch).WithMany().HasForeignKey(x => x.ProductBatchId).OnDelete(DeleteBehavior.Restrict);
             });
 
@@ -250,11 +255,68 @@ namespace Inventory.Infrastructure.Data
                  .WithMany(o => o.Payments)
                  .HasForeignKey(x => x.PurchaseOrderId)
                  .OnDelete(DeleteBehavior.Cascade);
+
+                b.HasIndex(x => x.SupplierSalesOrderId);
+                b.HasOne(x => x.SupplierSalesOrder)
+                 .WithMany(o => o.Payments)
+                 .HasForeignKey(x => x.SupplierSalesOrderId)
+                 .OnDelete(DeleteBehavior.Cascade);
             });
 
             builder.Entity<BankSystemSettings>(b =>
             {
                 b.Property(x => x.BankBaseBalance).HasPrecision(18, 2);
+            });
+
+            builder.Entity<SupplierSalesOrder>(b =>
+            {
+                b.Property(x => x.OrderNumber).HasMaxLength(50).IsRequired();
+                b.HasIndex(x => x.OrderNumber).IsUnique();
+                b.Property(x => x.SupplierNameSnapshot).HasMaxLength(200).IsRequired();
+                b.Property(x => x.OrderDate).IsRequired();
+                b.Property(x => x.DueDate).IsRequired();
+                b.Property(x => x.InvoicePath).HasMaxLength(500);
+                b.Property(x => x.ReceiptPath).HasMaxLength(500);
+                b.Property(x => x.TransferId).HasMaxLength(200);
+                b.Property(x => x.CreatedByUserId).HasMaxLength(450).IsRequired();
+                b.Property(x => x.CreatedByUserDisplayName).HasMaxLength(200).IsRequired();
+                b.Property(x => x.Note).HasMaxLength(500);
+                b.Property(x => x.Status).IsRequired().HasConversion<int>();
+                b.Property(x => x.PaymentMethod).IsRequired().HasConversion<int>();
+                b.Property(x => x.PaymentStatus).IsRequired().HasConversion<int>();
+                b.Property(x => x.Subtotal).HasPrecision(18, 2);
+                b.Property(x => x.VatAmount).HasPrecision(18, 2);
+                b.Property(x => x.ManufacturingTaxAmount).HasPrecision(18, 2);
+                b.Property(x => x.TotalAmount).HasPrecision(18, 2);
+                b.Property(x => x.RefundedAmount).HasPrecision(18, 2);
+                b.HasIndex(x => x.CreatedUtc);
+                b.HasIndex(x => x.Status);
+                b.HasIndex(x => x.PaymentStatus);
+                b.HasOne(x => x.Supplier)
+                 .WithMany()
+                 .HasForeignKey(x => x.SupplierId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<SupplierSalesOrderLine>(b =>
+            {
+                b.Property(x => x.ProductNameSnapshot).HasMaxLength(200).IsRequired();
+                b.Property(x => x.UnitSnapshot).HasMaxLength(32).IsRequired();
+                b.Property(x => x.BatchNumber).HasMaxLength(100);
+                b.Property(x => x.Quantity).HasPrecision(18, 2);
+                b.Property(x => x.UnitPrice).HasPrecision(18, 2);
+                b.Property(x => x.LineSubtotal).HasPrecision(18, 2);
+                b.Property(x => x.LineVatAmount).HasPrecision(18, 2);
+                b.Property(x => x.LineManufacturingTaxAmount).HasPrecision(18, 2);
+                b.Property(x => x.LineTotal).HasPrecision(18, 2);
+                b.Property(x => x.RefundedQuantity).HasPrecision(18, 2);
+                b.HasIndex(x => x.SupplierSalesOrderId);
+                b.HasOne(x => x.SupplierSalesOrder)
+                 .WithMany(o => o.Lines)
+                 .HasForeignKey(x => x.SupplierSalesOrderId)
+                 .OnDelete(DeleteBehavior.Cascade);
+                b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+                b.HasOne(x => x.ProductBatch).WithMany().HasForeignKey(x => x.ProductBatchId).OnDelete(DeleteBehavior.Restrict);
             });
         }
 

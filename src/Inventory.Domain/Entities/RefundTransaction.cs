@@ -26,6 +26,12 @@ public class RefundTransaction
     public PurchaseOrder? PurchaseOrder { get; set; }
     
     /// <summary>
+    /// Reference to SupplierSalesOrder if this is a supplier-sale refund
+    /// </summary>
+    public long? SupplierSalesOrderId { get; set; }
+    public SupplierSalesOrder? SupplierSalesOrder { get; set; }
+    
+    /// <summary>
     /// Monetary amount refunded
     /// </summary>
     public decimal Amount { get; set; }
@@ -60,5 +66,6 @@ public class RefundTransaction
 public enum RefundType
 {
     SalesOrder = 1,
-    PurchaseOrder = 2
+    PurchaseOrder = 2,
+    SupplierSalesOrder = 3
 }
