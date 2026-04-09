@@ -531,8 +531,8 @@ namespace Inventory.Infrastructure.Services
                     TotalRefunded = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
                     NetCash = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
                               o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
-                    PendingAmount = o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) > 0 
-                                    ? o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) 
+                    PendingAmount = o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)) > 0 
+                                    ? o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)) 
                                     : 0,
                     RefundDue = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
                                 o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount) - o.TotalAmount > 0
@@ -541,7 +541,8 @@ namespace Inventory.Infrastructure.Services
                                 : 0,
                     
                     // Legacy / UI mapping
-                    PaidAmount = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount),
+                    PaidAmount = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
+                                 o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
                     RemainingAmount = o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) > 0 
                                       ? o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) 
                                       : 0,
@@ -629,8 +630,8 @@ namespace Inventory.Infrastructure.Services
                     TotalRefunded = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
                     NetCash = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
                               o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
-                    PendingAmount = o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) > 0 
-                                    ? o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) 
+                    PendingAmount = o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)) > 0 
+                                    ? o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)) 
                                     : 0,
                     RefundDue = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
                                 o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount) - o.TotalAmount > 0
@@ -639,7 +640,8 @@ namespace Inventory.Infrastructure.Services
                                 : 0,
                     
                     // Legacy / UI mapping
-                    PaidAmount = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount),
+                    PaidAmount = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
+                                 o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
                     RemainingAmount = o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) > 0 
                                       ? o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) 
                                       : 0,
