@@ -978,7 +978,7 @@ namespace Inventory.Infrastructure.Services
                 CheckCashed = o.CheckCashed,
                 CheckCashedDate = o.CheckCashedDate,
                 TransferId = o.TransferId,
-                PaidAmount = totalPaid,
+                PaidAmount = o.GetNetCash(),
                 RemainingAmount = pending,
                 DeservedAmount = o.GetDeservedAmount(),
                 IsOverdue = o.IsOverdue(),
