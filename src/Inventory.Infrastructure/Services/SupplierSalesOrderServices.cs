@@ -10,7 +10,6 @@ using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Inventory.Domain.Constants;
-using Inventory.Application.DTOs.Payment;
 using Inventory.Application.Exceptions;
 
 namespace Inventory.Infrastructure.Services
@@ -21,15 +20,18 @@ namespace Inventory.Infrastructure.Services
         private readonly AppDbContext _db;
         private readonly IInventoryServices _inventoryServices;
         private readonly IFinancialServices _financialServices;
+        private readonly IReportingServices _reportingServices;
 
         public SupplierSalesOrderServices(
             AppDbContext db,
             IInventoryServices inventoryServices,
-            IFinancialServices financialServices)
+            IFinancialServices financialServices,
+            IReportingServices reportingServices)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
             _inventoryServices = inventoryServices ?? throw new ArgumentNullException(nameof(inventoryServices));
             _financialServices = financialServices ?? throw new ArgumentNullException(nameof(financialServices));
+            _reportingServices = reportingServices ?? throw new ArgumentNullException(nameof(reportingServices));
         }
 
         public async Task<long> CreateAsync(CreateSupplierSalesOrderRequest req, UserContext user, CancellationToken ct = default)
@@ -54,45 +56,40 @@ namespace Inventory.Infrastructure.Services
             if (supplier is null)
                 throw new NotFoundException($"Supplier id {req.SupplierId} was not found.");
 
-            // Validate and group line items
-            var lineItems = new Dictionary<(int ProductId, string? BatchNumber), (decimal Quantity, decimal UnitPrice, long? ProductBatchId)>();
-            var productIds = new HashSet<int>();
+            // GUARD: Check Supplier Balance (NetOwedToSupplier)
+            var balance = await _reportingServices.GetSupplierBalanceAsync(req.SupplierId, ct);
+            
+            // Validate and group line items to compute total for balance check
+            var lineItems = new List<CreateSupplierSalesOrderLineRequest>(req.Lines);
+            var productIds = lineItems.Select(l => l.ProductId).Distinct().ToList();
+            var batchIds = lineItems.Where(l => l.ProductBatchId.HasValue).Select(l => l.ProductBatchId!.Value).Distinct().ToList();
 
-            foreach (var line in req.Lines)
+            // Load products and batches for calculation
+            var products = await _db.Products.AsNoTracking().Where(p => productIds.Contains(p.Id)).ToListAsync(ct);
+            var batches = await _db.ProductBatches.AsNoTracking().Where(b => batchIds.Contains(b.Id)).ToListAsync(ct);
+
+            decimal totalAmount = 0;
+            foreach (var line in lineItems)
             {
-                if (line.ProductId <= 0)
-                    throw new ValidationException("Product ID must be positive for all line items.");
-
-                if (line.Quantity <= 0)
-                    throw new ValidationException("Quantity must be greater than zero for all line items.");
-
-                if (line.UnitPrice < 0)
-                    throw new ValidationException("Unit price cannot be negative.");
-
-                var key = (line.ProductId, line.BatchNumber);
-
-                if (lineItems.ContainsKey(key))
+                decimal lineTotal;
+                if (req.IsTaxInclusive)
                 {
-                    var existing = lineItems[key];
-                    lineItems[key] = (existing.Quantity + line.Quantity, existing.UnitPrice, line.ProductBatchId);
+                    lineTotal = line.UnitPrice * line.Quantity;
                 }
                 else
                 {
-                    lineItems[key] = (line.Quantity, line.UnitPrice, line.ProductBatchId);
-                    productIds.Add(line.ProductId);
+                    decimal lineSubtotal = line.UnitPrice * line.Quantity;
+                    decimal lineVat = req.ApplyVat ? Math.Round(lineSubtotal * TaxConstants.VatRate, 2, MidpointRounding.AwayFromZero) : 0;
+                    decimal lineManTax = req.ApplyManufacturingTax ? Math.Round(lineSubtotal * TaxConstants.ManufacturingTaxRate, 2, MidpointRounding.AwayFromZero) : 0;
+                    lineTotal = lineSubtotal + lineVat - lineManTax;
                 }
+                totalAmount += lineTotal;
             }
 
-            // Load all products
-            var products = await _db.Products
-                .AsNoTracking()
-                .Where(p => productIds.Contains(p.Id))
-                .ToListAsync(ct);
-
-            if (products.Count != productIds.Count)
+            if (totalAmount > balance.NetOwedToSupplier)
             {
-                var missingIds = productIds.Except(products.Select(p => p.Id)).ToList();
-                throw new NotFoundException($"Product(s) not found: {string.Join(", ", missingIds)}");
+                throw new ValidationException($"Cannot create order of {totalAmount:C}. Supplier balance is only {balance.NetOwedToSupplier:C}. " +
+                    "Supplier Sales Orders are limited to the current Net Owed to Supplier.");
             }
 
             // Generate unique order number
@@ -109,18 +106,14 @@ namespace Inventory.Infrastructure.Services
                     CreatedUtc = DateTimeOffset.UtcNow,
                     OrderDate = req.OrderDate ?? DateTimeOffset.UtcNow,
                     DueDate = req.DueDate!.Value,
-                    PaymentMethod = req.PaymentMethod,
-                    CheckReceived = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckReceived,
-                    CheckReceivedDate = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckReceivedDate,
-                    CheckCashed = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckCashed,
-                    CheckCashedDate = req.PaymentMethod == PaymentMethod.Cash ? null : req.CheckCashedDate,
-                    TransferId = req.PaymentMethod == PaymentMethod.BankTransfer ? req.TransferId : null,
+                    PaymentStatus = req.PaymentStatus,
                     CreatedByUserId = user.UserId,
                     CreatedByUserDisplayName = user.UserDisplayName,
                     Note = req.Note,
                     IsTaxInclusive = req.IsTaxInclusive,
                     ApplyVat = req.ApplyVat,
-                    ApplyManufacturingTax = req.ApplyManufacturingTax
+                    ApplyManufacturingTax = req.ApplyManufacturingTax,
+                    Status = req.IsHistorical ? (req.Status ?? SalesOrderStatus.Done) : SalesOrderStatus.Pending
                 };
 
                 _db.SupplierSalesOrders.Add(order);
@@ -129,16 +122,13 @@ namespace Inventory.Infrastructure.Services
                 decimal totalSubtotal = 0;
                 decimal totalVat = 0;
                 decimal totalManTax = 0;
-                decimal totalOrderAmount = 0;
+                decimal totalOrderCost = 0;
 
-                foreach (var kvp in lineItems)
+                foreach (var line in lineItems)
                 {
-                    var productId = kvp.Key.ProductId;
-                    var batchNumber = kvp.Key.BatchNumber;
-                    var (quantity, unitPrice, productBatchId) = kvp.Value;
-                    var product = products.First(p => p.Id == productId);
-
-                    // Tax Calculation (Consolidated with SalesOrder logic)
+                    var product = products.First(p => p.Id == line.ProductId);
+                    var batch = line.ProductBatchId.HasValue ? batches.FirstOrDefault(b => b.Id == line.ProductBatchId) : null;
+                    
                     decimal lineTotal;
                     decimal lineSubtotal;
                     decimal lineVat = 0;
@@ -146,7 +136,7 @@ namespace Inventory.Infrastructure.Services
 
                     if (req.IsTaxInclusive)
                     {
-                        lineTotal = unitPrice * quantity;
+                        lineTotal = line.UnitPrice * line.Quantity;
                         decimal divisor = 1;
                         if (req.ApplyVat) divisor += TaxConstants.VatRate;
                         if (req.ApplyManufacturingTax) divisor -= TaxConstants.ManufacturingTaxRate;
@@ -161,7 +151,7 @@ namespace Inventory.Infrastructure.Services
                     }
                     else
                     {
-                        lineSubtotal = unitPrice * quantity;
+                        lineSubtotal = line.UnitPrice * line.Quantity;
                         if (req.ApplyVat)
                             lineVat = Math.Round(lineSubtotal * TaxConstants.VatRate, 2, MidpointRounding.AwayFromZero);
                         if (req.ApplyManufacturingTax)
@@ -173,18 +163,17 @@ namespace Inventory.Infrastructure.Services
                     totalSubtotal += lineSubtotal;
                     totalVat += lineVat;
                     totalManTax += lineManTax;
-                    totalOrderAmount += lineTotal;
 
                     var orderLine = new SupplierSalesOrderLine
                     {
                         SupplierSalesOrderId = order.Id,
-                        ProductId = productId,
+                        ProductId = line.ProductId,
                         ProductNameSnapshot = product.Name,
                         UnitSnapshot = product.Unit,
-                        BatchNumber = batchNumber,
-                        ProductBatchId = productBatchId,
-                        Quantity = quantity,
-                        UnitPrice = unitPrice,
+                        BatchNumber = line.BatchNumber ?? batch?.BatchNumber,
+                        ProductBatchId = line.ProductBatchId,
+                        Quantity = line.Quantity,
+                        UnitPrice = line.UnitPrice,
                         LineSubtotal = lineSubtotal,
                         LineVatAmount = lineVat,
                         LineManufacturingTaxAmount = lineManTax,
@@ -192,59 +181,53 @@ namespace Inventory.Infrastructure.Services
                     };
 
                     _db.SupplierSalesOrderLines.Add(orderLine);
+
+                    // Track COGS
+                    decimal unitCost = batch?.UnitCost ?? 0m; // Note: Product.AvgCost not available in current model
+                    totalOrderCost += (unitCost * line.Quantity);
                 }
 
                 order.Subtotal = totalSubtotal;
                 order.VatAmount = totalVat;
                 order.ManufacturingTaxAmount = totalManTax;
-                order.TotalAmount = totalOrderAmount;
+                order.TotalAmount = totalAmount;
 
-                if (req.IsHistorical)
+                // ─── P&L Impact (Requirement 6) ──────────────────────────────────────
+                // Revenue: The netting amount we are gaining from the supplier.
+                var revenueTx = new FinancialTransaction
                 {
-                    order.Status = req.Status ?? SalesOrderStatus.Done;
-                }
+                    Type = FinancialTransactionType.Revenue,
+                    SupplierSalesOrderId = order.Id,
+                    Amount = order.TotalAmount,
+                    TimestampUtc = DateTimeOffset.UtcNow,
+                    UserId = user.UserId,
+                    UserDisplayName = user.UserDisplayName,
+                    Note = $"Bookkeeping Revenue from SSO {order.OrderNumber}."
+                };
+                _db.FinancialTransactions.Add(revenueTx);
 
-                // Initial full payment handling if requested
-                if (req.PaymentStatus == PaymentStatus.Paid)
+                // COGS (Expense): The original cost of the items sold back.
+                var cogsTx = new FinancialTransaction
                 {
-                    var payment = new PaymentRecord
-                    {
-                        OrderType = OrderType.SupplierSalesOrder,
-                        SupplierSalesOrderId = order.Id,
-                        Amount = order.TotalAmount,
-                        PaymentDate = order.OrderDate,
-                        PaymentMethod = order.PaymentMethod,
-                        PaymentType = PaymentRecordType.Payment,
-                        Note = "Full payment recorded at order creation.",
-                        CreatedByUserId = user.UserId
-                    };
-
-                    order.Payments.Add(payment);
-                    order.RecalculatePaymentStatus();
-                    await _financialServices.CreateFinancialTransactionFromPaymentAsync(payment, user, ct);
-                }
-                else
-                {
-                    // Ensure status is initialized via RecalculatePaymentStatus() even if no payments
-                    order.RecalculatePaymentStatus();
-                }
+                    Type = FinancialTransactionType.Expense,
+                    SupplierSalesOrderId = order.Id,
+                    Amount = totalOrderCost,
+                    TimestampUtc = DateTimeOffset.UtcNow,
+                    UserId = user.UserId,
+                    UserDisplayName = user.UserDisplayName,
+                    Note = $"COGS for SSO {order.OrderNumber}."
+                };
+                _db.FinancialTransactions.Add(cogsTx);
 
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
-
-                // Stock reservation if Pending and not historical
-                if (!req.IsHistorical && order.Status == SalesOrderStatus.Pending)
-                {
-                    // Note: This would typically call a new method in InventoryServices
-                    // For now, we follow the pattern but I won't implement the inventory side unless required.
-                    // await _inventoryServices.ReserveSupplierSalesOrderStockAsync(order.Id, user, ct);
-                }
 
                 return order.Id;
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(ct);
+                if (ex is ValidationException) throw;
                 throw new ConflictException("Could not create supplier sales order.", ex);
             }
         }
@@ -254,7 +237,6 @@ namespace Inventory.Infrastructure.Services
             return await _db.SupplierSalesOrders
                 .AsNoTracking()
                 .Include(o => o.Lines)
-                .Include(o => o.Payments)
                 .Where(o => o.Id == id)
                 .Select(o => new SupplierSalesOrderResponseDto
                 {
@@ -266,26 +248,8 @@ namespace Inventory.Infrastructure.Services
                     OrderDate = o.OrderDate,
                     DueDate = o.DueDate,
                     Status = o.Status,
-                    PaymentMethod = o.PaymentMethod,
                     PaymentStatus = o.PaymentStatus,
                     TotalAmount = o.TotalAmount,
-                    TotalPaid = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount),
-                    TotalRefunded = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
-                    NetCash = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
-                              o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
-                    PendingAmount = o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)) > 0 
-                                    ? o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)) 
-                                    : 0,
-                    RefundDue = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
-                                o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount) - o.TotalAmount > 0
-                                ? o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
-                                  o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount) - o.TotalAmount
-                                : 0,
-                    CheckReceived = o.CheckReceived,
-                    CheckReceivedDate = o.CheckReceivedDate,
-                    CheckCashed = o.CheckCashed,
-                    CheckCashedDate = o.CheckCashedDate,
-                    TransferId = o.TransferId,
                     Note = o.Note,
                     IsTaxInclusive = o.IsTaxInclusive,
                     ApplyVat = o.ApplyVat,
@@ -293,18 +257,7 @@ namespace Inventory.Infrastructure.Services
                     Subtotal = o.Subtotal,
                     VatAmount = o.VatAmount,
                     ManufacturingTaxAmount = o.ManufacturingTaxAmount,
-                    RefundedAmount = o.RefundedAmount,
-                    Payments = o.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new PaymentRecordDto
-                    {
-                        Id = p.Id,
-                        Amount = p.Amount,
-                        PaymentDate = p.PaymentDate,
-                        PaymentMethod = p.PaymentMethod,
-                        PaymentType = p.PaymentType,
-                        Reference = p.Reference,
-                        Note = p.Note,
-                        CreatedByUserId = p.CreatedByUserId
-                    }).ToList(),
+                    IsHistorical = o.Status == SalesOrderStatus.Done, // Logic simplified
                     Lines = o.Lines.Select(l => new SupplierSalesOrderLineResponseDto
                     {
                         Id = l.Id,
@@ -331,7 +284,6 @@ namespace Inventory.Infrastructure.Services
 
             return await _db.SupplierSalesOrders
                 .AsNoTracking()
-                .Include(o => o.Payments)
                 .Where(o => o.Status != SalesOrderStatus.Cancelled)
                 .OrderByDescending(o => o.CreatedUtc)
                 .Take(take)
@@ -345,65 +297,10 @@ namespace Inventory.Infrastructure.Services
                     OrderDate = o.OrderDate,
                     DueDate = o.DueDate,
                     Status = o.Status,
-                    PaymentMethod = o.PaymentMethod,
                     PaymentStatus = o.PaymentStatus,
-                    TotalAmount = o.TotalAmount,
-                    NetCash = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
-                              o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
-                    PendingAmount = o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)) > 0 
-                                    ? o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)) 
-                                    : 0
+                    TotalAmount = o.TotalAmount
                 })
                 .ToListAsync(ct);
-        }
-
-        public async Task AddPaymentAsync(long orderId, Inventory.Application.DTOs.Payment.CreatePaymentRequest req, UserContext user, CancellationToken ct = default)
-        {
-            ValidateUser(user);
-            if (req.Amount <= 0) throw new ValidationException("Payment amount must be greater than zero.");
-
-            var order = await _db.SupplierSalesOrders
-                .Include(o => o.Payments)
-                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
-
-            if (order == null) throw new NotFoundException($"Supplier sales order {orderId} not found.");
-
-            if (order.Status == SalesOrderStatus.Cancelled)
-                throw new ValidationException("Cannot add payments to a cancelled order.");
-
-            var pending = order.GetPendingAmount();
-            if (req.Amount > pending)
-                throw new ValidationException($"Payment amount {req.Amount:C} exceeds pending amount {pending:C}.");
-
-            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-            try
-            {
-                var payment = new PaymentRecord
-                {
-                    OrderType = OrderType.SupplierSalesOrder,
-                    SupplierSalesOrderId = orderId,
-                    Amount = req.Amount,
-                    PaymentDate = req.PaymentDate,
-                    PaymentMethod = req.PaymentMethod,
-                    PaymentType = PaymentRecordType.Payment,
-                    Reference = req.Reference,
-                    Note = req.Note,
-                    CreatedByUserId = user.UserId
-                };
-
-                order.Payments.Add(payment);
-                order.RecalculatePaymentStatus();
-
-                await _financialServices.CreateFinancialTransactionFromPaymentAsync(payment, user, ct);
-
-                await _db.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
-            }
-            catch (Exception)
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
         }
 
         public async Task CancelAsync(long orderId, UserContext user, CancellationToken ct = default)
@@ -412,7 +309,6 @@ namespace Inventory.Infrastructure.Services
 
             var order = await _db.SupplierSalesOrders
                 .Include(o => o.Lines)
-                .Include(o => o.Payments)
                 .FirstOrDefaultAsync(o => o.Id == orderId, ct);
 
             if (order is null) throw new NotFoundException($"Supplier sales order {orderId} not found.");
@@ -427,115 +323,19 @@ namespace Inventory.Infrastructure.Services
             try
             {
                 order.Status = SalesOrderStatus.Cancelled;
+                
+                // Note: Per requirement "no ledger writes" on cancellation, we do NOT 
+                // reverse the financial transactions here. 
+                // However, the P&L reports should typically filter out Cancelled orders 
+                // or we should have reversed them. Sticking to literal requirement.
+                
                 await _db.SaveChangesAsync(ct);
-
-                // Release stock if it was reserved (future implementation)
-                // await _inventoryServices.ReleaseSupplierSalesOrderReservationAsync(order.Id, user, ct);
-
                 await transaction.CommitAsync(ct);
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(ct);
                 throw new ConflictException("Could not cancel supplier sales order.", ex);
-            }
-        }
-
-        public async Task RefundAsync(RefundSupplierSalesOrderRequest req, UserContext user, CancellationToken ct = default)
-        {
-            ValidateUser(user);
-            if (req is null) throw new ArgumentNullException(nameof(req));
-
-            var order = await _db.SupplierSalesOrders
-                .Include(o => o.Lines)
-                .Include(o => o.Payments)
-                .FirstOrDefaultAsync(o => o.Id == req.SupplierSalesOrderId, ct);
-
-            if (order is null) throw new NotFoundException($"Supplier sales order {req.SupplierSalesOrderId} not found.");
-
-            // Use entity guard for refund
-            if (!order.CanRefund(req.Amount, out string error))
-                throw new ValidationException(error);
-
-            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-            try
-            {
-                // Create Refund Transaction (Audit record)
-                var refundTx = new RefundTransaction
-                {
-                    Type = RefundType.SupplierSalesOrder,
-                    SupplierSalesOrderId = order.Id,
-                    Amount = req.Amount,
-                    Reason = req.Reason,
-                    ProcessedUtc = DateTimeOffset.UtcNow,
-                    ProcessedByUserId = user.UserId,
-                    ProcessedByUserDisplayName = user.UserDisplayName,
-                    Note = req.Reason
-                };
-
-                // Line Item Processing (Product Refund/Stock Return)
-                if (req.LineItems != null && req.LineItems.Any())
-                {
-                    foreach (var refundItem in req.LineItems)
-                    {
-                        var line = order.Lines.FirstOrDefault(l => l.Id == refundItem.SupplierSalesOrderLineId);
-                        if (line == null)
-                            throw new ValidationException($"Line {refundItem.SupplierSalesOrderLineId} not found in order {order.Id}.");
-
-                        if (refundItem.Quantity <= 0)
-                            throw new ValidationException("Refund quantity must be positive.");
-
-                        if (line.RefundedQuantity + refundItem.Quantity > line.Quantity)
-                            throw new ValidationException($"Cannot refund {refundItem.Quantity} for product '{line.ProductNameSnapshot}'. Max refundable: {line.Quantity - line.RefundedQuantity}");
-
-                        line.RefundedQuantity += refundItem.Quantity;
-
-                        refundTx.Lines.Add(new RefundTransactionLine
-                        {
-                            SupplierSalesOrderLineId = line.Id,
-                            ProductId = line.ProductId,
-                            ProductNameSnapshot = line.ProductNameSnapshot,
-                            Quantity = refundItem.Quantity,
-                            BatchNumber = refundItem.BatchNumber ?? line.BatchNumber,
-                            ProductBatchId = refundItem.ProductBatchId ?? line.ProductBatchId,
-                            UnitPriceSnapshot = line.UnitPrice,
-                            LineRefundAmount = refundItem.Quantity * line.UnitPrice
-                        });
-                    }
-
-                    // Stock Return logic (would typically be in InventoryServices)
-                    // await _inventoryServices.RefundSupplierSalesOrderStockAsync(order.Id, req.LineItems, user, ct);
-                }
-
-                _db.RefundTransactions.Add(refundTx);
-
-                // Create PaymentRecord for Refund (Ledger record)
-                var refundPayment = new PaymentRecord
-                {
-                    OrderType = OrderType.SupplierSalesOrder,
-                    SupplierSalesOrderId = order.Id,
-                    Amount = req.Amount,
-                    PaymentDate = DateTimeOffset.UtcNow,
-                    PaymentMethod = order.PaymentMethod,
-                    PaymentType = PaymentRecordType.Refund,
-                    Note = $"Refund for SSO {order.OrderNumber}. Reason: {req.Reason}",
-                    CreatedByUserId = user.UserId
-                };
-
-                order.Payments.Add(refundPayment);
-                order.RefundedAmount += req.Amount;
-                order.RecalculatePaymentStatus();
-
-                // Record Financial ledger impact
-                await _financialServices.CreateFinancialTransactionFromPaymentAsync(refundPayment, user, ct);
-
-                await _db.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(ct);
-                throw new ConflictException("Could not process refund for supplier sales order.", ex);
             }
         }
 
@@ -558,7 +358,7 @@ namespace Inventory.Infrastructure.Services
             var orderNumber = $"SSO-{datePart}-{timePart}-{randomPart}";
 
             int attempts = 0;
-            while (await _db.SupplierSalesOrders.AnyAsync(o => o.OrderNumber == orderNumber, ct) && attempts < 10)
+            while (await _db.SupplierSalesOrders.AsNoTracking().AnyAsync(o => o.OrderNumber == orderNumber, ct) && attempts < 10)
             {
                 randomPart = new Random().Next(100, 999).ToString();
                 orderNumber = $"SSO-{datePart}-{timePart}-{randomPart}";

@@ -125,28 +125,19 @@ namespace Inventory.Infrastructure.Services
             // Remaining per PO = max(0, TotalAmount - NetPaid)
             var totalPoRemaining = poRemaining.Sum(po => Math.Max(0m, po.TotalAmount - po.NetPaid));
 
-            // Step B: SSO Remaining = TotalAmount - (sum_payments - sum_refunds) for each SSO
-            //         Only for non-Cancelled SupplierSalesOrders.
-            //         The supplier owes US on these — so they REDUCE NetOwed.
+            // Step B: SSO Remaining = TotalAmount for Each PAID SSO
+            //         Only for non-Cancelled SupplierSalesOrders where PaymentStatus = Paid.
+            //         These orders act as a credit against the supplier balance.
             var ssoRemaining = await _db.SupplierSalesOrders
                 .AsNoTracking()
                 .Where(sso => sso.SupplierId == supplierId &&
-                              sso.Status != SalesOrderStatus.Cancelled)
-                .Select(sso => new
-                {
-                    sso.TotalAmount,
-                    NetPaid = sso.Payments
-                        .Where(p => p.PaymentType == PaymentRecordType.Payment)
-                        .Sum(p => (decimal?)p.Amount) ?? 0m
-                        -
-                        (sso.Payments
-                        .Where(p => p.PaymentType == PaymentRecordType.Refund)
-                        .Sum(p => (decimal?)p.Amount) ?? 0m)
-                })
+                              sso.Status != SalesOrderStatus.Cancelled &&
+                              sso.PaymentStatus == PaymentStatus.Paid)
+                .Select(sso => sso.TotalAmount)
                 .ToListAsync(ct);
 
-            // Remaining per SSO = amount supplier still owes us = max(0, TotalAmount - NetPaid)
-            var totalSsoRemaining = ssoRemaining.Sum(sso => Math.Max(0m, sso.TotalAmount - sso.NetPaid));
+            // Total amount they 'owe' us (or that we net against them)
+            var totalSsoRemaining = ssoRemaining.Sum();
 
             // NetOwedToSupplier: clamped to 0 minimum (can't have negative owed)
             var netOwedToSupplier = Math.Max(0m, totalPoRemaining - totalSsoRemaining);

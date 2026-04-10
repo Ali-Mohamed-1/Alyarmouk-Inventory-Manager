@@ -188,8 +188,10 @@ namespace Inventory.Infrastructure.Data
                 b.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
                 b.HasIndex(x => x.SupplierId);
                 b.HasIndex(x => x.PurchaseOrderId);
+                b.HasIndex(x => x.SupplierSalesOrderId);
                 b.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
                 b.HasOne(x => x.PurchaseOrder).WithMany().HasForeignKey(x => x.PurchaseOrderId).OnDelete(DeleteBehavior.SetNull);
+                b.HasOne(x => x.SupplierSalesOrder).WithMany().HasForeignKey(x => x.SupplierSalesOrderId).OnDelete(DeleteBehavior.SetNull);
             });
 
             builder.Entity<RefundTransaction>(b =>
@@ -255,12 +257,6 @@ namespace Inventory.Infrastructure.Data
                  .WithMany(o => o.Payments)
                  .HasForeignKey(x => x.PurchaseOrderId)
                  .OnDelete(DeleteBehavior.Cascade);
-
-                b.HasIndex(x => x.SupplierSalesOrderId);
-                b.HasOne(x => x.SupplierSalesOrder)
-                 .WithMany(o => o.Payments)
-                 .HasForeignKey(x => x.SupplierSalesOrderId)
-                 .OnDelete(DeleteBehavior.Cascade);
             });
 
             builder.Entity<BankSystemSettings>(b =>
@@ -277,18 +273,15 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.DueDate).IsRequired();
                 b.Property(x => x.InvoicePath).HasMaxLength(500);
                 b.Property(x => x.ReceiptPath).HasMaxLength(500);
-                b.Property(x => x.TransferId).HasMaxLength(200);
                 b.Property(x => x.CreatedByUserId).HasMaxLength(450).IsRequired();
                 b.Property(x => x.CreatedByUserDisplayName).HasMaxLength(200).IsRequired();
                 b.Property(x => x.Note).HasMaxLength(500);
                 b.Property(x => x.Status).IsRequired().HasConversion<int>();
-                b.Property(x => x.PaymentMethod).IsRequired().HasConversion<int>();
                 b.Property(x => x.PaymentStatus).IsRequired().HasConversion<int>();
                 b.Property(x => x.Subtotal).HasPrecision(18, 2);
                 b.Property(x => x.VatAmount).HasPrecision(18, 2);
                 b.Property(x => x.ManufacturingTaxAmount).HasPrecision(18, 2);
                 b.Property(x => x.TotalAmount).HasPrecision(18, 2);
-                b.Property(x => x.RefundedAmount).HasPrecision(18, 2);
                 b.HasIndex(x => x.CreatedUtc);
                 b.HasIndex(x => x.Status);
                 b.HasIndex(x => x.PaymentStatus);

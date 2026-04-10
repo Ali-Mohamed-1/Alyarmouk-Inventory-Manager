@@ -13,21 +13,9 @@ namespace Inventory.Application.DTOs.SupplierSalesOrder
         public DateTimeOffset OrderDate { get; init; }
         public DateTimeOffset DueDate { get; init; }
         public SalesOrderStatus Status { get; init; }
-        public PaymentMethod PaymentMethod { get; init; }
         public PaymentStatus PaymentStatus { get; init; }
 
         public decimal TotalAmount { get; init; }
-        public decimal TotalPaid { get; init; }
-        public decimal TotalRefunded { get; init; }
-        public decimal NetCash { get; init; }
-        public decimal PendingAmount { get; init; }
-        public decimal RefundDue { get; init; }
-
-        public bool? CheckReceived { get; init; }
-        public DateTimeOffset? CheckReceivedDate { get; init; }
-        public bool? CheckCashed { get; init; }
-        public DateTimeOffset? CheckCashedDate { get; init; }
-        public string? TransferId { get; init; }
 
         public string? Note { get; init; }
         public bool IsTaxInclusive { get; init; }
@@ -39,10 +27,8 @@ namespace Inventory.Application.DTOs.SupplierSalesOrder
         
         public bool IsHistorical { get; init; }
         public bool IsStockProcessed { get; init; }
-        public decimal RefundedAmount { get; init; }
 
         public List<SupplierSalesOrderLineResponseDto> Lines { get; init; } = new();
-        public List<PaymentRecordDto> Payments { get; init; } = new();
     }
 
     public record SupplierSalesOrderLineResponseDto

@@ -28,9 +28,6 @@ public class PaymentRecord
     public long? PurchaseOrderId { get; set; }
     public PurchaseOrder? PurchaseOrder { get; set; }
     
-    public long? SupplierSalesOrderId { get; set; }
-    public SupplierSalesOrder? SupplierSalesOrder { get; set; }
-    
     public decimal Amount { get; set; }
     
     public DateTimeOffset PaymentDate { get; set; }

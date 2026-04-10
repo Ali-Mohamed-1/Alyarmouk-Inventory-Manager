@@ -1,3 +1,4 @@
+@using Inventory.Domain.Entities
 @model Inventory.Application.DTOs.SupplierSalesOrder.SupplierSalesOrderResponseDto
 @{
     ViewData["Title"] = $"Supplier Sale - {Model.OrderNumber}";
@@ -93,13 +94,12 @@
                     <h5 class="mb-0 fw-black text-uppercase small">Financial Status</h5>
                 </div>
                 <div class="p-4 bg-white text-center">
-                    <div class="mb-4">
-                        <div class="small fw-black text-uppercase opacity-50">Settled Amount</div>
-                        <div class="display-6 fw-black text-success">$@Model.NetCash.ToString("N2")</div>
-                    </div>
                     <div class="mb-0">
-                        <div class="small fw-black text-uppercase opacity-50">Pending Balance</div>
-                        <div class="h3 fw-black text-danger">$@Model.PendingAmount.ToString("N2")</div>
+                        <div class="small fw-black text-uppercase opacity-50">Settlement Status</div>
+                        <div class="h3 fw-black @(Model.PaymentStatus == PaymentStatus.Paid ? "text-success" : "text-danger")">
+                            @Model.PaymentStatus.ToString().ToUpper()
+                        </div>
+                        <div class="text-muted small">TOTAL: $@Model.TotalAmount.ToString("N2")</div>
                     </div>
                 </div>
             </div>
@@ -110,20 +110,12 @@
                 </div>
                 <div class="p-4 bg-white">
                     <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                        <span class="small fw-black text-uppercase">STATUS:</span>
-                        <span class="badge @((int)Model.Status == 2 ? "bg-danger" : "bg-black") fw-black">@Model.Status.ToString().ToUpper()</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                        <span class="small fw-black text-uppercase">PAYMENT:</span>
-                        <span class="badge @((int)Model.PaymentStatus == 1 ? "bg-success" : ((int)Model.PaymentStatus == 2 ? "bg-warning" : "bg-danger")) fw-black">@Model.PaymentStatus.ToString().ToUpper()</span>
+                        <span class="small fw-black text-uppercase">ORDER STATUS:</span>
+                        <span class="badge @((int)Model.Status == 2 ? "bg-danger" : "bg-black") fw-black text-uppercase">@Model.Status.ToString().ToUpper()</span>
                     </div>
                     <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
                         <span class="small fw-black text-uppercase">DEADLINE:</span>
                         <span class="fw-bold">@Model.DueDate.ToString("MMM dd, yyyy")</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-0">
-                        <span class="small fw-black text-uppercase">REFUNDED:</span>
-                        <span class="fw-bold text-danger">-$@Model.RefundedAmount.ToString("N2")</span>
                     </div>
                 </div>
             </div>

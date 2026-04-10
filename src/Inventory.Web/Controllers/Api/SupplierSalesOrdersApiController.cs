@@ -1,7 +1,6 @@
 using Inventory.Application.Abstractions;
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.SupplierSalesOrder;
-using Inventory.Application.DTOs.Payment;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Inventory.Web.Controllers.Api;
@@ -30,26 +29,6 @@ public class SupplierSalesOrdersApiController : ControllerBase
     {
         var user = GetUserContext();
         await _services.CancelAsync(id, user, ct);
-        return Ok();
-    }
-
-    [HttpPost("{id}/refund")]
-    public async Task<IActionResult> Refund(long id, [FromBody] RefundSupplierSalesOrderRequest request, CancellationToken ct)
-    {
-        if (id != request.SupplierSalesOrderId) return BadRequest("Order ID mismatch.");
-        
-        var user = GetUserContext();
-        await _services.RefundAsync(request, user, ct);
-        return Ok();
-    }
-
-    [HttpPost("{id}/payments")]
-    public async Task<IActionResult> AddPayment(long id, [FromBody] CreatePaymentRequest request, CancellationToken ct)
-    {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
-
-        var user = GetUserContext();
-        await _services.AddPaymentAsync(id, request, user, ct);
         return Ok();
     }
 

@@ -22,26 +22,9 @@ namespace Inventory.Application.DTOs.SupplierSalesOrder
         public DateTimeOffset? DueDate { get; init; }
 
         /// <summary>
-        /// Payment method for this order (cash / check / bank transfer).
-        /// </summary>
-        [Required]
-        public PaymentMethod PaymentMethod { get; init; } = PaymentMethod.Cash;
-
-        /// <summary>
-        /// Initial payment status. RecalculatePaymentStatus() will be called after creation.
+        /// Initial payment status.
         /// </summary>
         public PaymentStatus PaymentStatus { get; init; } = PaymentStatus.Pending;
-
-        // Check details (nullable)
-        public bool CheckReceived { get; init; } = false;
-        public DateTimeOffset? CheckReceivedDate { get; init; }
-        public bool CheckCashed { get; init; } = false;
-        public DateTimeOffset? CheckCashedDate { get; init; }
-        
-        /// <summary>
-        /// For bank transfer payments.
-        /// </summary>
-        public string? TransferId { get; init; }
 
         // Tax Configuration
         public bool IsTaxInclusive { get; init; } = false;

@@ -83,7 +83,6 @@ public sealed class SuppliersApiController : ControllerBase
     {
         var orders = await _db.SupplierSalesOrders
             .AsNoTracking()
-            .Include(o => o.Payments)
             .Where(o => o.SupplierId == id)
             .OrderByDescending(o => o.OrderDate)
             .Select(o => new SupplierSalesOrderResponseDto
@@ -96,14 +95,8 @@ public sealed class SuppliersApiController : ControllerBase
                 OrderDate = o.OrderDate,
                 DueDate = o.DueDate,
                 Status = o.Status,
-                PaymentMethod = o.PaymentMethod,
                 PaymentStatus = o.PaymentStatus,
-                TotalAmount = o.TotalAmount,
-                NetCash = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
-                          o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
-                PendingAmount = o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)) > 0 
-                                ? o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)) 
-                                : 0
+                TotalAmount = o.TotalAmount
             })
             .ToListAsync(cancellationToken);
 

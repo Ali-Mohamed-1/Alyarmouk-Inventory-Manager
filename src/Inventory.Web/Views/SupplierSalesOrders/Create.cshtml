@@ -74,43 +74,12 @@
                     </div>
                     <div class="p-4 bg-dark">
                         <div class="mb-4">
-                            <label asp-for="PaymentMethod" class="form-label fw-black text-uppercase small text-white">Method of Settlement</label>
-                            <select asp-for="PaymentMethod" class="form-select fw-black" id="paymentMethodSelect" onchange="togglePaymentFields()">
-                                <option value="1">CASH</option>
-                                <option value="2">CHECK / CHEQUE</option>
-                                <option value="3">BANK TRANSFER</option>
-                            </select>
-                        </div>
-
-                        <div class="mb-4">
                             <label asp-for="PaymentStatus" class="form-label fw-black text-uppercase small text-white">Initial Pay Status</label>
                             <select asp-for="PaymentStatus" class="form-select fw-black text-center">
                                 <option value="0">PENDING</option>
                                 <option value="1">PAID UPON ISSUANCE</option>
                             </select>
-                        </div>
-
-                        <!-- Check Fields -->
-                        <div id="checkFields" style="display: none;" class="neo-card p-4 bg-white mb-4 border-2">
-                            <h6 class="fw-black text-uppercase small mb-4 border-bottom border-2 pb-2">Check Details</h6>
-                            <div class="form-check mb-3">
-                                <input asp-for="CheckReceived" class="form-check-input" type="checkbox" id="checkReceived">
-                                <label class="form-check-label fw-bold small ms-2" for="checkReceived">RECEIVED</label>
-                            </div>
-                            <div class="mb-0">
-                                <label asp-for="CheckReceivedDate" class="form-label fw-bold small text-muted">RECEIVE DATE</label>
-                                <input asp-for="CheckReceivedDate" type="date" class="form-control fw-bold">
-                            </div>
-                        </div>
-
-                        <!-- Bank Transfer Fields -->
-                        <div id="bankFields" style="display: none;" class="neo-card p-4 bg-white mb-4 border-2">
-                            <h6 class="fw-black text-uppercase small mb-4 border-bottom border-2 pb-2">Transfer Details</h6>
-                            <div class="mb-0">
-                                <label asp-for="TransferId" class="form-label fw-bold small text-muted">REFERENCE ID / TRACE</label>
-                                <input asp-for="TransferId" class="form-control fw-bold" placeholder="e.g. TR-999999">
-                                <span asp-validation-for="TransferId" class="text-danger small fw-bold"></span>
-                            </div>
+                            <span class="small text-muted d-block mt-2" style="color: #aaa !important;">"PAID" will immediately subtract from the supplier's debt.</span>
                         </div>
 
                         <div class="neo-card p-3 bg-white mb-0 border-2">

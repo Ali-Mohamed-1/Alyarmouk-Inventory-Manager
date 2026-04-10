@@ -58,6 +58,9 @@ public sealed class FinancialTransaction
     public long? PurchaseOrderId { get; set; }
     public PurchaseOrder? PurchaseOrder { get; set; }
     
+    public long? SupplierSalesOrderId { get; set; }
+    public SupplierSalesOrder? SupplierSalesOrder { get; set; }
+    
     public long? PaymentRecordId { get; set; }
     public PaymentRecord? PaymentRecord { get; set; }
     
