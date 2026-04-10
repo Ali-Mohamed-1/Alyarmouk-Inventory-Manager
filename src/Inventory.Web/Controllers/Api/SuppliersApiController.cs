@@ -85,6 +85,7 @@ public sealed class SuppliersApiController : ControllerBase
             .AsNoTracking()
             .Where(o => o.SupplierId == id)
             .OrderByDescending(o => o.OrderDate)
+            .ThenByDescending(o => o.Id)
             .Select(o => new SupplierSalesOrderResponseDto
             {
                 Id = o.Id,

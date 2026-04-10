@@ -285,7 +285,8 @@ namespace Inventory.Infrastructure.Services
             return await _db.SupplierSalesOrders
                 .AsNoTracking()
                 .Where(o => o.Status != SalesOrderStatus.Cancelled)
-                .OrderByDescending(o => o.CreatedUtc)
+                .OrderByDescending(o => o.OrderDate)
+                .ThenByDescending(o => o.Id)
                 .Take(take)
                 .Select(o => new SupplierSalesOrderResponseDto
                 {

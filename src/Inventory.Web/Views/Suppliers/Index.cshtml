@@ -45,9 +45,9 @@
             </div>
 
             <!-- Tabs -->
-            <ul class="nav nav-tabs border-0 mb-0" id="supplierTabs" role="tablist">
+            <ul class="nav nav-tabs border-0 mb-0 gap-2" id="supplierTabs" role="tablist">
                 <li class="nav-item">
-                    <button class="neo-btn active me-2" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-content" type="button" role="tab" onclick="switchView('list')">PURCHASE ORDERS</button>
+                    <button class="neo-btn active" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-content" type="button" role="tab" onclick="switchView('list')">PURCHASE ORDERS</button>
                 </li>
                 <li class="nav-item">
                     <button class="neo-btn" id="products-tab" data-bs-toggle="tab" data-bs-target="#products-content" type="button" role="tab" onclick="switchView('list')">PRODUCTS</button>
@@ -636,7 +636,7 @@
             window.loadSupplierSales = async function() {
                 if(!currentSupplierId) return;
                 const tbody = document.getElementById('sales-table-body');
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></td></tr>';
 
                 try {
                     const r = await fetch(`/api/suppliers/${currentSupplierId}/sales-orders`);
@@ -644,7 +644,7 @@
                     const orders = await r.json();
 
                     if(!orders.length) {
-                        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5 fw-bold">NO SALES ISSUED TO THIS SUPPLIER.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 fw-bold">NO SALES ISSUED TO THIS SUPPLIER.</td></tr>';
                         return;
                     }
 
@@ -736,6 +736,7 @@
                 document.getElementById('supplier-info').innerHTML = '<div class="p-3 text-center"><div class="spinner-border"></div></div>';
                 document.getElementById('orders-table-body').innerHTML = '';
                 document.getElementById('products-grid').innerHTML = '';
+                document.getElementById('sales-table-body').innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></td></tr>';
 
                 try {
                     const [detail, orders, products] = await Promise.all([
@@ -796,6 +797,9 @@
                             </div>
                         </div>
                     `).join('');
+
+                    // Auto-load sales tab data so it's ready when user clicks it
+                    await loadSupplierSales();
 
                 } catch(e) { console.error(e); if (window.appMessages) window.appMessages.showError('Failed to load history'); }
             };
