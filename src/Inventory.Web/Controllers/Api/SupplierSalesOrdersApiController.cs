@@ -16,6 +16,13 @@ public class SupplierSalesOrdersApiController : ControllerBase
         _services = services;
     }
 
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<SupplierSalesOrderResponseDto>>> GetRecent(CancellationToken ct)
+    {
+        var orders = await _services.GetRecentAsync(ct: ct);
+        return Ok(orders);
+    }
+
     [HttpGet("{id}")]
     public async Task<ActionResult<SupplierSalesOrderResponseDto>> GetById(long id, CancellationToken ct)
     {

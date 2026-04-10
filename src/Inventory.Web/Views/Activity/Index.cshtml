@@ -39,7 +39,7 @@
                         <thead>
                             <tr>
                                 <th>ORDER #</th>
-                                <th>CUSTOMER</th>
+                                <th>PARTY / TYPE</th>
                                 <th>DATE</th>
                                 <th>DEADLINE</th>
                                 <th>STATUS</th>
@@ -49,7 +49,7 @@
                             </tr>
                         </thead>
                         <tbody id="so-table-body">
-                            <tr><td colspan="7" class="text-center py-4 fw-bold">LOADING RECENT SALES...</td></tr>
+                            <tr><td colspan="8" class="text-center py-4 fw-bold">LOADING RECENT SALES...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -927,33 +927,94 @@
 
             // --- SALES ORDERS LOGIC ---
             async function loadSalesOrders() {
+                const tbody = document.getElementById('so-table-body');
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 fw-bold">LOADING RECENT SALES...</td></tr>';
                 try {
-                    const r = await fetch('/api/activity/sales-orders');
-                    if(!r.ok) throw new Error();
-                    const orders = await r.json();
-                    renderSalesOrders(orders);
-                } catch(e) { document.getElementById('so-table-body').innerHTML = '<tr><td colspan="7" class="text-center text-danger fw-bold">FAILED TO LOAD SALES ACTIVITY</td></tr>'; }
+                    const [soRes, ssoRes] = await Promise.all([
+                        fetch('/api/activity/sales-orders'),
+                        fetch('/api/supplier-sales-orders')
+                    ]);
+                    if (!soRes.ok) throw new Error('Failed to load customer orders');
+
+                    const customerOrders = (await soRes.json()).map(o => ({ ...o, _type: 'so' }));
+                    const supplierOrders = ssoRes.ok ? (await ssoRes.json()).map(o => ({ ...o, _type: 'sso' })) : [];
+
+                    // Merge and sort chronologically (newest first)
+                    const combined = [...customerOrders, ...supplierOrders]
+                        .sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate));
+
+                    renderSalesOrders(combined);
+                } catch(e) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger fw-bold">FAILED TO LOAD SALES ACTIVITY</td></tr>';
+                    if (window.appMessages) window.appMessages.showError(e.message || 'Failed to load sales activity');
+                }
             }
 
             function renderSalesOrders(orders) {
                 const tbody = document.getElementById('so-table-body');
-                if(!orders.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 fw-bold">NO RECENT SALES ACTIVITY.</td></tr>'; return; }
-                
-                tbody.innerHTML = orders.map(o => `
-                    <tr>
-                        <td><code class="fw-black fs-6 text-black">${o.orderNumber}</code></td>
-                        <td>${escapeHtml(o.customerName)}</td>
-                        <td class="small fw-bold">${formatDate(o.orderDate)}</td>
-                        <td class="small fw-bold ${new Date(o.dueDate) < new Date() && o.paymentStatus !== 1 ? 'text-danger' : ''}">${formatDate(o.dueDate)}</td>
-                        <td>${getSoStatusBadge(o.status)}</td>
-                        <td>${getPaymentBadge(o.paymentStatus)}</td>
-                        <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
-                        <td class="text-end">
-                            <button class="neo-btn neo-btn-info btn-sm p-1 px-3" onclick="viewSoDetails(${o.id})">VIEW</button>
-                        </td>
-                    </tr>
-                `).join('');
+                if (!orders.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 fw-bold">NO RECENT SALES ACTIVITY.</td></tr>'; return; }
+
+                tbody.innerHTML = orders.map(o => {
+                    if (o._type === 'sso') {
+                        // Supplier Sale Order row
+                        const isActive = o.status !== 2;
+                        const statusBadge = isActive
+                            ? '<span class="badge bg-black fw-black">ACTIVE</span>'
+                            : '<span class="badge bg-danger fw-black">CANCELLED</span>';
+                        return `
+                            <tr class="table-light">
+                                <td><code class="fw-black fs-6 text-black">${escapeHtml(o.orderNumber || 'SSO-' + o.id)}</code></td>
+                                <td>
+                                    <div class="fw-bold">${escapeHtml(o.supplierName || '')}</div>
+                                    <span class="badge" style="background:#6f42c1;font-size:0.65rem;letter-spacing:0.05em">SUPPLIER SALE</span>
+                                </td>
+                                <td class="small fw-bold">${formatDate(o.orderDate)}</td>
+                                <td class="text-muted small">—</td>
+                                <td>${statusBadge}</td>
+                                <td class="text-muted small">—</td>
+                                <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
+                                <td class="text-end">
+                                    <div class="d-flex gap-1 justify-content-end">
+                                        <a href="/SupplierSalesOrders/Details/${o.id}" class="neo-btn neo-btn-info btn-sm p-1 px-2">VIEW</a>
+                                        ${isActive ? `<button class="neo-btn neo-btn-warning btn-sm p-1 px-2" onclick="cancelSsoFromActivity(${o.id})">CANCEL</button>` : ''}
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        // Customer Sales Order row
+                        return `
+                            <tr>
+                                <td><code class="fw-black fs-6 text-black">${escapeHtml(o.orderNumber)}</code></td>
+                                <td>${escapeHtml(o.customerName)}</td>
+                                <td class="small fw-bold">${formatDate(o.orderDate)}</td>
+                                <td class="small fw-bold ${new Date(o.dueDate) < new Date() && o.paymentStatus !== 1 ? 'text-danger' : ''}">${formatDate(o.dueDate)}</td>
+                                <td>${getSoStatusBadge(o.status)}</td>
+                                <td>${getPaymentBadge(o.paymentStatus)}</td>
+                                <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
+                                <td class="text-end">
+                                    <button class="neo-btn neo-btn-info btn-sm p-1 px-3" onclick="viewSoDetails(${o.id})">VIEW</button>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                }).join('');
             }
+
+            window.cancelSsoFromActivity = async (id) => {
+                if (!await window.appMessages.confirm('Are you sure you want to cancel this supplier sale order?')) return;
+                try {
+                    const r = await fetch(`/api/supplier-sales-orders/${id}/cancel`, { method: 'POST' });
+                    if (!r.ok) {
+                        const msg = await r.text();
+                        throw new Error(msg || 'Cancellation failed');
+                    }
+                    if (window.appMessages) window.appMessages.showSuccess('Supplier sale order cancelled successfully.');
+                    await loadSalesOrders();
+                } catch (e) {
+                    if (window.appMessages) window.appMessages.showError(e.message || 'Cancellation failed');
+                }
+            };
 
             window.viewSoDetails = async (id) => {
                 window.switchSoView('detail');

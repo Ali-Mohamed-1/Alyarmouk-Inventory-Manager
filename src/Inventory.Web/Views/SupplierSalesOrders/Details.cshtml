@@ -1,4 +1,3 @@
-@using Inventory.Domain.Entities
 @model Inventory.Application.DTOs.SupplierSalesOrder.SupplierSalesOrderResponseDto
 @{
     ViewData["Title"] = $"Supplier Sale - {Model.OrderNumber}";
@@ -90,32 +89,32 @@
 
         <div class="col-lg-4">
             <div class="neo-card p-0 overflow-hidden mb-4 border-4">
-                <div class="p-3 bg-black text-white">
-                    <h5 class="mb-0 fw-black text-uppercase small">Financial Status</h5>
-                </div>
-                <div class="p-4 bg-white text-center">
-                    <div class="mb-0">
-                        <div class="small fw-black text-uppercase opacity-50">Settlement Status</div>
-                        <div class="h3 fw-black @(Model.PaymentStatus == PaymentStatus.Paid ? "text-success" : "text-danger")">
-                            @Model.PaymentStatus.ToString().ToUpper()
-                        </div>
-                        <div class="text-muted small">TOTAL: $@Model.TotalAmount.ToString("N2")</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="neo-card p-0 overflow-hidden mb-4 border-4">
                 <div class="p-3 bg-dark text-white">
                     <h5 class="mb-0 fw-black text-uppercase small">Order Properties</h5>
                 </div>
                 <div class="p-4 bg-white">
                     <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
                         <span class="small fw-black text-uppercase">ORDER STATUS:</span>
-                        <span class="badge @((int)Model.Status == 2 ? "bg-danger" : "bg-black") fw-black text-uppercase">@Model.Status.ToString().ToUpper()</span>
+                        @if ((int)Model.Status == 2)
+                        {
+                            <span class="badge bg-danger fw-black text-uppercase">CANCELLED</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-black fw-black text-uppercase">ACTIVE</span>
+                        }
                     </div>
                     <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                        <span class="small fw-black text-uppercase">DEADLINE:</span>
-                        <span class="fw-bold">@Model.DueDate.ToString("MMM dd, yyyy")</span>
+                        <span class="small fw-black text-uppercase">SUPPLIER:</span>
+                        <span class="fw-bold text-end" style="max-width:60%">@Model.SupplierName</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                        <span class="small fw-black text-uppercase">ORDER DATE:</span>
+                        <span class="fw-bold">@Model.OrderDate.ToString("MMM dd, yyyy")</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-0">
+                        <span class="small fw-black text-uppercase">TOTAL AMOUNT:</span>
+                        <span class="fw-black text-success">$@Model.TotalAmount.ToString("N2")</span>
                     </div>
                 </div>
             </div>
@@ -123,12 +122,11 @@
     </div>
 </div>
 
-@section Styles {
-    <style>
-        @@media print {
-            .neo-btn, .bi-arrow-left, .text-decoration-none { display: none !important; }
-            .neo-card { border: 2px solid #000 !important; box-shadow: none !important; }
-            .container-fluid { width: 100% !important; max-width: 100% !important; }
-        }
-    </style>
-}
+
+<style>
+    @@media print {
+        .neo-btn, .bi-arrow-left, .text-decoration-none { display: none !important; }
+        .neo-card { border: 2px solid #000 !important; box-shadow: none !important; }
+        .container-fluid { width: 100% !important; max-width: 100% !important; }
+    }
+</style>
