@@ -6,7 +6,8 @@ public enum OrderType
 {
     SalesQuery = 1, // "Sales" might be reserved or generic, using SalesOrder/PurchaseOrder is clearer
     SalesOrder = 1,
-    PurchaseOrder = 2
+    PurchaseOrder = 2,
+    SupplierSalesOrder = 3
 }
 
 public enum PaymentRecordType

@@ -72,7 +72,7 @@ namespace Inventory.Infrastructure.Services
                     Type = "Sales",
                     CounterpartyId = so.CustomerId,
                     CounterpartyName = so.CustomerNameSnapshot,
-                    PaymentDeadline = so.DueDate,
+                    DueDate = so.DueDate,
                     RemainingAmount = remainingAmount,
                     DaysUntilDue = daysUntil,
                     Message = message
@@ -83,13 +83,13 @@ namespace Inventory.Infrastructure.Services
             // Criteria:
             // - Not Cancelled
             // - RemainingAmount > 0 (money still owed)
-            // - PaymentDeadline exists and is within 7 days (past or future) – includes overdue
+            // - DueDate exists and is within 7 days (past or future) – includes overdue
             var purchaseOrders = await _db.PurchaseOrders
                 .AsNoTracking()
                 .Include(o => o.Payments)
                 .Where(o => o.Status != PurchaseOrderStatus.Cancelled &&
-                            o.PaymentDeadline.HasValue &&
-                            o.PaymentDeadline.Value <= upcomingWindow)
+                            o.DueDate.HasValue &&
+                            o.DueDate.Value <= upcomingWindow)
                 .ToListAsync(ct);
 
             foreach (var po in purchaseOrders)
@@ -110,8 +110,8 @@ namespace Inventory.Infrastructure.Services
                     continue;
                 }
 
-                var paymentDeadline = po.PaymentDeadline!.Value;
-                var daysUntil = (paymentDeadline - now).Days;
+                var dueDate = po.DueDate!.Value;
+                var daysUntil = (dueDate - now).Days;
                 var message = daysUntil < 0
                     ? $"Overdue by {Math.Abs(daysUntil)} days for Purchase Order #{po.OrderNumber} to {po.SupplierNameSnapshot}"
                     : $"Payment due in {daysUntil} days for Purchase Order #{po.OrderNumber} to {po.SupplierNameSnapshot}";
@@ -124,14 +124,14 @@ namespace Inventory.Infrastructure.Services
                     Type = "Purchase",
                     CounterpartyId = po.SupplierId,
                     CounterpartyName = po.SupplierNameSnapshot,
-                    PaymentDeadline = paymentDeadline,
+                    DueDate = dueDate,
                     RemainingAmount = remainingAmount,
                     DaysUntilDue = daysUntil,
                     Message = message
                 });
             }
 
-            return notifications.OrderBy(n => n.PaymentDeadline);
+            return notifications.OrderBy(n => n.DueDate);
         }
     }
 }

@@ -283,7 +283,7 @@ public class HistoricalOrdersIntegrationTests : IClassFixture<IntegrationTestFix
 
         // 4. Assert Supplier History
         var supplierBalance = await _reportingServices.GetSupplierBalanceAsync(1, ct);
-        Assert.Equal(500, supplierBalance.TotalPending);
+        Assert.Equal(500, supplierBalance.NetOwedToSupplier);
     }
 
     [Fact]
@@ -536,7 +536,7 @@ public class HistoricalOrdersIntegrationTests : IClassFixture<IntegrationTestFix
         var poId = await _purchaseServices.CreateAsync(purchaseReq, _user, ct);
 
         // Transition status to Received to trigger stock processing
-        await _purchaseServices.UpdateStatusAsync(poId, new UpdatePurchaseOrderStatusRequest { OrderId = poId, Status = PurchaseOrderStatus.Received }, _user, ct);
+        await _purchaseServices.UpdateStatusAsync(poId, PurchaseOrderStatus.Received, _user, ct: ct);
 
         // Verify Inventory Transaction Timestamp
         _db.ChangeTracker.Clear();

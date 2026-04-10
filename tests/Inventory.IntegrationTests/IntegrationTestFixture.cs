@@ -40,6 +40,7 @@ public sealed class IntegrationTestFixture : IDisposable
         services.AddScoped<IProductBatchServices, ProductBatchServices>();
         services.AddScoped<IFinancialServices, FinancialServices>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<ISupplierSalesOrderServices, SupplierSalesOrderServices>();
 
         _serviceProvider = services.BuildServiceProvider();
     }

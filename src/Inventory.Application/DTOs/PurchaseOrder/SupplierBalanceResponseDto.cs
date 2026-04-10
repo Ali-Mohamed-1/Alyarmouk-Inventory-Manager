@@ -7,31 +7,36 @@ namespace Inventory.Application.DTOs.PurchaseOrder
         public int SupplierId { get; init; }
         public string SupplierName { get; init; } = string.Empty;
 
-        /// <summary>
-        /// Total value of all non-cancelled purchase orders (minus refunds).
-        /// </summary>
-        public decimal TotalOrders { get; init; }
-        
-        /// <summary>
-        /// Total payments made to this supplier.
-        /// </summary>
-        public decimal TotalPayments { get; init; }
+        // ──────────────────────────────────────────────────────────────────────
+        // Metric 1: Total Volume
+        // Sum of ALL purchase order TotalAmounts regardless of status.
+        // Represents the total business volume placed with this supplier.
+        // ──────────────────────────────────────────────────────────────────────
+        public decimal TotalVolume { get; init; }
 
-        /// <summary>
-        /// Net balance owed to supplier (TotalOrders - TotalPayments).
-        /// </summary>
-        public decimal Balance => TotalOrders - TotalPayments;
+        // ──────────────────────────────────────────────────────────────────────
+        // Metric 2: Pending (NetOwedToSupplier)
+        // Formula: sum(PO.Remaining) - sum(SSO.TotalAmount where Status != Cancelled)
+        // A SupplierSalesOrder is a permanent bookkeeping entry. An active SSO
+        // immediately reduces NetOwedToSupplier by its full amount.
+        // ──────────────────────────────────────────────────────────────────────
+        public decimal NetOwedToSupplier { get; init; }
 
-        /// <summary>
-        /// Sum of all unpaid/partially paid purchase orders, regardless of deadline.
-        /// </summary>
-        public decimal TotalPending { get; init; }
+        // ──────────────────────────────────────────────────────────────────────
+        // Metric 3: Paid
+        // Total cash paid OUT to this supplier from the PaymentRecord ledger
+        // (PaymentType=Payment, OrderType=PurchaseOrder), net of PO refunds received.
+        // SupplierSalesOrders NEVER contribute to Paid.
+        // ──────────────────────────────────────────────────────────────────────
+        public decimal Paid { get; init; }
 
-        /// <summary>
-        /// Subset of TotalPending where PaymentDeadline has passed.
-        /// This is the "Deserved" balance - what we owe them NOW.
-        /// </summary>
-        public decimal Deserved { get; init; }
+        // ──────────────────────────────────────────────────────────────────────
+        // Metric 4: Overdue
+        // Sum of remaining balances on PurchaseOrders where DueDate < now
+        // and PaymentStatus is not Paid and Status is not Cancelled.
+        // SupplierSalesOrders do NOT offset the Overdue metric.
+        // ──────────────────────────────────────────────────────────────────────
+        public decimal Overdue { get; init; }
 
         public DateTimeOffset AsOfUtc { get; init; }
     }

@@ -13,6 +13,9 @@ public class RefundTransactionLine
     
     public long? PurchaseOrderLineId { get; set; }
     public PurchaseOrderLine? PurchaseOrderLine { get; set; }
+    
+    public long? SupplierSalesOrderLineId { get; set; }
+    public SupplierSalesOrderLine? SupplierSalesOrderLine { get; set; }
 
     public int ProductId { get; set; }
     public Product? Product { get; set; }

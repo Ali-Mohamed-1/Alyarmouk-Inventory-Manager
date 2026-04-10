@@ -45,12 +45,15 @@
             </div>
 
             <!-- Tabs -->
-            <ul class="nav nav-tabs border-0 mb-0" id="supplierTabs" role="tablist">
+            <ul class="nav nav-tabs border-0 mb-0 gap-2" id="supplierTabs" role="tablist">
                 <li class="nav-item">
-                    <button class="neo-btn active me-2" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-content" type="button" role="tab" onclick="switchView('list')">PURCHASE ORDERS</button>
+                    <button class="neo-btn active" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-content" type="button" role="tab" onclick="switchView('list')">PURCHASE ORDERS</button>
                 </li>
                 <li class="nav-item">
-                    <button class="neo-btn" id="products-tab" data-bs-toggle="tab" data-bs-target="#products-content" type="button" role="tab">PRODUCTS</button>
+                    <button class="neo-btn" id="products-tab" data-bs-toggle="tab" data-bs-target="#products-content" type="button" role="tab" onclick="switchView('list')">PRODUCTS</button>
+                </li>
+                <li class="nav-item">
+                    <button class="neo-btn" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales-content" type="button" role="tab" onclick="switchView('list'); loadSupplierSales();">SALES TO SUPPLIER</button>
                 </li>
             </ul>
 
@@ -200,6 +203,32 @@
                     </div>
                     <div id="products-grid" class="row row-cols-1 row-cols-md-3 g-4"></div>
                 </div>
+
+                <!-- Sales to Supplier Tab -->
+                <div class="tab-pane fade" id="sales-content" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="fw-black text-uppercase mb-0">Sales Orders Issued to Supplier</h5>
+                        <button class="neo-btn neo-btn-primary btn-sm" id="btn-new-supplier-sale" onclick="newSupplierSale()">
+                            <i class="bi bi-plus-lg"></i> NEW SALE TO SUPPLIER
+                        </button>
+                    </div>
+                    <div id="sales-list-view">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>ORDER #</th>
+                                        <th>DATE</th>
+                                        <th>STATUS</th>
+                                        <th class="text-end">TOTAL</th>
+                                        <th class="text-end">ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sales-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -210,6 +239,29 @@
 <input type="file" id="receiptUploadInput" accept="application/pdf" style="display:none" onchange="performUpload('receipt')" />
 
 <!-- MODALS -->
+
+<!-- Edit Deadline Modal -->
+<div class="modal fade" id="editDeadlineModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content border-4 border-black border-radius-0">
+            <div class="modal-header bg-black text-white">
+                <h5 class="modal-title fw-black text-uppercase small text-white">Edit Deadline</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <div class="mb-0">
+                    <label class="form-label fw-black text-uppercase small">New Payment Deadline</label>
+                    <input type="date" class="form-control fw-black text-center" id="newDeadlineInput">
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
+                <button class="neo-btn neo-btn-primary btn-sm px-4" onclick="saveDeadline()">UPDATE</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <!-- Edit Order Date Modal -->
 <div class="modal fade" id="editOrderDateModal" tabindex="-1">
@@ -534,27 +586,7 @@
     </div>
 </div>
 
-<!-- Edit Deadline Modal -->
-<div class="modal fade" id="editDeadlineModal" tabindex="-1">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content border-4 border-black border-radius-0">
-            <div class="modal-header bg-black text-white">
-                <h5 class="modal-title fw-black text-uppercase small text-white">Edit Deadline</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4 text-center">
-                <div class="mb-0">
-                    <label class="form-label fw-black text-uppercase small">New Payment Deadline</label>
-                    <input type="date" class="form-control fw-black text-center" id="newDeadlineInput">
-                </div>
-            </div>
-            <div class="modal-footer border-0 p-4 pt-0">
-                <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
-                <button class="neo-btn neo-btn-primary btn-sm px-4" onclick="saveDeadline()">UPDATE</button>
-            </div>
-        </div>
-    </div>
-</div>
+
 
 @section Scripts {
     <script>
@@ -601,13 +633,74 @@
                 await loadSuppliers();
             }
 
+            window.loadSupplierSales = async function() {
+                if(!currentSupplierId) return;
+                const tbody = document.getElementById('sales-table-body');
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></td></tr>';
+
+                try {
+                    const r = await fetch(`/api/suppliers/${currentSupplierId}/sales-orders`);
+                    if(!r.ok) throw new Error('Failed to load sales');
+                    const orders = await r.json();
+
+                    if(!orders.length) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 fw-bold">NO SALES ISSUED TO THIS SUPPLIER.</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = orders.map(o => {
+                        const isActive = o.status !== 2;
+                        return `
+                            <tr>
+                                <td><code class="fw-black fs-6 text-black">${o.orderNumber || 'SSO-'+o.id}</code></td>
+                                <td class="small fw-bold">${formatDate(o.orderDate)}</td>
+                                <td>${isActive ? '<span class="badge bg-black fw-black">ACTIVE</span>' : '<span class="badge bg-danger fw-black">CANCELLED</span>'}</td>
+                                <td class="text-end fw-black">${formatCurrency(o.totalAmount)}</td>
+                                <td class="text-end">
+                                    <div class="d-flex gap-1 justify-content-end">
+                                        <a href="/SupplierSalesOrders/Details/${o.id}" class="neo-btn neo-btn-info btn-sm p-1 px-2">VIEW</a>
+                                        ${isActive ? `<button class="neo-btn neo-btn-warning btn-sm p-1 px-2" onclick="cancelSupplierSale(${o.id})">CANCEL</button>` : ''}
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                } catch(e) {
+                    if(window.appMessages) window.appMessages.showError(e.message);
+                }
+            };
+
+            window.newSupplierSale = function() {
+                if(!currentSupplierId) return;
+                window.location.href = `/SupplierSalesOrders/Create?supplierId=${currentSupplierId}`;
+            };
+
+            window.cancelSupplierSale = async function(id) {
+                if(!await window.appMessages.confirm('Are you sure you want to cancel this sale?')) return;
+                try {
+                    const r = await fetch(`/api/supplier-sales-orders/${id}/cancel`, { method: 'POST' });
+                    if(!r.ok) {
+                        const msg = await r.text();
+                        throw new Error(msg || 'Cancellation failed');
+                    }
+                    if(window.appMessages) window.appMessages.showSuccess('Order cancelled successfully.');
+                    await loadSupplierSales();
+                    await viewHistory(currentSupplierId); // Refresh balance
+                } catch(e) {
+                    if(window.appMessages) window.appMessages.showError(e.message);
+                }
+            };
+
             async function loadSuppliers() {
                 try {
                     const r = await fetch('/api/suppliers');
-                    if(!r.ok) throw new Error();
+                    if(!r.ok) throw new Error('API request failed');
                     allSuppliers = await r.json();
                     renderSuppliers(allSuppliers);
-                } catch(e) { document.getElementById('suppliers-grid').innerHTML = '<div class="col-12 text-center text-danger fw-black py-5">FAILED TO LOAD SUPPLIERS</div>'; }
+                } catch(e) { 
+                    document.getElementById('suppliers-grid').innerHTML = '<div class="col-12 text-center text-danger fw-black py-5">FAILED TO LOAD SUPPLIERS</div>'; 
+                    if(window.appMessages) window.appMessages.showError('Critical: Suppliers list could not be retrieved.');
+                }
             }
 
             function renderSuppliers(list) {
@@ -643,6 +736,7 @@
                 document.getElementById('supplier-info').innerHTML = '<div class="p-3 text-center"><div class="spinner-border"></div></div>';
                 document.getElementById('orders-table-body').innerHTML = '';
                 document.getElementById('products-grid').innerHTML = '';
+                document.getElementById('sales-table-body').innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></td></tr>';
 
                 try {
                     const [detail, orders, products] = await Promise.all([
@@ -658,11 +752,10 @@
                          <div class="mb-0 d-flex justify-content-between"><span>ADDRESS:</span> <strong class="text-uppercase text-end" style="max-width: 60%;">${escapeHtml(detail.supplier.address||'N/A')}</strong></div>`;
                     
                     document.getElementById('performance-info').innerHTML = `
-                         <div class="mb-2 d-flex justify-content-between"><span>TOTAL VOL:</span> <strong class="fw-black">${formatCurrency(detail.balance.totalOrders)}</strong></div>
-                         <div class="mb-2 d-flex justify-content-between"><span>TOTAL PAID:</span> <strong class="fw-black">${formatCurrency(detail.balance.totalPayments)}</strong></div>
-                         <div class="mb-2 d-flex justify-content-between pt-2 border-top border-white"><span>TOTAL PENDING:</span> <strong class="fw-black">${formatCurrency(detail.balance.totalPending)}</strong></div>
-                         <div class="mb-2 d-flex justify-content-between"><span class="text-warning">DESERVED (OVERDUE):</span> <strong class="fw-black text-warning">${formatCurrency(detail.balance.deserved)}</strong></div>
-                         <div class="mb-0 d-flex justify-content-between pt-2 border-top border-white"><span>DEBT BALANCE:</span> <strong class="h5 mb-0 fw-black">${formatCurrency(detail.balance.balance)}</strong></div>`;
+                         <div class="mb-2 d-flex justify-content-between"><span>TOTAL VOLUME:</span> <strong class="fw-black">${formatCurrency(detail.balance.totalVolume)}</strong></div>
+                         <div class="mb-2 d-flex justify-content-between"><span>PENDING (NET):</span> <strong class="fw-black">${formatCurrency(detail.balance.netOwedToSupplier)}</strong></div>
+                         <div class="mb-3 d-flex justify-content-between pt-2 border-top border-white"><span>PAID:</span> <strong class="fw-black">${formatCurrency(detail.balance.paid)}</strong></div>
+                         <div class="mb-0 d-flex justify-content-between pt-2 border-top border-white"><span class="text-warning">OVERDUE:</span> <strong class="h5 mb-0 fw-black text-warning">${formatCurrency(detail.balance.overdue)}</strong></div>`;
 
                     const tbody = document.getElementById('orders-table-body');
                     if(!orders.length) tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 fw-bold">NO ORDERS IN LOG.</td></tr>';
@@ -704,6 +797,9 @@
                             </div>
                         </div>
                     `).join('');
+
+                    // Auto-load sales tab data so it's ready when user clicks it
+                    await loadSupplierSales();
 
                 } catch(e) { console.error(e); if (window.appMessages) window.appMessages.showError('Failed to load history'); }
             };

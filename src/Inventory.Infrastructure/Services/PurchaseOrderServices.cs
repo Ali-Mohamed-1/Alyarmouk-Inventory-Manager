@@ -148,7 +148,7 @@ namespace Inventory.Infrastructure.Services
                     CreatedByUserId = user.UserId,
                     CreatedByUserDisplayName = user.UserDisplayName,
                     // Treat the incoming DueDate as the initial supplier payment deadline
-                    PaymentDeadline = req.DueDate,
+                    DueDate = req.DueDate,
                     Note = req.Note,
                     IsTaxInclusive = req.IsTaxInclusive,
                     ApplyVat = req.ApplyVat,
@@ -442,7 +442,7 @@ namespace Inventory.Infrastructure.Services
         }
 
 
-        public async Task UpdatePaymentDeadlineAsync(long id, DateTimeOffset? newDeadline, UserContext user, CancellationToken ct = default)
+        public async Task UpdateDueDateAsync(long id, DateTimeOffset? newDueDate, UserContext user, CancellationToken ct = default)
         {
             ValidateUser(user);
             var order = await _db.PurchaseOrders.FindAsync(new object[] { id }, ct);
@@ -451,13 +451,13 @@ namespace Inventory.Infrastructure.Services
             if (order.Status == PurchaseOrderStatus.Cancelled)
                 throw new ValidationException("Cannot modify the payment deadline of a cancelled order.");
 
-            if (order.PaymentDeadline == newDeadline) return;
+            if (order.DueDate == newDueDate) return;
 
             await using var transaction = await _db.Database.BeginTransactionAsync(ct);
             try
             {
-                var previousDeadline = order.PaymentDeadline;
-                order.PaymentDeadline = newDeadline;
+                var previousDeadline = order.DueDate;
+                order.DueDate = newDueDate;
 
                 await _db.SaveChangesAsync(ct);
 
@@ -952,7 +952,7 @@ namespace Inventory.Infrastructure.Services
                 SupplierName = o.SupplierNameSnapshot,
                 OrderDate = o.OrderDate,
                 CreatedUtc = o.CreatedUtc,
-                PaymentDeadline = o.PaymentDeadline,
+                DueDate = o.DueDate,
                 Status = o.Status,
                 PaymentStatus = o.PaymentStatus,
                 CreatedByUserDisplayName = o.CreatedByUserDisplayName,

@@ -30,6 +30,7 @@ namespace Inventory.Infrastructure
             services.AddScoped<IReportingServices, ReportingServices>();
             services.AddScoped<ISupplierServices, SupplierServices>();
             services.AddScoped<IPurchaseOrderServices, PurchaseOrderServices>();
+            services.AddScoped<ISupplierSalesOrderServices, SupplierSalesOrderServices>();
             services.AddScoped<IProductBatchServices, ProductBatchServices>();
             services.AddScoped<IFinancialServices, FinancialServices>();
             services.AddScoped<INotificationService, NotificationService>();

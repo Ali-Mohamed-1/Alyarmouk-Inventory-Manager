@@ -133,7 +133,7 @@ namespace Inventory.UnitTests
                 CreatedUtc = now,
                 CreatedByUserId = "test-user",
                 CreatedByUserDisplayName = "Test User",
-                PaymentDeadline = now.AddDays(4),
+                DueDate = now.AddDays(4),
                 TotalAmount = 250m
             };
 
@@ -168,7 +168,7 @@ namespace Inventory.UnitTests
                 CreatedUtc = now,
                 CreatedByUserId = "test-user",
                 CreatedByUserDisplayName = "Test User",
-                PaymentDeadline = now.AddDays(2),
+                DueDate = now.AddDays(2),
                 TotalAmount = 300m
             };
 
@@ -298,7 +298,7 @@ namespace Inventory.UnitTests
                 CreatedUtc = now,
                 CreatedByUserId = "test-user",
                 CreatedByUserDisplayName = "Test User",
-                PaymentDeadline = now.AddDays(-1),
+                DueDate = now.AddDays(-1),
                 TotalAmount = 300m
             };
             _db.PurchaseOrders.Add(po);
@@ -340,7 +340,7 @@ namespace Inventory.UnitTests
                 CreatedUtc = now,
                 CreatedByUserId = "test-user",
                 CreatedByUserDisplayName = "Test User",
-                PaymentDeadline = now.AddDays(15),
+                DueDate = now.AddDays(15),
                 TotalAmount = 75m
             };
 

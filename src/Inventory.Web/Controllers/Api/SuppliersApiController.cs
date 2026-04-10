@@ -4,7 +4,12 @@ using System.Threading.Tasks;
 using Inventory.Application.Abstractions;
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.Supplier;
+using Inventory.Application.DTOs.SupplierSalesOrder;
+using Inventory.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Inventory.Domain.Entities;
+using System.Linq;
 
 namespace Inventory.Web.Controllers.Api;
 
@@ -15,15 +20,18 @@ public sealed class SuppliersApiController : ControllerBase
     private readonly ISupplierServices _suppliers;
     private readonly IPurchaseOrderServices _purchaseOrders;
     private readonly IReportingServices _reporting;
+    private readonly AppDbContext _db;
 
     public SuppliersApiController(
         ISupplierServices suppliers,
         IPurchaseOrderServices purchaseOrders,
-        IReportingServices reporting)
+        IReportingServices reporting,
+        AppDbContext db)
     {
         _suppliers = suppliers;
         _purchaseOrders = purchaseOrders;
         _reporting = reporting;
+        _db = db;
     }
 
     /// <summary>
@@ -64,6 +72,35 @@ public sealed class SuppliersApiController : ControllerBase
     public async Task<IActionResult> GetPurchaseOrders(int id, CancellationToken cancellationToken)
     {
         var orders = await _purchaseOrders.GetBySupplierAsync(id, cancellationToken);
+        return Ok(orders);
+    }
+
+    /// <summary>
+    /// Get all sales orders for a specific supplier
+    /// </summary>
+    [HttpGet("{id:int}/sales-orders")]
+    public async Task<IActionResult> GetSalesOrders(int id, CancellationToken cancellationToken)
+    {
+        var orders = await _db.SupplierSalesOrders
+            .AsNoTracking()
+            .Where(o => o.SupplierId == id)
+            .OrderByDescending(o => o.OrderDate)
+            .ThenByDescending(o => o.Id)
+            .Select(o => new SupplierSalesOrderResponseDto
+            {
+                Id = o.Id,
+                OrderNumber = o.OrderNumber,
+                SupplierId = o.SupplierId,
+                SupplierName = o.SupplierNameSnapshot,
+                CreatedUtc = o.CreatedUtc,
+                OrderDate = o.OrderDate,
+                DueDate = o.DueDate,
+                Status = o.Status,
+                PaymentStatus = o.PaymentStatus,
+                TotalAmount = o.TotalAmount
+            })
+            .ToListAsync(cancellationToken);
+
         return Ok(orders);
     }
 

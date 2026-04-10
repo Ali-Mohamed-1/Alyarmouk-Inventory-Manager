@@ -104,7 +104,7 @@ public class PurchaseOrder
         return Math.Max(0, net - TotalAmount);
     }
 
-    public bool IsOverdue() => PaymentDeadline.HasValue && PaymentDeadline.Value < DateTimeOffset.UtcNow && PaymentStatus != PurchasePaymentStatus.Paid;
+    public bool IsOverdue() => DueDate.HasValue && DueDate.Value < DateTimeOffset.UtcNow && PaymentStatus != PurchasePaymentStatus.Paid;
 
     public decimal GetDeservedAmount()
     {
@@ -119,7 +119,7 @@ public class PurchaseOrder
     /// <summary>
     /// When payment to the supplier is expected/due.
     /// </summary>
-    public DateTimeOffset? PaymentDeadline { get; set; }
+    public DateTimeOffset? DueDate { get; set; }
 
     /// <summary>
     /// For check payments: whether we received/issued the check.

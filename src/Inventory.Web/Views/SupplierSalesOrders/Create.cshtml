@@ -1,0 +1,467 @@
+@model Inventory.Application.DTOs.SupplierSalesOrder.CreateSupplierSalesOrderRequest
+@{
+    ViewData["Title"] = "New Sale to Supplier";
+    var suppliers = ViewBag.Suppliers as IEnumerable<Inventory.Application.DTOs.Supplier.SupplierDropdownResponse> ?? new List<Inventory.Application.DTOs.Supplier.SupplierDropdownResponse>();
+}
+
+<style>
+    /* Hide number input arrows/spinners */
+    input::-webkit-outer-spin-button, 
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+</style>
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <a asp-controller="Suppliers" asp-action="Index" class="text-decoration-none text-muted small fw-bold mb-2 d-block">
+                <i class="bi bi-arrow-left me-1"></i> BACK TO SUPPLIERS
+            </a>
+            <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Issue New <span class="text-primary">Sale to Supplier</span></h1>
+        </div>
+    </div>
+
+    <form asp-action="Create" method="post" id="createOrderForm">
+        @Html.AntiForgeryToken()
+        <div class="row g-5">
+            <!-- Left Side: Order Params & Financials -->
+            <div class="col-lg-3">
+                <div class="neo-card p-0 overflow-hidden mb-4">
+                    <div class="p-3 bg-black text-white">
+                        <h5 class="mb-0 fw-black text-uppercase small">Order Parameters</h5>
+                    </div>
+                    <div class="p-4" style="background: white;">
+                        <div class="mb-4">
+                            <label asp-for="SupplierId" class="form-label fw-black text-uppercase small">Target Supplier</label>
+                            <select asp-for="SupplierId" class="form-select fw-bold" required>
+                                <option value="">-- SELECT SUPPLIER --</option>
+                                @foreach (var s in suppliers)
+                                {
+                                    <option value="@s.Id">@s.Name.ToUpper()</option>
+                                }
+                            </select>
+                            <span asp-validation-for="SupplierId" class="text-danger small fw-bold"></span>
+                        </div>
+
+                        <div class="mb-4">
+                            <label asp-for="OrderDate" class="form-label fw-black text-uppercase small">Order Timestamp</label>
+                            <input asp-for="OrderDate" type="date" class="form-control fw-bold" id="OrderDateInput" value="@Model.OrderDate?.ToString("yyyy-MM-dd")" />
+                        </div>
+
+                        <div class="mb-4">
+                            <label asp-for="DueDate" class="form-label fw-black text-uppercase small">Deadline / Due Date</label>
+                            <input asp-for="DueDate" type="date" class="form-control fw-bold" id="DueDateInput" value="@Model.DueDate?.ToString("yyyy-MM-dd")" required />
+                            <span asp-validation-for="DueDate" class="text-danger small fw-bold"></span>
+                        </div>
+
+                        <div class="mb-0">
+                            <label asp-for="Note" class="form-label fw-black text-uppercase small">Operational Notes</label>
+                            <textarea asp-for="Note" class="form-control fw-bold" rows="3" placeholder="Additional context..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Financial Details -->
+                <div class="neo-card p-0 overflow-hidden mb-4" style="background: var(--neo-yellow);">
+                    <div class="p-3 bg-black text-white">
+                        <h5 class="mb-0 fw-black text-uppercase small">Financial Context</h5>
+                    </div>
+                    <div class="p-4 bg-dark">
+                        <div class="mb-4">
+                            <label asp-for="PaymentStatus" class="form-label fw-black text-uppercase small text-white">Initial Pay Status</label>
+                            <select asp-for="PaymentStatus" class="form-select fw-black text-center">
+                                <option value="0">PENDING</option>
+                                <option value="1">PAID UPON ISSUANCE</option>
+                            </select>
+                            <span class="small text-muted d-block mt-2" style="color: #aaa !important;">"PAID" will immediately subtract from the supplier's debt.</span>
+                        </div>
+
+                        <div class="neo-card p-3 bg-white mb-0 border-2">
+                            <div class="form-check mb-3">
+                                <input asp-for="ApplyVat" class="form-check-input" type="checkbox" checked>
+                                <label class="form-check-label fw-black text-uppercase small ms-2" asp-for="ApplyVat">Apply VAT (14%)</label>
+                            </div>
+                            <div class="form-check mb-0">
+                                <input asp-for="ApplyManufacturingTax" class="form-check-input" type="checkbox" checked>
+                                <label class="form-check-label fw-black text-uppercase small ms-2" asp-for="ApplyManufacturingTax">Apply MAN. Tax (1%)</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Order Items -->
+            <div class="col-lg-9">
+                <div class="neo-card p-0 h-100 d-flex flex-column">
+                    <div class="p-3 bg-black text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-black text-uppercase small">Sale Line Items</h5>
+                        <button type="button" class="neo-btn neo-btn-success btn-sm" onclick="addLineItem()">
+                            <i class="bi bi-plus-lg"></i> ADD ITEM
+                        </button>
+                    </div>
+                    <div class="p-0 flex-grow-1" style="background: white;">
+                        <div class="w-100" style="min-height: 300px; overflow: visible;">
+                            <table class="table table-hover align-middle mb-0" id="itemsTable">
+                                <thead class="table-dark text-white small text-uppercase fw-black">
+                                    <tr>
+                                        <th style="width: 40%; min-width: 300px;" class="ps-4">PRODUCT RECORD</th>
+                                        <th style="width: 25%; min-width: 200px;">BATCH / LOT</th>
+                                        <th style="width: 15%">QUANTITY</th>
+                                        <th style="width: 15%">UNIT PRICE</th>
+                                        <th style="width: 5%" class="text-end pe-4">TRASH</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lineItemsContainer">
+                                    <!-- Lines added here via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div id="emptyState" class="text-center py-5">
+                            <i class="bi bi-cart-x text-muted" style="font-size: 4rem; opacity: 0.2;"></i>
+                            <p class="fw-black text-muted mt-3">MANIFEST IS CURRENTLY EMPTY.</p>
+                            <button type="button" class="neo-btn" onclick="addLineItem()">COMMENCE ENTRY</button>
+                        </div>
+                    </div>
+                    <div class="p-4 border-top border-4 bg-white">
+                        <div class="row g-4 align-items-end">
+                            <div class="col-md-5">
+                                <div class="neo-card p-3 bg-light mb-0 border-2">
+                                    <p class="small text-muted mb-0 fw-bold">TOTALS CALCULATED DYNAMICALLY BASED ON SELECTION.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-7">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="fw-black text-uppercase small">SUBTOTAL:</span>
+                                    <span id="displaySubtotal" class="fw-black">$0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="fw-black text-uppercase small text-muted">VAT (14%):</span>
+                                    <span id="displayVat" class="fw-black text-muted">$0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="fw-black text-uppercase small text-muted">MAN. TAX (1%):</span>
+                                    <span id="displayManTax" class="fw-black text-muted">$0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-4 border-top border-2 pt-2">
+                                    <span class="fw-black text-uppercase fs-5">EST. GRAND TOTAL:</span>
+                                    <span id="displayTotal" class="fw-black fs-4 text-success">$0.00</span>
+                                </div>
+                                <button type="submit" class="neo-btn neo-btn-primary w-100 py-3 fw-black fs-5">
+                                    <i class="bi bi-check2-circle me-2"></i> EXECUTE SALE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        let lineCount = 0;
+        let products = [];
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.searchable-dropdown')) {
+                document.querySelectorAll('.searchable-dropdown .dropdown-menu').forEach(menu => {
+                    menu.classList.remove('show');
+                });
+            }
+        });
+
+        async function loadProducts() {
+            try {
+                const response = await fetch('/api/products/with-stock');
+                products = await response.json();
+                if (lineCount === 0) addLineItem();
+            } catch (error) {
+                console.error('Error loading products:', error);
+            }
+        }
+
+        async function fetchBatches(productId) {
+            try {
+                const response = await fetch(`/api/products/${productId}/batches`);
+                const allBatches = await response.json();
+                return allBatches.filter(b => (b.onHand && b.onHand > 0));
+            } catch (error) {
+                console.error('Error loading batches:', error);
+                return [];
+            }
+        }
+
+        function setupDropdown(input, list, items, onSelect, itemRenderer) {
+            const show = () => {
+                document.querySelectorAll('.searchable-dropdown .dropdown-menu.show').forEach(m => m !== list && m.classList.remove('show'));
+                
+                list.innerHTML = '';
+                const filter = input.value.toLowerCase();
+                const filtered = items.filter(i => itemRenderer(i).text.toLowerCase().includes(filter));
+                
+                if (filtered.length === 0) {
+                    list.innerHTML = '<li class="dropdown-item text-muted small">No matches found</li>';
+                } else {
+                    filtered.forEach(item => {
+                        const rendered = itemRenderer(item);
+                        const li = document.createElement('li');
+                        li.className = 'dropdown-item small py-2 border-bottom';
+                        li.style.cursor = 'pointer';
+                        li.style.whiteSpace = 'normal';
+                        li.innerHTML = rendered.html;
+                        li.onclick = () => {
+                            input.value = rendered.text;
+                            onSelect(item);
+                            list.classList.remove('show');
+                        };
+                        list.appendChild(li);
+                    });
+                }
+                list.classList.add('show');
+            };
+
+            input.addEventListener('focus', show);
+            input.addEventListener('input', show);
+        }
+
+        function addLineItem() {
+            if (products.length === 0) return;
+            const container = document.getElementById('lineItemsContainer');
+            const emptyState = document.getElementById('emptyState');
+            emptyState.style.display = 'none';
+
+            const idx = lineCount++;
+            const row = document.createElement('tr'); row.id = `line-row-${idx}`;
+            
+            row.innerHTML = `
+                <td class="ps-4 py-3 align-top">
+                    <div class="searchable-dropdown position-relative" id="product-dropdown-${idx}">
+                        <input type="text" class="form-control fw-black text-uppercase" placeholder="SEARCH PRODUCT..." id="product-search-${idx}" autocomplete="off">
+                        <input type="hidden" name="Lines[${idx}].ProductId" id="product-id-input-${idx}" required>
+                         <input type="hidden" name="Lines[${idx}].ProductName" id="product-name-input-${idx}">
+                        <ul class="dropdown-menu w-100 shadow-lg border-0 rounded-0" id="product-list-${idx}" style="max-height: 300px; overflow-y: auto;"></ul>
+                    </div>
+                </td>
+                <td class="align-top">
+                    <div class="searchable-dropdown position-relative" id="batch-dropdown-${idx}">
+                        <input type="text" class="form-control fw-bold small" placeholder="SELECT BATCH" id="batch-search-${idx}" disabled autocomplete="off">
+                        <input type="hidden" name="Lines[${idx}].BatchNumber" id="batch-number-input-${idx}" required>
+                        <input type="hidden" name="Lines[${idx}].ProductBatchId" id="batch-id-input-${idx}">
+                        <ul class="dropdown-menu w-100 shadow-lg border-0 rounded-0" id="batch-list-${idx}" style="max-height: 300px; overflow-y: auto;"></ul>
+                    </div>
+                </td>
+                <td class="align-top">
+                    <input name="Lines[${idx}].Quantity" type="number" step="0.01" class="form-control fw-black text-center item-qty" onchange="calculateTotals()" value="1.00" required />
+                </td>
+                <td class="align-top">
+                    <input name="Lines[${idx}].UnitPrice" id="price-input-${idx}" type="number" step="0.01" class="form-control fw-black item-price small" onchange="calculateTotals()" value="0.00" required />
+                </td>
+                <td class="text-end pe-4 align-top">
+                    <button type="button" class="neo-btn neo-btn-danger btn-sm py-1" onclick="removeLineItem(${idx})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            `;
+            container.appendChild(row);
+
+            const pInput = document.getElementById(`product-search-${idx}`);
+            const pList = document.getElementById(`product-list-${idx}`);
+            
+            setupDropdown(pInput, pList, products, async (product) => {
+                document.getElementById(`product-id-input-${idx}`).value = product.productId;
+                document.getElementById(`product-name-input-${idx}`).value = product.name;
+                document.getElementById(`price-input-${idx}`).value = "0.00";
+                
+                const bInput = document.getElementById(`batch-search-${idx}`);
+                const bList = document.getElementById(`batch-list-${idx}`);
+                bInput.value = '';
+                bInput.disabled = true;
+                document.getElementById(`batch-number-input-${idx}`).value = '';
+                document.getElementById(`batch-id-input-${idx}`).value = '';
+                
+                const batches = await fetchBatches(product.productId);
+                
+                if (batches.length > 0) {
+                    bInput.disabled = false;
+                    bInput.placeholder = "SELECT BATCH...";
+                    
+                    setupDropdown(bInput, bList, batches, (batch) => {
+                        document.getElementById(`batch-number-input-${idx}`).value = batch.batchNumber;
+                        document.getElementById(`batch-id-input-${idx}`).value = batch.id;
+                        
+                        const available = batch.onHand - (batch.reserved || 0);
+                        const qtyInput = row.querySelector('.item-qty');
+                        qtyInput.max = available;
+                        if (parseFloat(qtyInput.value) > available) {
+                            qtyInput.value = available.toFixed(2);
+                        }
+
+                        qtyInput.addEventListener('input', function() {
+                            const val = parseFloat(this.value);
+                            const max = parseFloat(this.max);
+                            if (val > max) {
+                                this.value = max.toFixed(2);
+                                calculateTotals();
+                            }
+                        });
+                        
+                        const price = batch.unitPrice || batch.UnitPrice || 0;
+                        document.getElementById(`price-input-${idx}`).value = price.toFixed(2);
+                        calculateTotals();
+                    }, (batch) => {
+                        const available = batch.onHand - (batch.reserved || 0);
+                        return {
+                            text: batch.batchNumber,
+                            html: `
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold">${batch.batchNumber}</span>
+                                    <span class="badge bg-dark text-white rounded-pill">Avail: ${available}</span>
+                                </div>
+                                <div class="small text-muted">Price: $${(batch.unitPrice||0).toFixed(2)}</div>
+                            `
+                        };
+                    });
+                } else {
+                    bInput.placeholder = "NO STOCK AVAILABLE";
+                }
+
+                calculateTotals();
+            }, (product) => {
+                return {
+                    text: product.name.toUpperCase(),
+                    html: `
+                        <div class="fw-bold">${product.name.toUpperCase()}</div>
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>SKU: ${product.sku}</span>
+                            <span>Stock: ${product.onHand} ${product.unit}</span>
+                        </div>
+                    `
+                };
+            });
+
+            calculateTotals();
+        }
+
+        function removeLineItem(idx) {
+            document.getElementById(`line-row-${idx}`).remove();
+            if (document.querySelectorAll('#lineItemsContainer tr').length === 0) {
+                document.getElementById('emptyState').style.display = 'block';
+            }
+            calculateTotals();
+        }
+
+        function calculateTotals() {
+            const round = (val) => Math.round(val * 100) / 100;
+
+            let subtotal = 0;
+            const qtys = document.querySelectorAll('.item-qty');
+            const prices = document.querySelectorAll('.item-price');
+            for (let i = 0; i < qtys.length; i++) {
+                subtotal += (parseFloat(qtys[i].value) || 0) * (parseFloat(prices[i].value) || 0);
+            }
+            subtotal = round(subtotal);
+            
+            const applyVat = document.querySelector('[name="ApplyVat"]').checked;
+            const applyManTax = document.querySelector('[name="ApplyManufacturingTax"]').checked;
+
+            let vat = 0;
+            let manTax = 0;
+
+            if (applyVat) vat = round(subtotal * 0.14);
+            if (applyManTax) manTax = round(subtotal * 0.01);
+
+            const grandTotal = round(subtotal + vat - manTax);
+
+            document.getElementById('displaySubtotal').textContent = formatCurrency(subtotal);
+            document.getElementById('displayVat').textContent = formatCurrency(vat);
+            document.getElementById('displayManTax').textContent = (manTax > 0 ? "-" : "") + formatCurrency(manTax);
+            document.getElementById('displayTotal').textContent = formatCurrency(grandTotal);
+        }
+
+        function togglePaymentFields() {
+            const method = document.getElementById('paymentMethodSelect').value;
+            document.getElementById('checkFields').style.display = (method === '2') ? 'block' : 'none';
+            document.getElementById('bankFields').style.display = (method === '3') ? 'block' : 'none';
+        }
+
+        function formatCurrency(a) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(a); }
+
+        loadProducts();
+        document.querySelectorAll('[name="ApplyVat"], [name="ApplyManufacturingTax"]').forEach(input => {
+            input.addEventListener('change', calculateTotals);
+        });
+
+        // Deadline auto-calculation
+        const orderDateInput = document.getElementById('OrderDateInput');
+        const dueDateInput = document.getElementById('DueDateInput');
+        let deadlineManuallyChanged = false;
+
+        if (orderDateInput && dueDateInput) {
+            orderDateInput.addEventListener('change', function() {
+                if (!deadlineManuallyChanged) {
+                    const orderDate = new Date(this.value);
+                    if (!isNaN(orderDate.getTime())) {
+                        const dueDate = new Date(orderDate);
+                        dueDate.setMonth(dueDate.getMonth() + 1);
+                        const year = dueDate.getFullYear();
+                        const month = String(dueDate.getMonth() + 1).padStart(2, '0');
+                        const day = String(dueDate.getDate()).padStart(2, '0');
+                        dueDateInput.value = `${year}-${month}-${day}`;
+                    }
+                }
+            });
+            dueDateInput.addEventListener('change', () => deadlineManuallyChanged = true);
+        }
+
+        // Form Submission Interceptor
+        const form = document.querySelector('form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = form.querySelector('button[type="submit"]');
+            const originalHtml = btn.innerHTML;
+            
+            // Validate
+            if (document.querySelectorAll('#lineItemsContainer tr').length === 0) {
+                if (window.appMessages) window.appMessages.showError('ORDER MUST CONTAIN AT LEAST ONE LINE ITEM.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> PROCESSING...';
+
+            try {
+                const formData = new FormData(form);
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'RequestVerificationToken': document.querySelector('[name="__RequestVerificationToken"]').value
+                    }
+                });
+
+                if (response.ok) {
+                    if (window.appMessages) window.appMessages.showSuccess('SUPPLIER SALE EXECUTED SUCCESSFULLY.');
+                    // The server returns a redirect URL or we can guess it
+                    window.location.href = response.url;
+                } else {
+                    const errorText = await response.text();
+                    if (window.appMessages) window.appMessages.showError(errorText || 'FAILED TO EXECUTE SALE.');
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            } catch (error) {
+                if (window.appMessages) window.appMessages.showError('NETWORK ERROR OCCURRED.');
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        });
+    </script>
+}

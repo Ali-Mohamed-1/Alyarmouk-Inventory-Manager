@@ -1,0 +1,132 @@
+@model Inventory.Application.DTOs.SupplierSalesOrder.SupplierSalesOrderResponseDto
+@{
+    ViewData["Title"] = $"Supplier Sale - {Model.OrderNumber}";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <a href="/Suppliers?id=@Model.SupplierId" class="text-decoration-none text-muted small fw-bold mb-2 d-block">
+                <i class="bi bi-arrow-left me-1"></i> BACK TO SUPPLIER
+            </a>
+            <div class="d-flex align-items-center gap-3">
+                <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">Sale <span class="text-primary">Recap</span></h1>
+                <span class="badge bg-black text-white p-3 fs-5 border border-4">@Model.OrderNumber</span>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="neo-btn" onclick="window.print()">
+                <i class="bi bi-printer me-2"></i> PRINT INVOICE
+            </button>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="neo-card p-0 overflow-hidden mb-4 border-4">
+                <div class="p-3 bg-black text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-black text-uppercase small">Order Manifest</h5>
+                    <div class="small fw-bold">DATE: @Model.OrderDate.ToString("MMM dd, yyyy")</div>
+                </div>
+                <div class="p-0 bg-white">
+                    <div class="table-responsive">
+                        <table class="table mb-0 align-middle">
+                            <thead class="table-light small fw-black text-uppercase">
+                                <tr>
+                                    <th class="ps-4">PRODUCT</th>
+                                    <th>BATCH</th>
+                                    <th class="text-center">QTY</th>
+                                    <th class="text-end">UNIT</th>
+                                    <th class="text-end pe-4">TOTAL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var line in Model.Lines)
+                                {
+                                    <tr>
+                                        <td class="ps-4">
+                                            <div class="fw-black text-uppercase">@line.ProductName</div>
+                                            <div class="small text-muted">ID: #@line.ProductId</div>
+                                        </td>
+                                        <td><code class="fw-bold">@line.BatchNumber</code></td>
+                                        <td class="text-center fw-black">@line.Quantity</td>
+                                        <td class="text-end fw-bold">$@line.UnitPrice.ToString("N2")</td>
+                                        <td class="text-end pe-4 fw-black">$@((line.Quantity * line.UnitPrice).ToString("N2"))</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="p-4 bg-light border-top border-2">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="fw-black text-uppercase small mb-3">INTERNAL NOTES</h6>
+                            <p class="mb-0 small fw-bold text-muted">@(string.IsNullOrEmpty(Model.Note) ? "NO NOTES RECORDED FOR THIS TRANSACTION." : Model.Note)</p>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="small fw-black text-uppercase">SUBTOTAL:</span>
+                                <span class="fw-black">$@Model.Subtotal.ToString("N2")</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2 text-muted">
+                                <span class="small fw-black text-uppercase">VAT (14%):</span>
+                                <span class="fw-black">$@Model.VatAmount.ToString("N2")</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2 text-muted">
+                                <span class="small fw-black text-uppercase">MAN. TAX (1%):</span>
+                                <span class="fw-black">-$@Model.ManufacturingTaxAmount.ToString("N2")</span>
+                            </div>
+                            <div class="d-flex justify-content-between pt-2 border-top border-dark mt-2">
+                                <h4 class="fw-black text-uppercase mb-0">TOTAL:</h4>
+                                <h4 class="fw-black text-success mb-0">$@Model.TotalAmount.ToString("N2")</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="neo-card p-0 overflow-hidden mb-4 border-4">
+                <div class="p-3 bg-dark text-white">
+                    <h5 class="mb-0 fw-black text-uppercase small">Order Properties</h5>
+                </div>
+                <div class="p-4 bg-white">
+                    <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                        <span class="small fw-black text-uppercase">ORDER STATUS:</span>
+                        @if ((int)Model.Status == 2)
+                        {
+                            <span class="badge bg-danger fw-black text-uppercase">CANCELLED</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-black fw-black text-uppercase">ACTIVE</span>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                        <span class="small fw-black text-uppercase">SUPPLIER:</span>
+                        <span class="fw-bold text-end" style="max-width:60%">@Model.SupplierName</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                        <span class="small fw-black text-uppercase">ORDER DATE:</span>
+                        <span class="fw-bold">@Model.OrderDate.ToString("MMM dd, yyyy")</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-0">
+                        <span class="small fw-black text-uppercase">TOTAL AMOUNT:</span>
+                        <span class="fw-black text-success">$@Model.TotalAmount.ToString("N2")</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<style>
+    @@media print {
+        .neo-btn, .bi-arrow-left, .text-decoration-none { display: none !important; }
+        .neo-card { border: 2px solid #000 !important; box-shadow: none !important; }
+        .container-fluid { width: 100% !important; max-width: 100% !important; }
+    }
+</style>
