@@ -16,8 +16,9 @@ namespace Inventory.Application.DTOs.PurchaseOrder
 
         // ──────────────────────────────────────────────────────────────────────
         // Metric 2: Pending (NetOwedToSupplier)
-        // Formula: sum(PO.Remaining) - sum(SSO.Remaining where Status != Cancelled)
-        // A SupplierSalesOrder reduces what we owe because the supplier owes US.
+        // Formula: sum(PO.Remaining) - sum(SSO.TotalAmount where Status != Cancelled)
+        // A SupplierSalesOrder is a permanent bookkeeping entry. An active SSO
+        // immediately reduces NetOwedToSupplier by its full amount.
         // ──────────────────────────────────────────────────────────────────────
         public decimal NetOwedToSupplier { get; init; }
 
@@ -25,15 +26,15 @@ namespace Inventory.Application.DTOs.PurchaseOrder
         // Metric 3: Paid
         // Total cash paid OUT to this supplier from the PaymentRecord ledger
         // (PaymentType=Payment, OrderType=PurchaseOrder), net of PO refunds received.
+        // SupplierSalesOrders NEVER contribute to Paid.
         // ──────────────────────────────────────────────────────────────────────
         public decimal Paid { get; init; }
 
         // ──────────────────────────────────────────────────────────────────────
         // Metric 4: Overdue
-        // Remaining balance on PurchaseOrders where PaymentDeadline < now
-        // and PaymentStatus is not Paid and Status is not Cancelled,
-        // reduced by active (non-cancelled) SupplierSalesOrder remaining amounts.
-        // Clamped to 0 minimum.
+        // Sum of remaining balances on PurchaseOrders where DueDate < now
+        // and PaymentStatus is not Paid and Status is not Cancelled.
+        // SupplierSalesOrders do NOT offset the Overdue metric.
         // ──────────────────────────────────────────────────────────────────────
         public decimal Overdue { get; init; }
 

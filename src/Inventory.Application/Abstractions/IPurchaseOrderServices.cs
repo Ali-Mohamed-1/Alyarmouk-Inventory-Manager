@@ -22,7 +22,7 @@ namespace Inventory.Application.Abstractions
         Task CancelAsync(long id, UserContext user, CancellationToken ct = default);
 
         Task UpdateStatusAsync(long id, PurchaseOrderStatus status, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default);
-        Task UpdatePaymentDeadlineAsync(long id, DateTimeOffset? newDeadline, UserContext user, CancellationToken ct = default);
+        Task UpdateDueDateAsync(long id, DateTimeOffset? newDueDate, UserContext user, CancellationToken ct = default);
         Task UpdateOrderDateAsync(long id, DateTimeOffset newDate, UserContext user, CancellationToken ct = default);
         Task RefundAsync(RefundPurchaseOrderRequest req, UserContext user, CancellationToken ct = default);
         Task AddPaymentAsync(long orderId, Inventory.Application.DTOs.Payment.CreatePaymentRequest req, UserContext user, CancellationToken ct = default);

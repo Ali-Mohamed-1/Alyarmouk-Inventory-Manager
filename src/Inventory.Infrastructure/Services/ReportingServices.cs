@@ -101,50 +101,52 @@ namespace Inventory.Infrastructure.Services
 
             // ── Metric 2: NetOwedToSupplier (Pending) ──────────────────────────────
             //
-            // Step A: PO Remaining = TotalAmount - (sum_payments - sum_refunds) for each PO
-            //         Only for non-Cancelled POs where remaining > 0
+            // Formula: sum(PO.Remaining for non-Cancelled POs)
+            //        - sum(SSO.TotalAmount where Status != Cancelled)
             //
-            // Using a subquery: for each PO, compute net paid via PaymentRecords childset.
-            var poRemaining = await _db.PurchaseOrders
+            // A SupplierSalesOrder is a permanent bookkeeping entry. An Active SSO
+            // immediately and permanently reduces NetOwedToSupplier by its full
+            // TotalAmount, regardless of PaymentStatus. A Cancelled SSO has zero effect.
+            //
+            // Step A: Compute remaining amount per non-Cancelled PO.
+            var poData = await _db.PurchaseOrders
                 .AsNoTracking()
                 .Where(po => po.SupplierId == supplierId &&
                              po.Status != PurchaseOrderStatus.Cancelled)
                 .Select(po => new
                 {
                     po.TotalAmount,
-                    NetPaid = po.Payments
-                        .Where(p => p.PaymentType == PaymentRecordType.Payment)
-                        .Sum(p => (decimal?)p.Amount) ?? 0m
-                        -
-                        (po.Payments
-                        .Where(p => p.PaymentType == PaymentRecordType.Refund)
-                        .Sum(p => (decimal?)p.Amount) ?? 0m)
+                    po.PaymentStatus,
+                    po.DueDate,
+                    NetPaid = (po.Payments
+                                   .Where(p => p.PaymentType == PaymentRecordType.Payment)
+                                   .Sum(p => (decimal?)p.Amount) ?? 0m)
+                             - (po.Payments
+                                   .Where(p => p.PaymentType == PaymentRecordType.Refund)
+                                   .Sum(p => (decimal?)p.Amount) ?? 0m)
                 })
                 .ToListAsync(ct);
 
             // Remaining per PO = max(0, TotalAmount - NetPaid)
-            var totalPoRemaining = poRemaining.Sum(po => Math.Max(0m, po.TotalAmount - po.NetPaid));
+            var totalPoRemaining = poData.Sum(po => Math.Max(0m, po.TotalAmount - po.NetPaid));
 
-            // Step B: SSO Remaining = TotalAmount for Each PAID SSO
-            //         Only for non-Cancelled SupplierSalesOrders where PaymentStatus = Paid.
-            //         These orders act as a credit against the supplier balance.
-            var ssoRemaining = await _db.SupplierSalesOrders
+            // Step B: Sum all Active (non-Cancelled) SSO amounts.
+            // These are permanent debt reductions — PaymentStatus is irrelevant.
+            var totalActiveSsoAmount = await _db.SupplierSalesOrders
                 .AsNoTracking()
                 .Where(sso => sso.SupplierId == supplierId &&
-                              sso.Status != SalesOrderStatus.Cancelled &&
-                              sso.PaymentStatus == PaymentStatus.Paid)
-                .Select(sso => sso.TotalAmount)
-                .ToListAsync(ct);
-
-            // Total amount they 'owe' us (or that we net against them)
-            var totalSsoRemaining = ssoRemaining.Sum();
+                              sso.Status != SalesOrderStatus.Cancelled)
+                .SumAsync(sso => (decimal?)sso.TotalAmount, ct) ?? 0m;
 
             // NetOwedToSupplier: clamped to 0 minimum (can't have negative owed)
-            var netOwedToSupplier = Math.Max(0m, totalPoRemaining - totalSsoRemaining);
+            var netOwedToSupplier = Math.Max(0m, totalPoRemaining - totalActiveSsoAmount);
 
             // ── Metric 3: Paid ─────────────────────────────────────────────────────
-            // Total cash paid OUT to this supplier from the ledger, net of refunds received.
-            // Source: PaymentRecords with OrderType = PurchaseOrder for this supplier's POs.
+            // Total cash paid OUT to this supplier from the PaymentRecord ledger,
+            // net of any refunds received from the supplier.
+            // Source: PaymentRecords linked to this supplier's PurchaseOrders only.
+            // SupplierSalesOrders NEVER contribute to Paid — they are bookkeeping entries,
+            // not cash transactions.
             var supplierPoIds = await _db.PurchaseOrders
                 .AsNoTracking()
                 .Where(po => po.SupplierId == supplierId)
@@ -170,40 +172,32 @@ namespace Inventory.Infrastructure.Services
             var paid = Math.Max(0m, totalCashOut - totalRefundsReceived);
 
             // ── Metric 4: Overdue ──────────────────────────────────────────────────
-            // Remaining balance on POs where PaymentDeadline has passed and not yet Paid,
-            // minus the credit from still-active (non-Cancelled) SupplierSalesOrders.
-            //
-            // "Netted" SSOs have remaining = 0 (supplier has paid in full), so they
-            // contribute 0 credit and don't affect overdue in that scenario.
-            var overduePoRemaining = poRemaining
-                .Where(po => po.TotalAmount - po.NetPaid > 0)  // only those with remaining
-                .Sum(po => Math.Max(0m, po.TotalAmount - po.NetPaid));
-
-            // Re-query to filter only overdue POs (those with passed PaymentDeadline)
+            // Remaining balance on PurchaseOrders where:
+            //   - DueDate < now
+            //   - Status != Cancelled
+            //   - PaymentStatus != Paid
+            // SupplierSalesOrders do NOT offset the Overdue metric.
+            // Overdue reflects raw cash obligations that are past due.
             var overduePoData = await _db.PurchaseOrders
                 .AsNoTracking()
                 .Where(po => po.SupplierId == supplierId &&
                              po.Status != PurchaseOrderStatus.Cancelled &&
                              po.PaymentStatus != PurchasePaymentStatus.Paid &&
-                             po.PaymentDeadline.HasValue &&
-                             po.PaymentDeadline.Value < asOf)
+                             po.DueDate.HasValue &&
+                             po.DueDate.Value < asOf)
                 .Select(po => new
                 {
                     po.TotalAmount,
-                    NetPaid = po.Payments
-                        .Where(p => p.PaymentType == PaymentRecordType.Payment)
-                        .Sum(p => (decimal?)p.Amount) ?? 0m
-                        -
-                        (po.Payments
-                        .Where(p => p.PaymentType == PaymentRecordType.Refund)
-                        .Sum(p => (decimal?)p.Amount) ?? 0m)
+                    NetPaid = (po.Payments
+                                   .Where(p => p.PaymentType == PaymentRecordType.Payment)
+                                   .Sum(p => (decimal?)p.Amount) ?? 0m)
+                             - (po.Payments
+                                   .Where(p => p.PaymentType == PaymentRecordType.Refund)
+                                   .Sum(p => (decimal?)p.Amount) ?? 0m)
                 })
                 .ToListAsync(ct);
 
-            var totalOverduePoRemaining = overduePoData.Sum(po => Math.Max(0m, po.TotalAmount - po.NetPaid));
-
-            // SSO credits reduce overdue too — since the supplier owes us, that offsets what we owe
-            var overdue = Math.Max(0m, totalOverduePoRemaining - totalSsoRemaining);
+            var overdue = overduePoData.Sum(po => Math.Max(0m, po.TotalAmount - po.NetPaid));
 
             return new SupplierBalanceResponseDto
             {

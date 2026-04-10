@@ -59,11 +59,11 @@ public class PurchaseOrdersApiController : ControllerBase
         return Ok();
     }
 
-    [HttpPut("{id}/payment-deadline")]
-    public async Task<IActionResult> UpdatePaymentDeadline(long id, [FromBody] DateTimeOffset? newDeadline, CancellationToken ct)
+    [HttpPut("{id}/due-date")]
+    public async Task<IActionResult> UpdateDueDate(long id, [FromBody] DateTimeOffset? newDueDate, CancellationToken ct)
     {
         var user = GetUserContext();
-        await _purchaseOrderServices.UpdatePaymentDeadlineAsync(id, newDeadline, user, ct);
+        await _purchaseOrderServices.UpdateDueDateAsync(id, newDueDate, user, ct);
         return Ok();
     }
 

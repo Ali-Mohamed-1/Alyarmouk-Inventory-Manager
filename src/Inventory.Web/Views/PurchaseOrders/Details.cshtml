@@ -35,7 +35,7 @@
         <div>
             <h1 class="display-4 fw-black text-uppercase mb-0" style="letter-spacing: -2px;">PO ID: @Model.OrderNumber</h1>
             <p class="fw-bold text-muted mb-0">ISSUED: @Model.CreatedUtc.ToLocalTime().ToString("f").ToUpper()</p>
-            <p class="fw-bold text-danger mb-0">DEADLINE: @(Model.PaymentDeadline.HasValue ? Model.PaymentDeadline.Value.ToLocalTime().ToString("f").ToUpper() : "N/A")</p>
+            <p class="fw-bold text-danger mb-0">DUE DATE: @(Model.DueDate.HasValue ? Model.DueDate.Value.ToLocalTime().ToString("f").ToUpper() : "N/A")</p>
         </div>
         <div class="d-flex gap-2">
             @if (!string.IsNullOrEmpty(returnUrl))
@@ -56,7 +56,7 @@
         <div class="d-flex justify-content-between fw-bold border-bottom border-2 border-black pb-2 mt-2">
             <span>REF: @Model.OrderNumber</span>
             <span>DATE: @Model.OrderDate.ToString("yyyy-MM-dd")</span>
-            <span>DEADLINE: @(Model.PaymentDeadline.HasValue ? Model.PaymentDeadline.Value.ToLocalTime().ToString("yyyy-MM-dd") : "N/A")</span>
+            <span>DUE DATE: @(Model.DueDate.HasValue ? Model.DueDate.Value.ToLocalTime().ToString("yyyy-MM-dd") : "N/A")</span>
         </div>
     </div>
 
@@ -329,8 +329,8 @@
                         
                         <div class="col-12 mt-1 @(Model.Status == Inventory.Domain.Entities.PurchaseOrderStatus.Cancelled ? "d-none" : "")">
                              <div class="d-flex justify-content-between small opacity-75">
-                                 <span>DEADLINE: @(Model.PaymentDeadline.HasValue ? Model.PaymentDeadline.Value.ToString("MMM dd").ToUpper() : "N/A")</span>
-                                 <a href="javascript:void(0)" class="text-black no-print" onclick="openEditPaymentDeadlineModal()">EDIT</a>
+                                 <span>DUE DATE: @(Model.DueDate.HasValue ? Model.DueDate.Value.ToString("MMM dd").ToUpper() : "N/A")</span>
+                                 <a href="javascript:void(0)" class="text-black no-print" onclick="openEditDueDateModal()">EDIT</a>
                              </div>
                         </div>
 
@@ -554,23 +554,23 @@
     </div>
 </div>
 
-<!-- Edit Payment Deadline Modal -->
-<div class="modal fade" id="editPaymentDeadlineModal" tabindex="-1">
+<!-- Edit Due Date Modal -->
+<div class="modal fade" id="editDueDateModal" tabindex="-1">
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
             <div class="modal-header bg-black text-white">
-                <h5 class="modal-title fw-black text-uppercase small">Update Payment Deadline</h5>
+                <h5 class="modal-title fw-black text-uppercase small">Update Due Date</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
                 <div class="mb-3">
-                    <label class="form-label fw-black text-uppercase small">New Deadline</label>
-                    <input type="date" class="form-control fw-bold" id="newPaymentDeadline" value="@(Model.PaymentDeadline.HasValue ? Model.PaymentDeadline.Value.ToString("yyyy-MM-dd") : "")">
+                    <label class="form-label fw-black text-uppercase small">New Due Date</label>
+                    <input type="date" class="form-control fw-bold" id="newDueDate" value="@(Model.DueDate.HasValue ? Model.DueDate.Value.ToString("yyyy-MM-dd") : "")">
                 </div>
             </div>
             <div class="modal-footer border-0 pt-0 p-4">
                 <button class="neo-btn btn-sm" data-bs-dismiss="modal">CANCEL</button>
-                <button class="neo-btn neo-btn-primary btn-sm" onclick="savePaymentDeadline()">UPDATE</button>
+                <button class="neo-btn neo-btn-primary btn-sm" onclick="saveDueDate()">UPDATE</button>
             </div>
         </div>
     </div>
@@ -757,8 +757,8 @@
             } catch (e) { if (window.appMessages) window.appMessages.showError(e.message || 'Refund failed'); }
         }
 
-        function openEditPaymentDeadlineModal() {
-            new bootstrap.Modal(document.getElementById('editPaymentDeadlineModal')).show();
+        function openEditDueDateModal() {
+            new bootstrap.Modal(document.getElementById('editDueDateModal')).show();
         }
 
         function openRecordPaymentModal() {
@@ -870,15 +870,15 @@
             }
         }
 
-        async function savePaymentDeadline() {
-            const date = document.getElementById('newPaymentDeadline').value;
+        async function saveDueDate() {
+            const date = document.getElementById('newDueDate').value;
             let payload = null;
             if (date) {
                 payload = new Date(date).toISOString();
             }
 
             try {
-                const response = await fetch('/api/purchase-orders/@Model.Id/payment-deadline', {
+                const response = await fetch('/api/purchase-orders/@Model.Id/due-date', {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -891,7 +891,7 @@
                     location.reload();
                 } else {
                     const errText = await response.text();
-                    const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(response, errText) : 'Failed to update payment deadline.';
+                    const msg = window.appMessages ? await window.appMessages.getApiErrorMessage(response, errText) : 'Failed to update due date.';
                     if (window.appMessages) window.appMessages.showError(msg);
                 }
             } catch (error) {
