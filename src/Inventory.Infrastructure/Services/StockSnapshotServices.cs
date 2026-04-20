@@ -24,14 +24,14 @@ namespace Inventory.Infrastructure.Services
 
         public async Task<IReadOnlyList<StockSnapshotResponseDto>> GetAllAsync(CancellationToken ct = default)
         {
-            var stockData = await _db.ProductBatches
+            var stockData = await _db.InventoryTransactions
                 .AsNoTracking()
-                .GroupBy(b => b.ProductId)
+                .GroupBy(t => t.ProductId)
                 .Select(g => new
                 {
                     ProductId = g.Key,
-                    OnHand = g.Sum(b => b.OnHand),
-                    Reserved = g.Sum(b => b.Reserved)
+                    OnHand = g.Sum(t => t.QuantityDelta),
+                    Reserved = 0m // Live reservation tracking removed from schema
                 })
                 .ToListAsync(ct);
 
@@ -58,14 +58,14 @@ namespace Inventory.Infrastructure.Services
         {
             if (productId <= 0) throw new ArgumentOutOfRangeException(nameof(productId), "Product ID must be positive.");
 
-            var stock = await _db.ProductBatches
+            var stock = await _db.InventoryTransactions
                 .AsNoTracking()
-                .Where(b => b.ProductId == productId)
-                .GroupBy(b => b.ProductId)
+                .Where(t => t.ProductId == productId)
+                .GroupBy(t => t.ProductId)
                 .Select(g => new
                 {
-                    OnHand = g.Sum(b => b.OnHand),
-                    Reserved = g.Sum(b => b.Reserved)
+                    OnHand = g.Sum(t => t.QuantityDelta),
+                    Reserved = 0m // Live reservation tracking removed from schema
                 })
                 .FirstOrDefaultAsync(ct);
 

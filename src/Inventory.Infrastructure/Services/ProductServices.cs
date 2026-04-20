@@ -268,8 +268,6 @@ namespace Inventory.Infrastructure.Services
                 BatchNumber = batchNumber,
                 UnitCost = req.UnitCost,
                 UnitPrice = req.UnitPrice,
-                OnHand = 0, // Will be updated by transaction if needed
-                Reserved = 0,
                 Notes = req.Notes
             };
 

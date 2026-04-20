@@ -61,7 +61,7 @@ public static class TestDataSeeder
         };
         db.Products.Add(product);
 
-        db.StockSnapshots.Add(new StockSnapshot { ProductId = 1, OnHand = 0 });
+        db.StockSnapshots.Add(new StockSnapshot { ProductId = 1 });
 
         var batch = new ProductBatch
         {
@@ -69,11 +69,22 @@ public static class TestDataSeeder
             ProductId = 1,
             BatchNumber = "BATCH-001",
             UnitCost = 80,
-            UnitPrice = 100,
-            OnHand = 50,
-            Reserved = 0
+            UnitPrice = 100
         };
         db.ProductBatches.Add(batch);
+
+        // Add initial stock transaction
+        db.InventoryTransactions.Add(new InventoryTransaction
+        {
+            ProductId = 1,
+            ProductBatchId = 100,
+            BatchNumber = "BATCH-001",
+            QuantityDelta = 50,
+            Type = InventoryTransactionType.Receive,
+            TimestampUtc = DateTimeOffset.UtcNow,
+            UserId = "system",
+            UserDisplayName = "System Seeder"
+        });
 
         db.Customers.Add(new Customer { Id = 1, Name = "Test Customer" });
         db.Suppliers.Add(new Supplier { Id = 1, Name = "Test Supplier" });

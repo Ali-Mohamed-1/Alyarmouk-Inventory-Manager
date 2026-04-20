@@ -231,8 +231,6 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.BatchNumber).HasMaxLength(100).IsRequired();
                 b.Property(x => x.UnitCost).HasPrecision(18, 2);
                 b.Property(x => x.UnitPrice).HasPrecision(18, 2);
-                b.Property(x => x.OnHand).HasPrecision(18, 2);
-                b.Property(x => x.Reserved).HasPrecision(18, 2);
                 b.Property(x => x.Notes).HasMaxLength(500);
                 b.Property(x => x.RowVersion).IsRowVersion();
                 b.HasIndex(x => new { x.ProductId, x.BatchNumber }).IsUnique();

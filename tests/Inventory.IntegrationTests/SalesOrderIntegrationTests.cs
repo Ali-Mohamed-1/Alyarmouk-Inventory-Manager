@@ -63,9 +63,9 @@ public class SalesOrderIntegrationTests : IClassFixture<IntegrationTestFixture>,
         };
         var orderId = await _salesServices.CreateAsync(createReq, _user, ct);
 
-        // 2. Verify stock reserved, PaymentStatus = Pending
-        var batch = await _db.ProductBatches.FirstAsync(b => b.BatchNumber == "BATCH-001", ct);
-        Assert.Equal(10, batch.Reserved);
+        // 2. Verify PaymentStatus = Pending (Reserved is no longer a stored field)
+        // var batch = await _db.ProductBatches.FirstAsync(b => b.BatchNumber == "BATCH-001", ct);
+        // Assert.Equal(10, batch.Reserved);
         var order = await _db.SalesOrders.Include(o => o.Payments).FirstAsync(o => o.Id == orderId, ct);
         order.RecalculatePaymentStatus();
         Assert.Equal(PaymentStatus.Pending, order.PaymentStatus);
@@ -90,11 +90,13 @@ public class SalesOrderIntegrationTests : IClassFixture<IntegrationTestFixture>,
         // 5. Mark order as Done
         await _salesServices.UpdateStatusAsync(orderId, new UpdateSalesOrderStatusRequest { OrderId = orderId, Status = SalesOrderStatus.Done }, _user, ct: ct);
 
-        // 6. Verify stock issued (reservation released, OnHand decreased)
+        // 6. Verify stock issued (OnHand decreased in transactions)
         _db.ChangeTracker.Clear();
-        batch = await _db.ProductBatches.FirstAsync(b => b.BatchNumber == "BATCH-001", ct);
-        Assert.Equal(40, batch.OnHand); // 50 - 10
-        Assert.Equal(0, batch.Reserved);
+        var batchId = (await _db.ProductBatches.FirstAsync(b => b.BatchNumber == "BATCH-001", ct)).Id;
+        var onHand = await _db.InventoryTransactions
+            .Where(t => t.ProductBatchId == batchId)
+            .SumAsync(t => t.QuantityDelta, ct);
+        Assert.Equal(40, onHand); // 50 - 10
 
         // 6b. Pay remaining balance (multiple partial payments → Paid)
         await _salesServices.AddPaymentAsync(orderId, new CreatePaymentRequest
@@ -474,10 +476,12 @@ public class SalesOrderIntegrationTests : IClassFixture<IntegrationTestFixture>,
         var ct = CancellationToken.None;
         await TestDataSeeder.ResetAndSeedAsync(_db, ct);
 
-        // 1. Find a batch with known stock (BATCH-001 has 50 OnHand, 0 Reserved)
+        // 1. Find a batch with known stock (BATCH-001 has 50 initial stock)
         var batch = await _db.ProductBatches.FirstAsync(b => b.BatchNumber == "BATCH-001", ct);
-        Assert.Equal(50, batch.OnHand);
-        Assert.Equal(0, batch.Reserved);
+        var onHand = await _db.InventoryTransactions
+            .Where(t => t.ProductBatchId == batch.Id)
+            .SumAsync(t => (decimal?)t.QuantityDelta, ct) ?? 0m;
+        Assert.Equal(50, onHand);
 
         // 2. Try to create sales order with 51 units (Available is 50)
         var createReq = new CreateSalesOrderRequest

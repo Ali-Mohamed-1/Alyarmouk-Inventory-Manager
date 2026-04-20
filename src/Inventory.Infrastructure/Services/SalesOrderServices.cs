@@ -149,9 +149,11 @@ namespace Inventory.Infrastructure.Services
                         batch = await _db.ProductBatches.FirstOrDefaultAsync(b => b.ProductId == productId && b.BatchNumber == batchNum, ct);
                     }
 
-                    decimal onHand = batch?.OnHand ?? 0;
-                    decimal reserved = batch?.Reserved ?? 0;
-                    decimal available = onHand - reserved;
+                    // Calculate on-hand from transactions
+                    decimal available = await _db.InventoryTransactions
+                        .AsNoTracking()
+                        .Where(t => t.ProductId == productId && (t.ProductBatchId == (batch != null ? batch.Id : -1) || t.BatchNumber == batchNum))
+                        .SumAsync(t => t.QuantityDelta, ct);
 
                     if (available < quantity)
                     {

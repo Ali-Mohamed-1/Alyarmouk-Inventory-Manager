@@ -33,10 +33,10 @@ namespace Inventory.Infrastructure.Services
                 .AsNoTracking()
                 .CountAsync(ct);
 
-            // Get total on-hand stock across all products (from Batches now)
-            var totalOnHand = await _db.ProductBatches
+            // Get total on-hand stock across all products (derived from Transactions now)
+            var totalOnHand = await _db.InventoryTransactions
                 .AsNoTracking()
-                .SumAsync(b => (decimal?)b.OnHand, ct) ?? 0m;
+                .SumAsync(t => (decimal?)t.QuantityDelta, ct) ?? 0m;
 
             // Get low stock count (products where Sum(Batch.OnHand) <= ReorderPoint and product is active)
             // We need to group batches by product first
@@ -47,7 +47,7 @@ namespace Inventory.Infrastructure.Services
                 {
                     p.Id,
                     p.ReorderPoint,
-                    TotalOnHand = _db.ProductBatches.Where(b => b.ProductId == p.Id).Sum(b => (decimal?)b.OnHand) ?? 0m
+                    TotalOnHand = _db.InventoryTransactions.Where(t => t.ProductId == p.Id).Sum(t => (decimal?)t.QuantityDelta) ?? 0m
                 })
                 .Where(x => x.TotalOnHand <= x.ReorderPoint)
                 .CountAsync(ct);
@@ -77,7 +77,7 @@ namespace Inventory.Infrastructure.Services
                 {
                     ProductId = p.Id,
                     ProductName = p.Name,
-                    OnHand = _db.ProductBatches.Where(b => b.ProductId == p.Id).Sum(b => (decimal?)b.OnHand) ?? 0m,
+                    OnHand = _db.InventoryTransactions.Where(t => t.ProductId == p.Id).Sum(t => (decimal?)t.QuantityDelta) ?? 0m,
                     Unit = p.Unit,
                     ReorderPoint = p.ReorderPoint
                 })

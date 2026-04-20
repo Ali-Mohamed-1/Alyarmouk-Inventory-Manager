@@ -113,20 +113,12 @@ namespace Inventory.Infrastructure.Services
                     batch = new ProductBatch
                     {
                         ProductId = req.ProductId,
-                        BatchNumber = batchNumber,
-                        OnHand = 0,
-                        Reserved = 0
+                        BatchNumber = batchNumber
                     };
                     _db.ProductBatches.Add(batch);
                     // No need to SaveChanges here, it will be saved with the transaction and other entities
                 }
 
-                // 4. Validation
-                if (req.Type == InventoryTransactionType.Issue)
-                {
-                    if (batch.OnHand + quantityDelta < 0)
-                        throw new ValidationException($"Insufficient stock in batch '{batchNumber}'. Available: {batch.OnHand}, Requested: {req.Quantity}");
-                }
 
                 // 5. Create transaction
                 var inventoryTransaction = new InventoryTransaction
@@ -151,10 +143,8 @@ namespace Inventory.Infrastructure.Services
                     inventoryTransaction.TimestampUtc = DateTimeOffset.UtcNow;
                 }
 
-                // Update batch OnHand
-                batch.OnHand += quantityDelta;
-
-                _db.InventoryTransactions.Add(inventoryTransaction);
+                // 4. Add transaction
+                await _db.InventoryTransactions.AddAsync(inventoryTransaction, ct);
                 await _db.SaveChangesAsync(ct); 
 
                 if (transaction != null)

@@ -109,8 +109,8 @@ public sealed class ProductBatchServices : IProductBatchServices
                 BatchNumber = "Unbatched",
                 IsUnbatched = true,
                 OnHand = unbatchedAgg?.OnHand ?? 0m,
-                Reserved = unbatchedMeta?.Reserved ?? 0m,
-                Available = (unbatchedAgg?.OnHand ?? 0m) - (unbatchedMeta?.Reserved ?? 0m),
+                Reserved = 0m, // Live reservation tracking removed from schema
+                Available = unbatchedAgg?.OnHand ?? 0m,
                 UnitCost = unbatchedMeta?.UnitCost ?? unbatchedAgg?.LastUnitCost ?? 0m,
                 UnitPrice = unbatchedMeta?.UnitPrice ?? 0m,
                 LastMovementUtc = unbatchedAgg?.LastMovementUtc,
@@ -132,8 +132,8 @@ public sealed class ProductBatchServices : IProductBatchServices
                 BatchNumber = batchNumber,
                 IsUnbatched = false,
                 OnHand = agg?.OnHand ?? 0m,
-                Reserved = meta?.Reserved ?? 0m,
-                Available = (agg?.OnHand ?? 0m) - (meta?.Reserved ?? 0m),
+                Reserved = 0m, // Live reservation tracking removed from schema
+                Available = agg?.OnHand ?? 0m,
                 UnitCost = meta?.UnitCost ?? agg?.LastUnitCost ?? 0m,
                 UnitPrice = meta?.UnitPrice ?? 0m,
                 LastMovementUtc = agg?.LastMovementUtc,
@@ -222,8 +222,8 @@ public sealed class ProductBatchServices : IProductBatchServices
             BatchNumber = displayBatch,
             IsUnbatched = string.IsNullOrEmpty(normalized),
             OnHand = agg?.OnHand ?? 0m,
-            Reserved = entity.Reserved,
-            Available = (agg?.OnHand ?? 0m) - entity.Reserved,
+            Reserved = 0m, // Live reservation tracking removed from schema
+            Available = agg?.OnHand ?? 0m,
             UnitCost = entity.UnitCost ?? agg?.LastUnitCost ?? 0m,
             UnitPrice = entity.UnitPrice ?? 0m,
             LastMovementUtc = agg?.LastMovementUtc,

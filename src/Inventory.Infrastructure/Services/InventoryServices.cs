@@ -111,17 +111,15 @@ namespace Inventory.Infrastructure.Services
             decimal currentOnHand = 0;
             if (req.ProductBatchId.HasValue && req.ProductBatchId.Value > 0)
             {
-                currentOnHand = await _db.ProductBatches
-                    .Where(b => b.Id == req.ProductBatchId.Value)
-                    .Select(b => b.OnHand)
-                    .FirstOrDefaultAsync(ct);
+                currentOnHand = await _db.InventoryTransactions
+                    .Where(t => t.ProductBatchId == req.ProductBatchId.Value)
+                    .SumAsync(t => t.QuantityDelta, ct);
             }
             else if (!string.IsNullOrWhiteSpace(req.BatchNumber))
             {
-                currentOnHand = await _db.ProductBatches
-                    .Where(b => b.ProductId == req.ProductId && b.BatchNumber == req.BatchNumber)
-                    .Select(b => b.OnHand)
-                    .FirstOrDefaultAsync(ct);
+                currentOnHand = await _db.InventoryTransactions
+                    .Where(t => t.ProductId == req.ProductId && t.BatchNumber == req.BatchNumber)
+                    .SumAsync(t => t.QuantityDelta, ct);
             }
             else
             {
@@ -275,15 +273,13 @@ namespace Inventory.Infrastructure.Services
                     batch = new ProductBatch
                     {
                         ProductId = line.ProductId,
-                        BatchNumber = batchNumber,
-                        OnHand = 0,
-                        Reserved = 0
+                        BatchNumber = batchNumber
                     };
                     _db.ProductBatches.Add(batch);
                     await _db.SaveChangesAsync(ct); // To get the ID
                 }
 
-                batch.Reserved += line.Quantity;
+                // batch.Reserved += line.Quantity; // Removed live counter
                 line.ProductBatchId = batch.Id;
             }
             await _db.SaveChangesAsync(ct);
@@ -303,8 +299,8 @@ namespace Inventory.Infrastructure.Services
                     var batch = await _db.ProductBatches.FindAsync(new object[] { line.ProductBatchId.Value }, ct);
                     if (batch != null)
                     {
-                        batch.Reserved -= line.Quantity;
-                        if (batch.Reserved < 0) batch.Reserved = 0;
+                        // batch.Reserved -= line.Quantity; // Removed live counter
+                        // if (batch.Reserved < 0) batch.Reserved = 0;
                     }
                 }
             }
@@ -326,8 +322,7 @@ namespace Inventory.Infrastructure.Services
                     var batch = await _db.ProductBatches.FindAsync(new object[] { line.ProductBatchId.Value }, ct);
                     if (batch != null)
                     {
-                        batch.Reserved -= line.Quantity;
-                        if (batch.Reserved < 0) batch.Reserved = 0;
+                        // batch.Reserved -= line.Quantity; // Removed live counter
                     }
                 }
 
@@ -377,7 +372,7 @@ namespace Inventory.Infrastructure.Services
                     var batch = await _db.ProductBatches.FindAsync(new object[] { line.ProductBatchId.Value }, ct);
                     if (batch != null)
                     {
-                        batch.Reserved += line.Quantity;
+                        // batch.Reserved += line.Quantity; // Removed live counter
                     }
                 }
             }

@@ -44,7 +44,7 @@ namespace Inventory.Web.Controllers
                 await _context.Database.ExecuteSqlRawAsync("DELETE FROM StockSnapshots");
 
                 // Reset Product Batch quantities (optional but usually desired when clearing transactions)
-                await _context.Database.ExecuteSqlRawAsync("UPDATE ProductBatches SET OnHand = 0, Reserved = 0");
+                // Removed because OnHand/Reserved columns no longer exist.
 
                 await _context.SaveChangesAsync();
 
