@@ -68,15 +68,7 @@ namespace Inventory.Application.Abstractions
         /// </summary>
         Task RefundPurchaseOrderStockAsync(long purchaseOrderId, List<RefundPurchaseLineItem> lines, UserContext user, CancellationToken ct = default);
 
-        /// <summary>
-        /// Reserves stock for a Sales Order (e.g. Status = Pending)
-        /// </summary>
-        Task ReserveSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default);
 
-        /// <summary>
-        /// Releases reserved stock for a Sales Order (e.g. Status = Cancelled)
-        /// </summary>
-        Task ReleaseSalesOrderReservationAsync(long salesOrderId, UserContext user, CancellationToken ct = default);
 
         /// <summary>
         /// Processes stock issue for a Sales Order (SalesOrder.Status = Done)

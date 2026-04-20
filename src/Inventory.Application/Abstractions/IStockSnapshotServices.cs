@@ -15,9 +15,5 @@ namespace Inventory.Application.Abstractions
         /// </summary>
         Task<StockSnapshotResponseDto?> GetByProductIdAsync(int productId, CancellationToken ct = default);
 
-        /// <summary>
-        /// Updates a stock snapshot with new counts and who performed the change
-        /// </summary>
-        Task UpdateAsync(UpdateStockRequest req, UserContext user, CancellationToken ct = default);
     }
 }

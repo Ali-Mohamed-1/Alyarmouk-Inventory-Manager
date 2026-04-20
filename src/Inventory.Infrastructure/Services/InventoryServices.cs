@@ -38,13 +38,10 @@ namespace Inventory.Infrastructure.Services
         {
             if (productId <= 0) throw new ArgumentOutOfRangeException(nameof(productId), "Product ID must be positive.");
 
-            var snapshot = await _db.StockSnapshots
+            return await _db.InventoryTransactions
                 .AsNoTracking()
-                .Where(s => s.ProductId == productId)
-                .Select(s => s.OnHand)
-                .FirstOrDefaultAsync(ct);
-
-            return snapshot; // Returns 0 if snapshot doesn't exist (default for decimal)
+                .Where(t => t.ProductId == productId)
+                .SumAsync(t => t.QuantityDelta, ct);
         }
 
         public async Task<StockSnapshotResponseDto?> GetStockAsync(int productId, CancellationToken ct = default)
@@ -246,66 +243,6 @@ namespace Inventory.Infrastructure.Services
             await _db.SaveChangesAsync(ct);
         }
 
-        public async Task ReserveSalesOrderStockAsync(long salesOrderId, UserContext user, CancellationToken ct = default)
-        {
-            var order = await _db.SalesOrders
-                .Include(o => o.Lines)
-                .FirstOrDefaultAsync(o => o.Id == salesOrderId, ct);
-            if (order == null) throw new NotFoundException($"Sales order {salesOrderId} not found.");
-
-            foreach (var line in order.Lines)
-            {
-                var batchNumber = (line.BatchNumber ?? "").Trim();
-                ProductBatch? batch = null;
-
-                if (line.ProductBatchId.HasValue && line.ProductBatchId.Value > 0)
-                {
-                    batch = await _db.ProductBatches.FindAsync(new object[] { line.ProductBatchId.Value }, ct);
-                }
-                
-                if (batch == null)
-                {
-                    batch = await _db.ProductBatches.FirstOrDefaultAsync(b => b.ProductId == line.ProductId && b.BatchNumber == batchNumber, ct);
-                }
-
-                if (batch == null)
-                {
-                    batch = new ProductBatch
-                    {
-                        ProductId = line.ProductId,
-                        BatchNumber = batchNumber
-                    };
-                    _db.ProductBatches.Add(batch);
-                    await _db.SaveChangesAsync(ct); // To get the ID
-                }
-
-                // batch.Reserved += line.Quantity; // Removed live counter
-                line.ProductBatchId = batch.Id;
-            }
-            await _db.SaveChangesAsync(ct);
-        }
-
-        public async Task ReleaseSalesOrderReservationAsync(long salesOrderId, UserContext user, CancellationToken ct = default)
-        {
-            var order = await _db.SalesOrders
-                .Include(o => o.Lines)
-                .FirstOrDefaultAsync(o => o.Id == salesOrderId, ct);
-            if (order == null) throw new NotFoundException($"Sales order {salesOrderId} not found.");
-
-            foreach (var line in order.Lines)
-            {
-                if (line.ProductBatchId.HasValue)
-                {
-                    var batch = await _db.ProductBatches.FindAsync(new object[] { line.ProductBatchId.Value }, ct);
-                    if (batch != null)
-                    {
-                        // batch.Reserved -= line.Quantity; // Removed live counter
-                        // if (batch.Reserved < 0) batch.Reserved = 0;
-                    }
-                }
-            }
-            await _db.SaveChangesAsync(ct);
-        }
 
         public async Task ProcessSalesOrderStockAsync(long salesOrderId, UserContext user, DateTimeOffset? timestamp = null, CancellationToken ct = default)
         {
@@ -316,15 +253,6 @@ namespace Inventory.Infrastructure.Services
 
             foreach (var line in order.Lines)
             {
-                // Release reservation first
-                if (line.ProductBatchId.HasValue)
-                {
-                    var batch = await _db.ProductBatches.FindAsync(new object[] { line.ProductBatchId.Value }, ct);
-                    if (batch != null)
-                    {
-                        // batch.Reserved -= line.Quantity; // Removed live counter
-                    }
-                }
 
                 var txReq = new CreateInventoryTransactionRequest
                 {
@@ -366,15 +294,6 @@ namespace Inventory.Infrastructure.Services
 
                 await _transactionServices.CreateAsync(txReq, user, ct);
 
-                // Re-reserve the stock
-                if (line.ProductBatchId.HasValue)
-                {
-                    var batch = await _db.ProductBatches.FindAsync(new object[] { line.ProductBatchId.Value }, ct);
-                    if (batch != null)
-                    {
-                        // batch.Reserved += line.Quantity; // Removed live counter
-                    }
-                }
             }
 
             await _db.SaveChangesAsync(ct);
