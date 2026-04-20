@@ -131,9 +131,7 @@ function formatDate(dateString) {
 }
 
 function getStockStatus(onHand, preserved, available) {
-    if (available <= 0) return '<span class="badge badge-danger">Out of Stock</span>';
-    if (available < 50) return '<span class="badge badge-warning">Low Stock</span>';
-    return '<span class="badge badge-success">In Stock</span>';
+    return '<span class="badge badge-success">Active</span>';
 }
 
 function getTransactionTypeBadge(type) {
@@ -881,7 +879,7 @@ function populateProductDropdown(selectId) {
     const select = document.getElementById(selectId);
     if (select) {
         select.innerHTML = '<option value="">Select product...</option>' +
-            demoData.products.map(p => `<option value="${p.productId}">${p.productName} (${p.sku}) - Available: ${p.available}</option>`).join('');
+            demoData.products.map(p => `<option value="${p.productId}">${p.productName} (${p.sku})</option>`).join('');
     }
 }
 
@@ -1294,25 +1292,11 @@ function submitReceiveStock() {
 function showIssueStockModal() {
     document.getElementById('issueStockModal').style.display = 'flex';
     populateProductDropdown('issueProductId');
-    document.getElementById('issueProductId').addEventListener('change', updateIssueAvailableStock);
 }
 
 function closeIssueStockModal() {
     document.getElementById('issueStockModal').style.display = 'none';
     document.getElementById('issueStockForm').reset();
-    document.getElementById('issueAvailableStock').textContent = '-';
-}
-
-function updateIssueAvailableStock() {
-    const productId = document.getElementById('issueProductId').value;
-    if (productId) {
-        const product = demoData.products.find(p => p.productId == productId);
-        if (product) {
-            document.getElementById('issueAvailableStock').textContent = product.available.toLocaleString();
-        }
-    } else {
-        document.getElementById('issueAvailableStock').textContent = '-';
-    }
 }
 
 function submitIssueStock() {
@@ -1332,10 +1316,6 @@ function submitIssueStock() {
         return;
     }
 
-    if (product.available < quantity) {
-        if (window.appMessages) window.appMessages.showError(`Insufficient stock. Available: ${product.available}, Requested: ${quantity}`);
-        return;
-    }
 
     // In a real app, this would make an API call to create an Issue transaction
     product.onHand -= quantity;

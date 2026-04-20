@@ -123,47 +123,6 @@ namespace Inventory.Infrastructure.Services
                 throw new ValidationException($"Cannot create order with inactive product(s): {string.Join(", ", inactiveProducts.Select(p => p.Name))}");
             }
 
-            // Load stock snapshots for all products
-            var productIdsList = productIds.ToList();
-            var stockSnapshots = await _db.StockSnapshots
-                .Where(s => productIdsList.Contains(s.ProductId))
-                .ToListAsync(ct);
-
-            // Verify sufficient stock for all products if not historical
-            if (!req.IsHistorical)
-            {
-                foreach (var lineReq in req.Lines)
-                {
-                    var productId = lineReq.ProductId;
-                    var quantity = lineReq.Quantity;
-                    var batchNum = (lineReq.BatchNumber ?? "").Trim();
-                    
-                    // Look up batch
-                    ProductBatch? batch = null;
-                    if (lineReq.ProductBatchId.HasValue && lineReq.ProductBatchId.Value > 0)
-                    {
-                        batch = await _db.ProductBatches.FindAsync(new object[] { lineReq.ProductBatchId.Value }, ct);
-                    }
-                    else
-                    {
-                        batch = await _db.ProductBatches.FirstOrDefaultAsync(b => b.ProductId == productId && b.BatchNumber == batchNum, ct);
-                    }
-
-                    // Calculate on-hand from transactions
-                    decimal available = await _db.InventoryTransactions
-                        .AsNoTracking()
-                        .Where(t => t.ProductId == productId && (t.ProductBatchId == (batch != null ? batch.Id : -1) || t.BatchNumber == batchNum))
-                        .SumAsync(t => t.QuantityDelta, ct);
-
-                    if (available < quantity)
-                    {
-                        var product = products.First(p => p.Id == productId);
-                        throw new ValidationException($"Insufficient stock for product '{product.Name}' (Batch: '{batchNum}'). Available: {available}, Requested: {quantity}");
-                    }
-                }
-            }
-
-
             // Generate unique order number
             var orderNumber = await GenerateUniqueOrderNumberAsync(ct);
 
