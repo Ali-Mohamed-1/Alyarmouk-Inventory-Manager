@@ -352,7 +352,6 @@
                             html: `
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="fw-bold">${batch.batchNumber}</span>
-                                    <span class="badge bg-dark text-white rounded-pill">Stock: ${batch.onHand}</span>
                                 </div>
                                 <div class="small text-muted">Cost: $${cost.toFixed(2)}</div>
                             `
@@ -375,7 +374,6 @@
                         <div class="fw-bold">${product.name.toUpperCase()}</div>
                         <div class="d-flex justify-content-between small text-muted">
                             <span>SKU: ${product.sku}</span>
-                            <span>Stock: ${product.onHand} ${product.unit}</span>
                         </div>
                     `
                 };

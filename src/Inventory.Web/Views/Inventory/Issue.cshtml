@@ -86,24 +86,13 @@
                 batchSelect.innerHTML = '<option value="">-- SELECT BATCH --</option>';
                 if (batches.length > 0) {
                     batches.forEach(b => {
-                        // Filter out empty batches or show them disabled? Better to show only available stock for ISSUE
-                        if (b.onHand > 0) {
-                            const option = document.createElement('option');
-                            option.value = b.batchNumber;
-                            option.dataset.id = b.id;
-                            option.textContent = `${b.batchNumber} (Qty: ${b.onHand})`;
-                            batchSelect.appendChild(option);
-                        }
+                        const option = document.createElement('option');
+                        option.value = b.batchNumber;
+                        option.dataset.id = b.id;
+                        option.textContent = b.batchNumber;
+                        batchSelect.appendChild(option);
                     });
-                    
-                    if (batchSelect.options.length === 1) { // Only default option
-                         const option = document.createElement('option');
-                         option.disabled = true;
-                         option.textContent = "NO STOCK AVAILABLE";
-                         batchSelect.appendChild(option);
-                    } else {
-                        batchSelect.disabled = false;
-                    }
+                    batchSelect.disabled = false;
                 } else {
                     const option = document.createElement('option');
                     option.disabled = true;

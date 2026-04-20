@@ -312,14 +312,12 @@
                         document.getElementById(`price-input-${idx}`).value = cost.toFixed(2);
                     }, (batch) => {
                         // Batch Renderer
-                         const onHand = batch.onHand ?? batch.OnHand ?? 0;
                          const cost = batch.unitCost ?? batch.UnitCost ?? 0;
                          return {
                             text: batch.batchNumber ?? batch.BatchNumber,
                             html: `
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="fw-bold">${batch.batchNumber ?? batch.BatchNumber}</span>
-                                    <span class="badge bg-light text-dark border">Qty: ${onHand}</span>
                                 </div>
                                 <div class="small text-muted">Cost: $${cost.toFixed(2)}</div>
                             `

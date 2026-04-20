@@ -169,7 +169,7 @@
                 try {
                     const batches = await fetchProductBatches(pid);
                     batchList.innerHTML = batches.map(b =>
-                        `<option value="${b.batchNumber}" data-cost="${b.unitCost || ''}">Qty: ${b.onHand}</option>`
+                        `<option value="${b.batchNumber}" data-cost="${b.unitCost || ''}">${b.batchNumber}</option>`
                     ).join('');
                 } catch (e) {
                     console.error("Failed to load batches", e);

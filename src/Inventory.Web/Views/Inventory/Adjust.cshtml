@@ -42,10 +42,6 @@
                                 <input type="hidden" asp-for="ProductBatchId" id="batchIdInput" />
                             </div>
 
-                             <div class="col-md-6">
-                                <label class="form-label fw-black text-uppercase small">Current Quantity</label>
-                                <input type="text" class="form-control" id="currentQty" disabled value="-" />
-                            </div>
 
                             <div class="col-md-6">
                                 <label asp-for="NewQuantity" class="form-label fw-black text-uppercase small">New Quantity (Actual)</label>
@@ -80,7 +76,6 @@
             // Reset fields
             batchSelect.innerHTML = '<option value="">LOADING...</option>';
             batchSelect.disabled = true;
-            document.getElementById('currentQty').value = '-';
             document.getElementById('batchIdInput').value = '';
 
             if (!productId) {
@@ -99,8 +94,7 @@
                         const option = document.createElement('option');
                         option.value = b.batchNumber;
                         option.dataset.id = b.id;
-                        option.dataset.qty = b.onHand;
-                        option.textContent = `${b.batchNumber} (Current: ${b.onHand})`;
+                        option.textContent = b.batchNumber;
                         batchSelect.appendChild(option);
                     });
                     batchSelect.disabled = false;
@@ -119,7 +113,6 @@
         document.getElementById('batchSelect').addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
             document.getElementById('batchIdInput').value = selectedOption.dataset.id || '';
-            document.getElementById('currentQty').value = selectedOption.dataset.qty || '-';
         });
     </script>
 }

@@ -69,23 +69,6 @@ public sealed class ProductBatchServices : IProductBatchServices
             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // Get transaction aggregates per batch
-        // These are the actual inventory quantities (source of truth)
-        var txAgg = await _db.InventoryTransactions
-            .AsNoTracking()
-            .Where(t => t.ProductId == productId)
-            .GroupBy(t => (t.BatchNumber ?? "").Trim())
-            .Select(g => new
-            {
-                BatchNumber = g.Key,
-                OnHand = g.Sum(x => x.QuantityDelta),
-                LastMovementUtc = g.Max(x => x.TimestampUtc),
-                LastUnitCost = g.OrderByDescending(x => x.TimestampUtc).Select(x => x.UnitCost).FirstOrDefault()
-            })
-            .ToListAsync(ct);
-
-        var txAggByBatch = txAgg.ToDictionary(x => x.BatchNumber, x => x, StringComparer.OrdinalIgnoreCase);
-
         // Get batch metadata
         var metas = await _db.ProductBatches
             .AsNoTracking()
@@ -100,20 +83,14 @@ public sealed class ProductBatchServices : IProductBatchServices
         if (hasUnbatched)
         {
             var key = "";
-            txAggByBatch.TryGetValue(key, out var unbatchedAgg);
             metaByBatch.TryGetValue(key, out var unbatchedMeta);
-
             result.Add(new ProductBatchResponseDto
             {
                 Id = unbatchedMeta?.Id ?? 0,
                 BatchNumber = "Unbatched",
                 IsUnbatched = true,
-                OnHand = unbatchedAgg?.OnHand ?? 0m,
-                Reserved = 0m, // Live reservation tracking removed from schema
-                Available = unbatchedAgg?.OnHand ?? 0m,
-                UnitCost = unbatchedMeta?.UnitCost ?? unbatchedAgg?.LastUnitCost ?? 0m,
+                UnitCost = unbatchedMeta?.UnitCost ?? 0m,
                 UnitPrice = unbatchedMeta?.UnitPrice ?? 0m,
-                LastMovementUtc = unbatchedAgg?.LastMovementUtc,
                 Notes = unbatchedMeta?.Notes,
                 RowVersion = unbatchedMeta?.RowVersion is { Length: > 0 }
                     ? Convert.ToBase64String(unbatchedMeta.RowVersion)
@@ -123,7 +100,6 @@ public sealed class ProductBatchServices : IProductBatchServices
 
         foreach (var batchNumber in allBatchNumbers)
         {
-            txAggByBatch.TryGetValue(batchNumber, out var agg);
             metaByBatch.TryGetValue(batchNumber, out var meta);
 
             result.Add(new ProductBatchResponseDto
@@ -131,12 +107,8 @@ public sealed class ProductBatchServices : IProductBatchServices
                 Id = meta?.Id ?? 0,
                 BatchNumber = batchNumber,
                 IsUnbatched = false,
-                OnHand = agg?.OnHand ?? 0m,
-                Reserved = 0m, // Live reservation tracking removed from schema
-                Available = agg?.OnHand ?? 0m,
-                UnitCost = meta?.UnitCost ?? agg?.LastUnitCost ?? 0m,
+                UnitCost = meta?.UnitCost ?? 0m,
                 UnitPrice = meta?.UnitPrice ?? 0m,
-                LastMovementUtc = agg?.LastMovementUtc,
                 Notes = meta?.Notes,
                 RowVersion = meta?.RowVersion is { Length: > 0 }
                     ? Convert.ToBase64String(meta.RowVersion)
@@ -200,20 +172,6 @@ public sealed class ProductBatchServices : IProductBatchServices
             throw new InvalidOperationException("Batch was updated by another user.", ex);
         }
 
-        // recompute aggregates for this single batch
-        var key = normalized;
-        var agg = await _db.InventoryTransactions
-            .AsNoTracking()
-            .Where(t => t.ProductId == productId && ((t.BatchNumber ?? "").Trim() == key))
-            .GroupBy(t => 1)
-            .Select(g => new
-            {
-                OnHand = g.Sum(x => x.QuantityDelta),
-                LastMovementUtc = g.Max(x => x.TimestampUtc),
-                LastUnitCost = g.OrderByDescending(x => x.TimestampUtc).Select(x => x.UnitCost).FirstOrDefault()
-            })
-            .FirstOrDefaultAsync(ct);
-
         var displayBatch = string.IsNullOrEmpty(normalized) ? "Unbatched" : normalized;
 
         return new ProductBatchResponseDto
@@ -221,12 +179,8 @@ public sealed class ProductBatchServices : IProductBatchServices
             Id = entity.Id,
             BatchNumber = displayBatch,
             IsUnbatched = string.IsNullOrEmpty(normalized),
-            OnHand = agg?.OnHand ?? 0m,
-            Reserved = 0m, // Live reservation tracking removed from schema
-            Available = agg?.OnHand ?? 0m,
-            UnitCost = entity.UnitCost ?? agg?.LastUnitCost ?? 0m,
+            UnitCost = entity.UnitCost ?? 0m,
             UnitPrice = entity.UnitPrice ?? 0m,
-            LastMovementUtc = agg?.LastMovementUtc,
             Notes = entity.Notes,
             RowVersion = entity.RowVersion is { Length: > 0 }
                 ? Convert.ToBase64String(entity.RowVersion)

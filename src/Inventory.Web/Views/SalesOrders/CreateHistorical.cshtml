@@ -253,10 +253,7 @@
         async function fetchBatches(productId) {
             try {
                 const response = await fetch(`/api/products/${productId}/batches`);
-                const allBatches = await response.json();
-                // For historical, return ALL batches if possible, or just positive ones?
-                // Since we validate strict batch on backend, we need real batches.
-                return allBatches.filter(b => (b.onHand && b.onHand > 0));
+                return await response.json();
             } catch (error) {
                 console.error('Error loading batches:', error);
                 return [];
@@ -372,14 +369,13 @@
                             html: `
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="fw-bold">${batch.batchNumber}</span>
-                                    <span class="badge bg-dark text-white rounded-pill">Qty: ${batch.onHand}</span>
                                 </div>
                                 <div class="small text-muted">Price: $${(batch.unitPrice||0).toFixed(2)}</div>
                             `
                         };
                     });
                 } else {
-                    bInput.placeholder = "NO STOCK AVAILABLE";
+                    bInput.placeholder = "NO BATCHES FOUND";
                 }
 
                 calculateTotals();
@@ -390,7 +386,6 @@
                         <div class="fw-bold">${product.name.toUpperCase()}</div>
                         <div class="d-flex justify-content-between small text-muted">
                             <span>SKU: ${product.sku}</span>
-                            <span>Stock: ${product.onHand} ${product.unit}</span>
                         </div>
                     `
                 };
