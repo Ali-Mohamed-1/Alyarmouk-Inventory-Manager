@@ -32,6 +32,8 @@ namespace Inventory.Application.DTOs
         public decimal ManufacturingTaxAmount { get; init; }
         public decimal ReceiptExpenses { get; init; }
         public decimal TotalAmount { get; init; }
+        public decimal OriginalTotal { get; init; }
+        public decimal EffectiveTotal { get; init; }
         public decimal RefundedAmount { get; init; }
         public string? Note { get; init; }
         public bool IsHistorical { get; init; }
@@ -73,5 +75,9 @@ namespace Inventory.Application.DTOs
         decimal LineVatAmount,
         decimal LineManufacturingTaxAmount,
         decimal LineTotal,
-        decimal RefundedQuantity);
+        decimal RefundedQuantity)
+    {
+        public decimal OriginalQuantity => Quantity;
+        public decimal RemainingQuantity => Quantity - RefundedQuantity;
+    }
 }

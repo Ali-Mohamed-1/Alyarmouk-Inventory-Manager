@@ -65,7 +65,9 @@ namespace Inventory.Application.DTOs.SalesOrder
         public decimal Subtotal { get; set; }
         public decimal VatAmount { get; init; }
         public decimal ManufacturingTaxAmount { get; init; }
-        public decimal TotalAmount { get; set; }
+        public decimal TotalAmount { get; init; }
+        public decimal OriginalTotal { get; init; }
+        public decimal EffectiveTotal { get; init; }
 
         public bool IsHistorical { get; init; }
         public bool IsStockProcessed { get; init; }

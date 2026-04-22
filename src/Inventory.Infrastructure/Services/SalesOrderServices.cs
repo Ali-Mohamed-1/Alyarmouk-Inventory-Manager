@@ -480,6 +480,8 @@ namespace Inventory.Infrastructure.Services
                     VatAmount = o.VatAmount,
                     ManufacturingTaxAmount = o.ManufacturingTaxAmount,
                     TotalAmount = o.TotalAmount,
+                    OriginalTotal = o.TotalAmount,
+                    EffectiveTotal = o.EffectiveTotal,
                     IsHistorical = o.IsHistorical,
                     IsStockProcessed = o.IsStockProcessed,
                     RefundedAmount = o.RefundedAmount,
@@ -582,6 +584,8 @@ namespace Inventory.Infrastructure.Services
                     VatAmount = o.VatAmount,
                     ManufacturingTaxAmount = o.ManufacturingTaxAmount,
                     TotalAmount = o.TotalAmount,
+                    OriginalTotal = o.TotalAmount,
+                    EffectiveTotal = o.EffectiveTotal,
                     RefundedAmount = o.RefundedAmount,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
                     {
@@ -681,6 +685,8 @@ namespace Inventory.Infrastructure.Services
                     VatAmount = o.VatAmount,
                     ManufacturingTaxAmount = o.ManufacturingTaxAmount,
                     TotalAmount = o.TotalAmount,
+                    OriginalTotal = o.TotalAmount,
+                    EffectiveTotal = o.EffectiveTotal,
                     RefundedAmount = o.RefundedAmount,
                     Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
                     {

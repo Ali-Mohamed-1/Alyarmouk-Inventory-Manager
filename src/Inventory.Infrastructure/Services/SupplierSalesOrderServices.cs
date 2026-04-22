@@ -191,6 +191,7 @@ namespace Inventory.Infrastructure.Services
                 order.VatAmount = totalVat;
                 order.ManufacturingTaxAmount = totalManTax;
                 order.TotalAmount = totalAmount;
+                order.EffectiveTotal = totalAmount;
 
                 // ─── P&L Impact (Requirement 6) ──────────────────────────────────────
                 // Revenue: The netting amount we are gaining from the supplier.
@@ -250,6 +251,8 @@ namespace Inventory.Infrastructure.Services
                     Status = o.Status,
                     PaymentStatus = o.PaymentStatus,
                     TotalAmount = o.TotalAmount,
+                    OriginalTotal = o.TotalAmount,
+                    EffectiveTotal = o.EffectiveTotal,
                     Note = o.Note,
                     IsTaxInclusive = o.IsTaxInclusive,
                     ApplyVat = o.ApplyVat,
@@ -299,7 +302,9 @@ namespace Inventory.Infrastructure.Services
                     DueDate = o.DueDate,
                     Status = o.Status,
                     PaymentStatus = o.PaymentStatus,
-                    TotalAmount = o.TotalAmount
+                    TotalAmount = o.TotalAmount,
+                    OriginalTotal = o.TotalAmount,
+                    EffectiveTotal = o.EffectiveTotal
                 })
                 .ToListAsync(ct);
         }

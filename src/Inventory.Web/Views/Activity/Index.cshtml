@@ -1006,7 +1006,15 @@
                                 <td class="text-muted small">—</td>
                                 <td>${statusBadge}</td>
                                 <td class="text-muted small">—</td>
-                                <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
+                                <td class="text-end">
+                                    ${o.refundedAmount > 0 ? `
+                                        <div class="d-flex flex-column align-items-end">
+                                            <span class="text-decoration-line-through text-muted small" style="font-size: 0.7rem;">${formatCurrency(o.originalTotal)}</span>
+                                            <span class="fw-black text-success">${formatCurrency(o.effectiveTotal)}</span>
+                                            <span class="badge bg-danger" style="font-size: 0.5rem; padding: 2px 4px;">REFUNDED</span>
+                                        </div>
+                                    ` : `<span class="fw-black text-success">${formatCurrency(o.totalAmount)}</span>`}
+                                </td>
                                 <td class="text-end">
                                     <div class="d-flex gap-1 justify-content-end">
                                         <a href="/SupplierSalesOrders/Details/${o.id}" class="neo-btn neo-btn-info btn-sm p-1 px-2">VIEW</a>
@@ -1025,7 +1033,15 @@
                                 <td class="small fw-bold ${new Date(o.dueDate) < new Date() && o.paymentStatus !== 1 ? 'text-danger' : ''}">${formatDate(o.dueDate)}</td>
                                 <td>${getSoStatusBadge(o.status)}</td>
                                 <td>${getPaymentBadge(o.paymentStatus)}</td>
-                                <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
+                                <td class="text-end">
+                                    ${o.refundedAmount > 0 ? `
+                                        <div class="d-flex flex-column align-items-end">
+                                            <span class="text-decoration-line-through text-muted small" style="font-size: 0.7rem;">${formatCurrency(o.originalTotal)}</span>
+                                            <span class="fw-black text-success">${formatCurrency(o.effectiveTotal)}</span>
+                                            <span class="badge bg-danger" style="font-size: 0.5rem; padding: 2px 4px;">REFUNDED</span>
+                                        </div>
+                                    ` : `<span class="fw-black text-success">${formatCurrency(o.totalAmount)}</span>`}
+                                </td>
                                 <td class="text-end">
                                     <button class="neo-btn neo-btn-info btn-sm p-1 px-3" onclick="viewSoDetails(${o.id})">VIEW</button>
                                 </td>
@@ -1069,7 +1085,18 @@
                     document.getElementById('so-detail-subtotal').innerText = formatCurrency(o.subtotal);
                     document.getElementById('so-detail-vat').innerText = formatCurrency(o.vatAmount);
                     document.getElementById('so-detail-man-tax').innerText = o.manufacturingTaxAmount > 0 ? '-' + formatCurrency(o.manufacturingTaxAmount) : '-';
-                    document.getElementById('so-detail-total').innerText = formatCurrency(o.totalAmount);
+                    
+                    if (o.refundedAmount > 0) {
+                        document.getElementById('so-detail-total').innerHTML = `
+                            <div class="text-end">
+                                <div class="text-decoration-line-through text-muted fs-6 fw-normal">${formatCurrency(o.originalTotal)}</div>
+                                <div class="text-success">${formatCurrency(o.effectiveTotal)}</div>
+                                <div class="badge bg-danger text-uppercase p-1" style="font-size: 0.6rem; letter-spacing: 0.05em;">Partial Refund Active</div>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('so-detail-total').innerText = formatCurrency(o.totalAmount);
+                    }
 
                     // Actions Container
                     const actionsHtml = [];
@@ -1091,6 +1118,18 @@
 
                     // Lines
                     document.getElementById('so-detail-lines').innerHTML = o.lines.map(l => `
+                        <tr>
+                            <td><span class="fw-black text-uppercase small">${escapeHtml(l.productName)}</span></td>
+                            <td>${l.batchNumber ? `<code class="fw-bold">${escapeHtml(l.batchNumber)}</code>` : '-'}</td>
+                            <td class="text-center fw-bold">
+                                ${l.refundedQuantity > 0 ? `
+                                    <span class="text-decoration-line-through text-muted small">${l.originalQuantity}</span>
+                                    <span class="ms-1">${l.remainingQuantity}</span>
+                                    ${l.remainingQuantity === 0 ? '<span class="badge bg-danger ms-1" style="font-size: 0.6rem;">Fully Returned</span>' : ''}
+                                ` : l.quantity}
+                            </td>
+                            <td class="text-end fw-bold">${formatCurrency(l.unitPrice)}</td>
+                            <td class="text-end fw-black">${formatCurrency(l.lineTotal)}</td>
                         </tr>
                     `).join('');
 
@@ -1172,7 +1211,15 @@
                         <td class="small fw-bold ${o.paymentDeadline && new Date(o.paymentDeadline) < new Date() && o.paymentStatus !== 1 ? 'text-danger' : ''}">${o.paymentDeadline ? formatDate(o.paymentDeadline) : '-'}</td>
                         <td>${getPoStatusBadge(o.status)}</td>
                         <td>${getPaymentBadge(o.paymentStatus)}</td>
-                        <td class="text-end fw-black text-success">${formatCurrency(o.totalAmount)}</td>
+                        <td class="text-end">
+                            ${o.refundedAmount > 0 ? `
+                                <div class="d-flex flex-column align-items-end">
+                                    <span class="text-decoration-line-through text-muted small" style="font-size: 0.7rem;">${formatCurrency(o.originalTotal)}</span>
+                                    <span class="fw-black text-success">${formatCurrency(o.effectiveTotal)}</span>
+                                    <span class="badge bg-danger" style="font-size: 0.5rem; padding: 2px 4px;">REFUNDED</span>
+                                </div>
+                            ` : `<span class="fw-black text-success">${formatCurrency(o.totalAmount)}</span>`}
+                        </td>
                         <td class="text-end">
                             <button class="neo-btn neo-btn-info btn-sm p-1 px-3" onclick="viewPoDetails(${o.id})">VIEW</button>
                         </td>
@@ -1201,7 +1248,18 @@
                     document.getElementById('po-detail-vat').innerText = formatCurrency(o.vatAmount);
                     document.getElementById('po-detail-man-tax').innerText = formatCurrency(o.manufacturingTaxAmount);
                     document.getElementById('po-detail-receipt-exp').innerText = formatCurrency(o.receiptExpenses || 0);
-                    document.getElementById('po-detail-total').innerText = formatCurrency(o.totalAmount);
+                    
+                    if (o.refundedAmount > 0) {
+                        document.getElementById('po-detail-total').innerHTML = `
+                            <div class="text-end">
+                                <div class="text-decoration-line-through text-muted fs-6 fw-normal">${formatCurrency(o.originalTotal)}</div>
+                                <div class="text-success">${formatCurrency(o.effectiveTotal)}</div>
+                                <div class="badge bg-danger text-uppercase p-1" style="font-size: 0.6rem; letter-spacing: 0.05em;">Partial Refund Active</div>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('po-detail-total').innerText = formatCurrency(o.totalAmount);
+                    }
 
 
                     // PO Actions
@@ -1228,7 +1286,13 @@
                         <tr>
                             <td><span class="fw-black text-uppercase small">${escapeHtml(l.productName)}</span></td>
                             <td>${l.batchNumber ? `<code class="fw-bold">${escapeHtml(l.batchNumber)}</code>` : '-'}</td>
-                            <td class="text-center fw-bold">${l.quantity}</td>
+                            <td class="text-center fw-bold">
+                                ${l.refundedQuantity > 0 ? `
+                                    <span class="text-decoration-line-through text-muted small">${l.originalQuantity}</span>
+                                    <span class="ms-1">${l.remainingQuantity}</span>
+                                    ${l.remainingQuantity === 0 ? '<span class="badge bg-danger ms-1" style="font-size: 0.6rem;">Fully Returned</span>' : ''}
+                                ` : l.quantity}
+                            </td>
                             <td class="text-end fw-bold">${formatCurrency(l.unitPrice)}</td>
                             <td class="text-end fw-black">${formatCurrency(l.lineTotal)}</td>
                         </tr>

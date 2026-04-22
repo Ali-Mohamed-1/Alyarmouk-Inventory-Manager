@@ -73,6 +73,17 @@ public class SupplierSalesOrder
     public decimal VatAmount { get; set; }
     public decimal ManufacturingTaxAmount { get; set; }
     public decimal TotalAmount { get; set; }
+    
+    /// <summary>
+    /// Effective total after quantity refunds. Used for calculating debt.
+    /// </summary>
+    public decimal EffectiveTotal { get; set; }
+    
+    /// <summary>
+    /// Total amount that has been refunded for this order.
+    /// Must never exceed TotalAmount.
+    /// </summary>
+    public decimal RefundedAmount { get; set; }
 
     public List<SupplierSalesOrderLine> Lines { get; set; } = new();
 }

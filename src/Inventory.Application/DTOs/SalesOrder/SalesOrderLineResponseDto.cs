@@ -1,4 +1,4 @@
-﻿namespace Inventory.Application.DTOs.SalesOrder
+namespace Inventory.Application.DTOs.SalesOrder
 {
     public record SalesOrderLineResponseDto
     {
@@ -19,5 +19,7 @@
         /// Total quantity of this line that has been refunded (Prev. Ret.).
         /// </summary>
         public decimal RefundedQuantity { get; init; }
+        public decimal OriginalQuantity => Quantity;
+        public decimal RemainingQuantity => Quantity - RefundedQuantity;
     }
 }
