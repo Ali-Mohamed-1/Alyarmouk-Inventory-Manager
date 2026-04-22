@@ -285,6 +285,8 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.VatAmount).HasPrecision(18, 2);
                 b.Property(x => x.ManufacturingTaxAmount).HasPrecision(18, 2);
                 b.Property(x => x.TotalAmount).HasPrecision(18, 2);
+                b.Property(x => x.EffectiveTotal).HasPrecision(18, 2);
+                b.Property(x => x.RefundedAmount).HasPrecision(18, 2);
                 b.HasIndex(x => x.CreatedUtc);
                 b.HasIndex(x => x.Status);
                 b.HasIndex(x => x.PaymentStatus);

@@ -204,6 +204,10 @@ public  class SalesOrder
     /// </summary>
     public decimal EffectiveTotal { get; set; }
     
+    public decimal EffectiveSubtotal { get; set; }
+    public decimal EffectiveVatAmount { get; set; }
+    public decimal EffectiveManufacturingTaxAmount { get; set; }
+    
     /// <summary>
     /// Total amount that has been refunded for this order.
     /// Must never exceed TotalAmount.

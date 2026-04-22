@@ -13,6 +13,7 @@ using Inventory.Domain.Constants;
 using Inventory.Application.DTOs.Transaction;
 using Inventory.Application.DTOs.Payment;
 using Inventory.Application.Exceptions;
+using Microsoft.Extensions.Logging;
 
 
 namespace Inventory.Infrastructure.Services
@@ -24,15 +25,18 @@ namespace Inventory.Infrastructure.Services
         private readonly AppDbContext _db;
         private readonly IInventoryServices _inventoryServices;
         private readonly IFinancialServices _financialServices;
+        private readonly ILogger<SalesOrderServices> _logger;
 
         public SalesOrderServices(
             AppDbContext db,
             IInventoryServices inventoryServices,
-            IFinancialServices financialServices)
+            IFinancialServices financialServices,
+            ILogger<SalesOrderServices> logger)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
             _inventoryServices = inventoryServices ?? throw new ArgumentNullException(nameof(inventoryServices));
             _financialServices = financialServices ?? throw new ArgumentNullException(nameof(financialServices));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<long> CreateAsync(CreateSalesOrderRequest req, UserContext user, CancellationToken ct = default)
@@ -254,6 +258,10 @@ namespace Inventory.Infrastructure.Services
                 salesOrder.VatAmount = totalVat;
                 salesOrder.ManufacturingTaxAmount = totalManTax;
                 salesOrder.TotalAmount = totalOrderAmount;
+                
+                salesOrder.EffectiveSubtotal = totalSubtotal;
+                salesOrder.EffectiveVatAmount = totalVat;
+                salesOrder.EffectiveManufacturingTaxAmount = totalManTax;
                 salesOrder.EffectiveTotal = totalOrderAmount;
 
                 // 4. Handle Historical Status
@@ -364,100 +372,134 @@ namespace Inventory.Infrastructure.Services
         {
             if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id), "Id must be positive.");
 
-            return await _db.SalesOrders
-                .AsNoTracking()
+            var order = await _db.SalesOrders
                 .Include(o => o.Lines)
                 .Include(o => o.Payments)
-                .Where(o => o.Id == id)
-                .Select(o => new SalesOrderResponseDto
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
+
+            if (order == null) return null;
+
+            // Check for backfill failure
+            var hasRefunds = await _db.RefundTransactions.AnyAsync(r => r.SalesOrderId == id, ct);
+            if (hasRefunds && order.EffectiveTotal == order.TotalAmount && order.EffectiveSubtotal == order.Subtotal)
+            {
+                _logger.LogWarning("Potential backfill failure detected for Sales Order {OrderNumber}. Re-calculating effective fields on-the-fly.", order.OrderNumber);
+                
+                var refunds = await _db.RefundTransactions
+                    .Include(r => r.Lines)
+                    .Where(r => r.SalesOrderId == id)
+                    .ToListAsync(ct);
+
+                var totalSubtotalRef = refunds.SelectMany(r => r.Lines).Sum(l => l.SubtotalRefunded);
+                var totalVatRef = refunds.SelectMany(r => r.Lines).Sum(l => l.VatRefunded);
+                var totalManTaxRef = refunds.SelectMany(r => r.Lines).Sum(l => l.ManTaxRefunded);
+
+                if (totalSubtotalRef > 0 || totalVatRef > 0)
                 {
-                    Id = o.Id,
-                    OrderNumber = o.OrderNumber,
-                    CustomerId = o.CustomerId,
-                    CustomerName = o.CustomerNameSnapshot,
-                    CreatedUtc = o.CreatedUtc,
-                    OrderDate = o.OrderDate,
-                    DueDate = o.DueDate,
-                    Status = o.Status,
-                    PaymentMethod = o.PaymentMethod,
-                    PaymentStatus = o.PaymentStatus,
-                    
-                    // Inline calculations for EF Core translation
-                    TotalPaid = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount),
-                    TotalRefunded = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
-                    NetCash = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
-                              o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
-                    PendingAmount = o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) > 0 
-                                    ? o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) 
-                                    : 0,
-                    RefundDue = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
-                                o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount) - o.TotalAmount > 0
-                                ? o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
-                                  o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount) - o.TotalAmount
+                    order.EffectiveSubtotal = order.Subtotal - totalSubtotalRef;
+                    order.EffectiveVatAmount = order.VatAmount - totalVatRef;
+                    order.EffectiveManufacturingTaxAmount = order.ManufacturingTaxAmount - totalManTaxRef;
+                    order.EffectiveTotal = order.EffectiveSubtotal + order.EffectiveVatAmount - order.EffectiveManufacturingTaxAmount;
+                }
+            }
+
+            return MapToResponse(order);
+        }
+
+        private static SalesOrderResponseDto MapToResponse(SalesOrder o)
+        {
+            return new SalesOrderResponseDto
+            {
+                Id = o.Id,
+                OrderNumber = o.OrderNumber,
+                CustomerId = o.CustomerId,
+                CustomerName = o.CustomerNameSnapshot,
+                CreatedUtc = o.CreatedUtc,
+                OrderDate = o.OrderDate,
+                DueDate = o.DueDate,
+                Status = o.Status,
+                PaymentMethod = o.PaymentMethod,
+                PaymentStatus = o.PaymentStatus,
+                
+                // Inline calculations
+                TotalPaid = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount),
+                TotalRefunded = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
+                NetCash = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
+                          o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
+                PendingAmount = o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) > 0 
+                                ? o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) 
                                 : 0,
-                    
-                    // Legacy / UI mapping
-                    PaidAmount = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount), // Show total collected
-                    RemainingAmount = o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) > 0 
-                                      ? o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) 
-                                      : 0,
-                    DeservedAmount = o.DueDate < DateTimeOffset.UtcNow && o.PaymentStatus != PaymentStatus.Paid 
-                                     ? o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount)
-                                     : 0,
-                    IsOverdue = o.DueDate < DateTimeOffset.UtcNow && o.PaymentStatus != PaymentStatus.Paid,
-                    
-                    Payments = o.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new PaymentRecordDto
-                    {
-                        Id = p.Id,
-                        Amount = p.Amount,
-                        PaymentDate = p.PaymentDate,
-                        PaymentMethod = p.PaymentMethod,
-                        PaymentType = p.PaymentType,
-                        Reference = p.Reference,
-                        Note = p.Note,
-                        CreatedByUserId = p.CreatedByUserId
-                    }).ToList(),
-                    CheckReceived = o.CheckReceived,
-                    CheckReceivedDate = o.CheckReceivedDate,
-                    CheckCashed = o.CheckCashed,
-                    CheckCashedDate = o.CheckCashedDate,
-                    TransferId = o.TransferId,
-                    InvoicePath = o.InvoicePath,
-                    InvoiceUploadedUtc = o.InvoiceUploadedUtc,
-                    ReceiptPath = o.ReceiptPath,
-                    ReceiptUploadedUtc = o.ReceiptUploadedUtc,
-                    CreatedByUserDisplayName = o.CreatedByUserDisplayName,
-                    Note = o.Note,
-                    IsTaxInclusive = o.IsTaxInclusive,
-                    ApplyVat = o.ApplyVat,
-                    ApplyManufacturingTax = o.ApplyManufacturingTax,
-                    Subtotal = o.Subtotal,
-                    VatAmount = o.VatAmount,
-                    ManufacturingTaxAmount = o.ManufacturingTaxAmount,
-                    TotalAmount = o.TotalAmount,
-                    OriginalTotal = o.TotalAmount,
-                    EffectiveTotal = o.EffectiveTotal,
-                    IsHistorical = o.IsHistorical,
-                    IsStockProcessed = o.IsStockProcessed,
-                    RefundedAmount = o.RefundedAmount,
-                    Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
-                    {
-                        Id = l.Id,
-                        ProductId = l.ProductId,
-                        ProductName = l.ProductNameSnapshot,
-                        Quantity = l.Quantity,
-                        Unit = l.UnitSnapshot,
-                        UnitPrice = l.UnitPrice,
-                        BatchNumber = l.BatchNumber,
-                        ProductBatchId = l.ProductBatchId,
-                        LineSubtotal = l.LineSubtotal,
-                        LineVatAmount = l.LineVatAmount,
-                        LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
-                        LineTotal = l.LineTotal,
-                        RefundedQuantity = l.RefundedQuantity
-                    }).ToList()
-                })
-                .SingleOrDefaultAsync(ct);
+                RefundDue = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
+                            o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount) - o.TotalAmount > 0
+                            ? o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
+                              o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount) - o.TotalAmount
+                            : 0,
+                
+                PaidAmount = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount),
+                RemainingAmount = o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) > 0 
+                                  ? o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) 
+                                  : 0,
+                DeservedAmount = o.DueDate < DateTimeOffset.UtcNow && o.PaymentStatus != PaymentStatus.Paid 
+                                 ? o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount)
+                                 : 0,
+                IsOverdue = o.DueDate < DateTimeOffset.UtcNow && o.PaymentStatus != PaymentStatus.Paid,
+                
+                Payments = o.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new PaymentRecordDto
+                {
+                    Id = p.Id,
+                    Amount = p.Amount,
+                    PaymentDate = p.PaymentDate,
+                    PaymentMethod = p.PaymentMethod,
+                    PaymentType = p.PaymentType,
+                    Reference = p.Reference,
+                    Note = p.Note,
+                    CreatedByUserId = p.CreatedByUserId
+                }).ToList(),
+                CheckReceived = o.CheckReceived,
+                CheckReceivedDate = o.CheckReceivedDate,
+                CheckCashed = o.CheckCashed,
+                CheckCashedDate = o.CheckCashedDate,
+                TransferId = o.TransferId,
+                InvoicePath = o.InvoicePath,
+                InvoiceUploadedUtc = o.InvoiceUploadedUtc,
+                ReceiptPath = o.ReceiptPath,
+                ReceiptUploadedUtc = o.ReceiptUploadedUtc,
+                CreatedByUserDisplayName = o.CreatedByUserDisplayName,
+                Note = o.Note,
+                IsTaxInclusive = o.IsTaxInclusive,
+                ApplyVat = o.ApplyVat,
+                ApplyManufacturingTax = o.ApplyManufacturingTax,
+                Subtotal = o.Subtotal,
+                VatAmount = o.VatAmount,
+                ManufacturingTaxAmount = o.ManufacturingTaxAmount,
+                
+                EffectiveSubtotal = o.EffectiveSubtotal == 0 && o.Subtotal > 0 ? o.Subtotal : o.EffectiveSubtotal,
+                EffectiveVatAmount = o.EffectiveVatAmount == 0 && o.VatAmount > 0 ? o.VatAmount : o.EffectiveVatAmount,
+                EffectiveManufacturingTaxAmount = o.EffectiveManufacturingTaxAmount == 0 && o.ManufacturingTaxAmount > 0 ? o.ManufacturingTaxAmount : o.EffectiveManufacturingTaxAmount,
+                
+                TotalAmount = o.TotalAmount,
+                OriginalTotal = o.TotalAmount,
+                EffectiveTotal = o.EffectiveTotal == 0 && o.TotalAmount > 0 ? o.TotalAmount : o.EffectiveTotal,
+                IsHistorical = o.IsHistorical,
+                IsStockProcessed = o.IsStockProcessed,
+                RefundedAmount = o.RefundedAmount,
+                Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
+                {
+                    Id = l.Id,
+                    ProductId = l.ProductId,
+                    ProductName = l.ProductNameSnapshot,
+                    Quantity = l.Quantity,
+                    Unit = l.UnitSnapshot,
+                    UnitPrice = l.UnitPrice,
+                    BatchNumber = l.BatchNumber,
+                    ProductBatchId = l.ProductBatchId,
+                    LineSubtotal = l.LineSubtotal,
+                    LineVatAmount = l.LineVatAmount,
+                    LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
+                    LineTotal = l.LineTotal,
+                    RefundedQuantity = l.RefundedQuantity
+                }).ToList()
+            };
         }
 
         public async Task<IReadOnlyList<SalesOrderResponseDto>> GetCustomerOrdersAsync(int customerId, int take = 100, CancellationToken ct = default)
@@ -465,101 +507,15 @@ namespace Inventory.Infrastructure.Services
             if (customerId <= 0) throw new ArgumentOutOfRangeException(nameof(customerId), "Customer ID must be positive.");
             take = Math.Clamp(take, 1, MaxTake);
 
-            return await _db.SalesOrders
-                .AsNoTracking()
+            var orders = await _db.SalesOrders
                 .Include(o => o.Lines)
                 .Include(o => o.Payments)
                 .Where(o => o.CustomerId == customerId && o.Status != SalesOrderStatus.Cancelled)
                 .OrderByDescending(o => o.CreatedUtc)
                 .Take(take)
-                .Select(o => new SalesOrderResponseDto
-                {
-                    Id = o.Id,
-                    OrderNumber = o.OrderNumber,
-                    CustomerId = o.CustomerId,
-                    CustomerName = o.CustomerNameSnapshot,
-                    CreatedUtc = o.CreatedUtc,
-                    OrderDate = o.OrderDate,
-                    DueDate = o.DueDate,
-                    Status = o.Status,
-                    PaymentMethod = o.PaymentMethod,
-                    PaymentStatus = o.PaymentStatus,
-                    
-                    // Inline calculations for EF Core translation
-                    TotalPaid = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount),
-                    TotalRefunded = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
-                    NetCash = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
-                              o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
-                    PendingAmount = o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)) > 0 
-                                    ? o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)) 
-                                    : 0,
-                    RefundDue = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
-                                o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount) - o.TotalAmount > 0
-                                ? o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
-                                  o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount) - o.TotalAmount
-                                : 0,
-                    
-                    // Legacy / UI mapping
-                    PaidAmount = o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - 
-                                 o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount),
-                    RemainingAmount = o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) > 0 
-                                      ? o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) 
-                                      : 0,
-                    DeservedAmount = o.DueDate < DateTimeOffset.UtcNow && o.PaymentStatus != PaymentStatus.Paid 
-                                     ? o.TotalAmount - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount)
-                                     : 0,
-                    IsOverdue = o.DueDate < DateTimeOffset.UtcNow && o.PaymentStatus != PaymentStatus.Paid,
-                    
-                    Payments = o.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new PaymentRecordDto
-                    {
-                        Id = p.Id,
-                        Amount = p.Amount,
-                        PaymentDate = p.PaymentDate,
-                        PaymentMethod = p.PaymentMethod,
-                        PaymentType = p.PaymentType,
-                        Reference = p.Reference,
-                        Note = p.Note,
-                        CreatedByUserId = p.CreatedByUserId
-                    }).ToList(),
-                    CheckReceived = o.CheckReceived,
-                    CheckReceivedDate = o.CheckReceivedDate,
-                    CheckCashed = o.CheckCashed,
-                    CheckCashedDate = o.CheckCashedDate,
-                    TransferId = o.TransferId,
-                    InvoicePath = o.InvoicePath,
-                    InvoiceUploadedUtc = o.InvoiceUploadedUtc,
-                    ReceiptPath = o.ReceiptPath,
-                    ReceiptUploadedUtc = o.ReceiptUploadedUtc,
-                    CreatedByUserDisplayName = o.CreatedByUserDisplayName,
-                    Note = o.Note,
-                    IsTaxInclusive = o.IsTaxInclusive,
-                    ApplyVat = o.ApplyVat,
-                    ApplyManufacturingTax = o.ApplyManufacturingTax,
-                    Subtotal = o.Subtotal,
-                    VatAmount = o.VatAmount,
-                    ManufacturingTaxAmount = o.ManufacturingTaxAmount,
-                    TotalAmount = o.TotalAmount,
-                    OriginalTotal = o.TotalAmount,
-                    EffectiveTotal = o.EffectiveTotal,
-                    RefundedAmount = o.RefundedAmount,
-                    Lines = o.Lines.Select(l => new SalesOrderLineResponseDto
-                    {
-                        Id = l.Id,
-                        ProductId = l.ProductId,
-                        ProductName = l.ProductNameSnapshot,
-                        Quantity = l.Quantity,
-                        Unit = l.UnitSnapshot,
-                        UnitPrice = l.UnitPrice,
-                        BatchNumber = l.BatchNumber,
-                        ProductBatchId = l.ProductBatchId,
-                        LineSubtotal = l.LineSubtotal,
-                        LineVatAmount = l.LineVatAmount,
-                        LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
-                        LineTotal = l.LineTotal,
-                        RefundedQuantity = l.RefundedQuantity
-                    }).ToList()
-                })
                 .ToListAsync(ct);
+
+            return orders.Select(MapToResponse).ToList();
         }
 
         public async Task<IReadOnlyList<SalesOrderResponseDto>> GetRecentAsync(int take = 50, CancellationToken ct = default)
@@ -639,6 +595,9 @@ namespace Inventory.Infrastructure.Services
                     Subtotal = o.Subtotal,
                     VatAmount = o.VatAmount,
                     ManufacturingTaxAmount = o.ManufacturingTaxAmount,
+                    EffectiveSubtotal = o.EffectiveSubtotal,
+                    EffectiveVatAmount = o.EffectiveVatAmount,
+                    EffectiveManufacturingTaxAmount = o.EffectiveManufacturingTaxAmount,
                     TotalAmount = o.TotalAmount,
                     OriginalTotal = o.TotalAmount,
                     EffectiveTotal = o.EffectiveTotal,
@@ -1144,7 +1103,10 @@ namespace Inventory.Infrastructure.Services
 
                         // Update Order and Line state
                         line.RefundedQuantity += refundItem.Quantity;
-                        order.EffectiveTotal -= lineRefundTotal;
+                        order.EffectiveSubtotal -= lineRefundSubtotal;
+                        order.EffectiveVatAmount -= lineRefundVat;
+                        order.EffectiveManufacturingTaxAmount -= lineRefundManTax;
+                        order.EffectiveTotal = order.EffectiveSubtotal + order.EffectiveVatAmount - order.EffectiveManufacturingTaxAmount;
 
                         // Add to Audit Transaction Lines
                         refundTx.Lines.Add(new RefundTransactionLine

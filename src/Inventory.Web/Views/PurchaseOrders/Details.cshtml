@@ -142,17 +142,47 @@
                 <div class="p-4 bg-light border-top border-4">
                     <div class="row g-2">
                         <div class="col-9 text-end fw-black text-uppercase small">Subtotal:</div>
-                        <div class="col-3 text-end fw-black">@Model.Subtotal.ToString("C2")</div>
+                        <div class="col-3 text-end fw-black">
+                            @if (Model.EffectiveSubtotal < Model.Subtotal)
+                            {
+                                <div class="text-muted small text-decoration-line-through fw-bold" style="font-size: 0.8rem;">@Model.Subtotal.ToString("C2")</div>
+                                <div>@Model.EffectiveSubtotal.ToString("C2")</div>
+                            }
+                            else
+                            {
+                                @Model.Subtotal.ToString("C2")
+                            }
+                        </div>
                         
                         @if (Model.ApplyVat)
                         {
                             <div class="col-9 text-end fw-black text-uppercase small">VAT (14%):</div>
-                            <div class="col-3 text-end fw-bold">@Model.VatAmount.ToString("C2")</div>
+                            <div class="col-3 text-end fw-bold">
+                                @if (Model.EffectiveVatAmount < Model.VatAmount)
+                                {
+                                    <div class="text-muted small text-decoration-line-through fw-bold" style="font-size: 0.8rem;">@Model.VatAmount.ToString("C2")</div>
+                                    <div class="text-danger">@Model.EffectiveVatAmount.ToString("C2")</div>
+                                }
+                                else
+                                {
+                                    @Model.VatAmount.ToString("C2")
+                                }
+                            </div>
                         }
                         @if (Model.ApplyManufacturingTax)
                         {
                             <div class="col-9 text-end fw-black text-uppercase small">Manufacturing Tax (1%):</div>
-                            <div class="col-3 text-end fw-bold text-danger">-@Model.ManufacturingTaxAmount.ToString("C2")</div>
+                            <div class="col-3 text-end fw-bold text-danger">
+                                @if (Model.EffectiveManufacturingTaxAmount < Model.ManufacturingTaxAmount)
+                                {
+                                    <div class="text-muted small text-decoration-line-through fw-bold" style="font-size: 0.8rem;">-@Model.ManufacturingTaxAmount.ToString("C2")</div>
+                                    <div>-@Model.EffectiveManufacturingTaxAmount.ToString("C2")</div>
+                                }
+                                else
+                                {
+                                    <span>-@Model.ManufacturingTaxAmount.ToString("C2")</span>
+                                }
+                            </div>
                         }
                          @if (Model.ReceiptExpenses > 0)
                         {

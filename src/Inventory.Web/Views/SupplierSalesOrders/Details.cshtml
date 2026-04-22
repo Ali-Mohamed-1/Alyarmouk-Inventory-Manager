@@ -94,15 +94,45 @@
                         <div class="col-md-6">
                             <div class="d-flex justify-content-between mb-2">
                                 <span class="small fw-black text-uppercase">SUBTOTAL:</span>
-                                <span class="fw-black">$@Model.Subtotal.ToString("N2")</span>
+                                <div class="text-end">
+                                    @if (Model.EffectiveSubtotal < Model.Subtotal)
+                                    {
+                                        <div class="text-muted small text-decoration-line-through fw-bold" style="font-size: 0.7rem;">$@Model.Subtotal.ToString("N2")</div>
+                                        <span class="fw-black">$@Model.EffectiveSubtotal.ToString("N2")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="fw-black">$@Model.Subtotal.ToString("N2")</span>
+                                    }
+                                </div>
                             </div>
                             <div class="d-flex justify-content-between mb-2 text-muted">
                                 <span class="small fw-black text-uppercase">VAT (14%):</span>
-                                <span class="fw-black">$@Model.VatAmount.ToString("N2")</span>
+                                <div class="text-end">
+                                    @if (Model.EffectiveVatAmount < Model.VatAmount)
+                                    {
+                                        <div class="text-muted small text-decoration-line-through fw-bold" style="font-size: 0.7rem;">$@Model.VatAmount.ToString("N2")</div>
+                                        <span class="fw-black">$@Model.EffectiveVatAmount.ToString("N2")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="fw-black">$@Model.VatAmount.ToString("N2")</span>
+                                    }
+                                </div>
                             </div>
                             <div class="d-flex justify-content-between mb-2 text-muted">
                                 <span class="small fw-black text-uppercase">MAN. TAX (1%):</span>
-                                <span class="fw-black">-$@Model.ManufacturingTaxAmount.ToString("N2")</span>
+                                <div class="text-end">
+                                    @if (Model.EffectiveManufacturingTaxAmount < Model.ManufacturingTaxAmount)
+                                    {
+                                        <div class="text-muted small text-decoration-line-through fw-bold" style="font-size: 0.7rem;">$@Model.ManufacturingTaxAmount.ToString("N2")</div>
+                                        <span class="fw-black">-$@Model.EffectiveManufacturingTaxAmount.ToString("N2")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="fw-black">-$@Model.ManufacturingTaxAmount.ToString("N2")</span>
+                                    }
+                                </div>
                             </div>
                             <div class="d-flex justify-content-between pt-2 border-top border-dark mt-2">
                                 <h4 class="fw-black text-uppercase mb-0">TOTAL:</h4>

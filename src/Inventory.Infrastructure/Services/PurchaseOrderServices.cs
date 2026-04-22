@@ -11,6 +11,7 @@ using Inventory.Domain.Entities;
 using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Inventory.Application.Exceptions;
+using Microsoft.Extensions.Logging;
 
 using Inventory.Application.DTOs.Payment;
 
@@ -21,51 +22,82 @@ namespace Inventory.Infrastructure.Services
         private readonly AppDbContext _db;
         private readonly IInventoryServices _inventoryServices;
         private readonly IFinancialServices _financialServices;
+        private readonly ILogger<PurchaseOrderServices> _logger;
 
         public PurchaseOrderServices(
             AppDbContext db,
             IInventoryServices inventoryServices,
-            IFinancialServices financialServices)
+            IFinancialServices financialServices,
+            ILogger<PurchaseOrderServices> logger)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
             _inventoryServices = inventoryServices ?? throw new ArgumentNullException(nameof(inventoryServices));
             _financialServices = financialServices ?? throw new ArgumentNullException(nameof(financialServices));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<IEnumerable<PurchaseOrderResponse>> GetRecentAsync(int count = 10, CancellationToken ct = default)
         {
-            return await _db.PurchaseOrders
+            var orders = await _db.PurchaseOrders
                 .Include(o => o.Payments)
                 .Where(o => o.Status != PurchaseOrderStatus.Cancelled)
                 .OrderByDescending(o => o.OrderDate)
                 .ThenByDescending(o => o.CreatedUtc)
                 .Take(count)
-                .Select(o => MapToResponse(o))
                 .ToListAsync(ct);
+
+            return orders.Select(MapToResponse).ToList();
         }
 
         public async Task<PurchaseOrderResponse?> GetByIdAsync(long id, CancellationToken ct = default)
         {
             var order = await _db.PurchaseOrders
-                .AsNoTracking()
                 .Include(o => o.Lines)
                 .Include(o => o.Payments)
                 .FirstOrDefaultAsync(o => o.Id == id, ct);
 
-            return order == null ? null : MapToResponse(order);
+            if (order == null) return null;
+
+            // Check for backfill failure
+            var hasRefunds = await _db.RefundTransactions.AnyAsync(r => r.PurchaseOrderId == id, ct);
+            if (hasRefunds && order.EffectiveTotal == order.TotalAmount && order.EffectiveSubtotal == order.Subtotal)
+            {
+                // This might be a backfill failure if we expect reductions.
+                // We'll re-calculate on the fly for this response and log a warning.
+                _logger.LogWarning("Potential backfill failure detected for Purchase Order {OrderNumber}. Re-calculating effective fields on-the-fly.", order.OrderNumber);
+                
+                var refunds = await _db.RefundTransactions
+                    .Include(r => r.Lines)
+                    .Where(r => r.PurchaseOrderId == id)
+                    .ToListAsync(ct);
+
+                var totalSubtotalRef = refunds.SelectMany(r => r.Lines).Sum(l => l.SubtotalRefunded);
+                var totalVatRef = refunds.SelectMany(r => r.Lines).Sum(l => l.VatRefunded);
+                var totalManTaxRef = refunds.SelectMany(r => r.Lines).Sum(l => l.ManTaxRefunded);
+
+                if (totalSubtotalRef > 0 || totalVatRef > 0)
+                {
+                    order.EffectiveSubtotal = order.Subtotal - totalSubtotalRef;
+                    order.EffectiveVatAmount = order.VatAmount - totalVatRef;
+                    order.EffectiveManufacturingTaxAmount = order.ManufacturingTaxAmount - totalManTaxRef;
+                    order.EffectiveTotal = order.EffectiveSubtotal + order.EffectiveVatAmount - order.EffectiveManufacturingTaxAmount + order.ReceiptExpenses;
+                }
+            }
+
+            return MapToResponse(order);
         }
         //
         public async Task<IEnumerable<PurchaseOrderResponse>> GetBySupplierAsync(int supplierId, CancellationToken ct = default)
         {
-            return await _db.PurchaseOrders
-                .AsNoTracking()
+            var orders = await _db.PurchaseOrders
                 .Include(o => o.Lines)
                 .Include(o => o.Payments)
                 .Where(o => o.SupplierId == supplierId && o.Status != PurchaseOrderStatus.Cancelled)
                 .OrderByDescending(o => o.OrderDate)
                 .ThenByDescending(o => o.CreatedUtc)
-                .Select(o => MapToResponse(o))
                 .ToListAsync(ct);
+
+            return orders.Select(MapToResponse).ToList();
         }
 
         public async Task<long> CreateAsync(CreatePurchaseOrderRequest req, UserContext user, CancellationToken ct = default)
@@ -266,6 +298,10 @@ namespace Inventory.Infrastructure.Services
                 purchaseOrder.VatAmount = totalVat;
                 purchaseOrder.ManufacturingTaxAmount = totalManTax;
                 purchaseOrder.TotalAmount = totalOrderAmount + req.ReceiptExpenses;
+                
+                purchaseOrder.EffectiveSubtotal = totalSubtotal;
+                purchaseOrder.EffectiveVatAmount = totalVat;
+                purchaseOrder.EffectiveManufacturingTaxAmount = totalManTax;
                 purchaseOrder.EffectiveTotal = purchaseOrder.TotalAmount;
 
                 // 4. Handle Initial Payment
@@ -643,7 +679,10 @@ namespace Inventory.Infrastructure.Services
 
                         // Update Order and Line state
                         line.RefundedQuantity += refundItem.Quantity;
-                        order.EffectiveTotal -= lineRefundTotal;
+                        order.EffectiveSubtotal -= lineRefundSubtotal;
+                        order.EffectiveVatAmount -= lineRefundVat;
+                        order.EffectiveManufacturingTaxAmount -= lineRefundManTax;
+                        order.EffectiveTotal = order.EffectiveSubtotal + order.EffectiveVatAmount - order.EffectiveManufacturingTaxAmount + order.ReceiptExpenses;
 
                         // Add to Audit Transaction Lines
                         refundTx.Lines.Add(new RefundTransactionLine
@@ -976,9 +1015,14 @@ namespace Inventory.Infrastructure.Services
                 VatAmount = o.VatAmount,
                 ManufacturingTaxAmount = o.ManufacturingTaxAmount,
                 ReceiptExpenses = o.ReceiptExpenses,
+                
+                EffectiveSubtotal = o.EffectiveSubtotal == 0 && o.Subtotal > 0 ? o.Subtotal : o.EffectiveSubtotal,
+                EffectiveVatAmount = o.EffectiveVatAmount == 0 && o.VatAmount > 0 ? o.VatAmount : o.EffectiveVatAmount,
+                EffectiveManufacturingTaxAmount = o.EffectiveManufacturingTaxAmount == 0 && o.ManufacturingTaxAmount > 0 ? o.ManufacturingTaxAmount : o.EffectiveManufacturingTaxAmount,
+                
                 TotalAmount = o.TotalAmount,
                 OriginalTotal = o.TotalAmount,
-                EffectiveTotal = o.EffectiveTotal,
+                EffectiveTotal = o.EffectiveTotal == 0 && o.TotalAmount > 0 ? o.TotalAmount : o.EffectiveTotal,
                 RefundedAmount = o.RefundedAmount,
                 Note = o.Note,
                 IsHistorical = o.IsHistorical,
@@ -997,7 +1041,7 @@ namespace Inventory.Infrastructure.Services
                 RemainingAmount = pending,
                 DeservedAmount = o.GetDeservedAmount(),
                 IsOverdue = o.IsOverdue(),
-                Payments = o.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new PaymentRecordDto
+                Payments = o.Payments.OrderByDescending(p => p.PaymentDate).ToList().Select(p => new PaymentRecordDto
                 {
                     Id = p.Id,
                     Amount = p.Amount,
@@ -1008,7 +1052,7 @@ namespace Inventory.Infrastructure.Services
                     Note = p.Note,
                     CreatedByUserId = p.CreatedByUserId
                 }).ToList(),
-                Lines = o.Lines.Select(l => new PurchaseOrderLineResponse(
+                Lines = o.Lines.ToList().Select(l => new PurchaseOrderLineResponse(
                     l.Id,
                     l.ProductId,
                     l.ProductNameSnapshot,
