@@ -1,5 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.SalesOrder;
+using Inventory.Application.DTOs.Refunds;
 using Inventory.Domain.Entities;
 
 namespace Inventory.Application.Abstractions
@@ -83,5 +88,6 @@ namespace Inventory.Application.Abstractions
         /// Manually triggers stock deduction for a historical order that was created without stock impact.
         /// </summary>
         Task ActivateStockAsync(long orderId, UserContext user, CancellationToken ct = default);
+        Task<IReadOnlyList<RefundTransactionResponseDto>> GetRefundsAsync(long orderId, CancellationToken ct = default);
     }
 }

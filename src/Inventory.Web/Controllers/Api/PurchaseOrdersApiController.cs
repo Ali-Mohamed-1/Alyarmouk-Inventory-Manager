@@ -43,6 +43,7 @@ public class PurchaseOrdersApiController : ControllerBase
         return Ok(order);
     }
 
+
     [HttpPut("{id}/status")]
     public async Task<IActionResult> UpdateStatus(long id, [FromBody] PurchaseOrderStatus status, CancellationToken ct)
     {
@@ -82,6 +83,13 @@ public class PurchaseOrdersApiController : ControllerBase
         var user = GetUserContext();
         await _purchaseOrderServices.RefundAsync(request, user, ct);
         return Ok();
+    }
+
+    [HttpGet("{id}/refunds")]
+    public async Task<ActionResult<IReadOnlyList<Inventory.Application.DTOs.Refunds.RefundTransactionResponseDto>>> GetRefunds(long id, CancellationToken ct)
+    {
+        var refunds = await _purchaseOrderServices.GetRefundsAsync(id, ct);
+        return Ok(refunds);
     }
 
 

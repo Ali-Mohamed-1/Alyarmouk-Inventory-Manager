@@ -1373,6 +1373,39 @@ namespace Inventory.Infrastructure.Services
             return orderNumber;
         }
 
+        public async Task<IReadOnlyList<Inventory.Application.DTOs.Refunds.RefundTransactionResponseDto>> GetRefundsAsync(long orderId, CancellationToken ct = default)
+        {
+            var refunds = await _db.RefundTransactions
+                .Where(r => r.SalesOrderId == orderId)
+                .Include(r => r.Lines)
+                    .ThenInclude(l => l.Product)
+                .OrderByDescending(r => r.ProcessedUtc)
+                .Select(r => new Inventory.Application.DTOs.Refunds.RefundTransactionResponseDto
+                {
+                    Id = r.Id,
+                    ProcessedUtc = r.ProcessedUtc,
+                    Amount = r.Amount,
+                    Reason = r.Reason,
+                    Note = r.Note,
+                    ProcessedByUserDisplayName = r.ProcessedByUserDisplayName,
+                    Lines = r.Lines.Select(l => new Inventory.Application.DTOs.Refunds.RefundTransactionLineResponseDto
+                    {
+                        Id = l.Id,
+                        ProductId = l.ProductId,
+                        ProductName = l.ProductNameSnapshot,
+                        BatchNumber = l.BatchNumber,
+                        Quantity = l.Quantity,
+                        LineRefundAmount = l.LineRefundAmount,
+                        SubtotalRefunded = l.SubtotalRefunded,
+                        VatRefunded = l.VatRefunded,
+                        ManTaxRefunded = l.ManTaxRefunded
+                    }).ToList()
+                })
+                .ToListAsync(ct);
+
+            return refunds;
+        }
+
         #endregion
     }
 }
