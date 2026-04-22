@@ -76,10 +76,28 @@
         <!-- Main Info -->
         <div class="col-lg-8">
             <div class="neo-card p-0 overflow-hidden mb-4">
-                <div class="p-3 bg-black text-white">
+                <div class="p-3 bg-black text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 fw-black text-uppercase small">Inventory Line Items</h5>
+                    @if (Model.EffectiveTotal < Model.OriginalTotal)
+                    {
+                        <span class="badge bg-danger text-white fw-black animate__animated animate__pulse animate__infinite">REFUNDED TRANSACTION</span>
+                    }
                 </div>
                 <div class="p-0" style="background: white;">
+                    @if (Model.EffectiveTotal < Model.OriginalTotal)
+                    {
+                        <div class="p-3 bg-danger bg-opacity-10 border-bottom border-danger">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-exclamation-triangle-fill text-danger fs-4 me-3"></i>
+                                <div>
+                                    <h6 class="fw-black text-uppercase mb-1 text-danger">Partial Refund Detected</h6>
+                                    <div class="small fw-bold opacity-75">
+                                        Original: <span class="text-decoration-line-through text-black">@Model.OriginalTotal.ToString("C2")</span> &rarr; After Refunds: <span class="fw-black text-danger">@Model.EffectiveTotal.ToString("C2")</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-dark text-white small text-uppercase fw-black">
@@ -109,7 +127,22 @@
                                                 <span class="text-muted small fw-bold">GENERAL</span>
                                             }
                                         </td>
-                                        <td class="text-center fw-black">@line.Quantity</td>
+                                        <td class="text-center">
+                                            @if (line.RefundedQuantity > 0)
+                                            {
+                                                <div class="text-muted text-decoration-line-through small fw-bold">@line.OriginalQuantity</div>
+                                                <div class="fw-black">@line.RemainingQuantity</div>
+                                                <div class="small fw-bold text-danger" style="font-size:0.7rem;">Qty: @line.OriginalQuantity &rarr; @line.RemainingQuantity</div>
+                                                @if (line.RemainingQuantity == 0)
+                                                {
+                                                    <span class="badge bg-danger text-uppercase fw-black mt-1">Fully Returned</span>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="fw-black">@line.OriginalQuantity</span>
+                                            }
+                                        </td>
                                         <td class="text-end fw-bold">@line.UnitPrice.ToString("C2")</td>
                                         <td class="text-end fw-black text-primary pe-4">@line.LineTotal.ToString("C2")</td>
                                     </tr>
@@ -134,7 +167,17 @@
                             <div class="col-3 text-end fw-bold text-danger">-@Model.ManufacturingTaxAmount.ToString("C2")</div>
                         }
                         <div class="col-9 text-end fw-black text-uppercase fs-4 mt-3">Grand Total:</div>
-                        <div class="col-3 text-end fw-black fs-3 text-success mt-3">@Model.TotalAmount.ToString("C2")</div>
+                        <div class="col-3 text-end fw-black fs-3 text-success mt-3">
+                            @if (Model.EffectiveTotal < Model.OriginalTotal)
+                            {
+                                <div class="text-muted small text-decoration-line-through fw-bold" style="font-size: 0.9rem;">@Model.OriginalTotal.ToString("C2")</div>
+                                <div class="text-success">@Model.EffectiveTotal.ToString("C2")</div>
+                            }
+                            else
+                            {
+                                <span>@Model.TotalAmount.ToString("C2")</span>
+                            }
+                        </div>
                     </div>
                 </div>
             </div>
@@ -316,7 +359,17 @@
                     </div>
                     <div class="row g-3 fw-bold">
                         <div class="col-6 text-uppercase small">Total:</div>
-                        <div class="col-6 text-end fw-black">@Model.TotalAmount.ToString("C2")</div>
+                        <div class="col-6 text-end fw-black">
+                            @if (Model.EffectiveTotal < Model.OriginalTotal)
+                            {
+                                <span class="text-muted text-decoration-line-through me-1 small">@Model.OriginalTotal.ToString("C2")</span>
+                                <span class="text-primary">@Model.EffectiveTotal.ToString("C2")</span>
+                            }
+                            else
+                            {
+                                @Model.TotalAmount.ToString("C2")
+                            }
+                        </div>
                         
                         <div class="col-6 text-uppercase small">Paid:</div>
                         <div class="col-6 text-end fw-black text-success">@Model.PaidAmount.ToString("C2")</div>

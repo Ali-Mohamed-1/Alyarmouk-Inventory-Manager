@@ -16,6 +16,8 @@ namespace Inventory.Application.DTOs.SupplierSalesOrder
         public PaymentStatus PaymentStatus { get; init; }
 
         public decimal TotalAmount { get; init; }
+        public decimal OriginalTotal { get; init; }
+        public decimal EffectiveTotal { get; init; }
 
         public string? Note { get; init; }
         public bool IsTaxInclusive { get; init; }
@@ -46,5 +48,7 @@ namespace Inventory.Application.DTOs.SupplierSalesOrder
         public decimal LineManufacturingTaxAmount { get; init; }
         public decimal LineTotal { get; init; }
         public decimal RefundedQuantity { get; init; }
+        public decimal OriginalQuantity => Quantity;
+        public decimal RemainingQuantity => Quantity - RefundedQuantity;
     }
 }

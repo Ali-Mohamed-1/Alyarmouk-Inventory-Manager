@@ -40,7 +40,18 @@
                             <td class="ps-4"><code class="fw-black fs-6 text-black">@item.OrderNumber</code></td>
                             <td class="fw-black text-uppercase">@item.CustomerName</td>
                             <td class="small fw-bold">@item.CreatedUtc.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
-                            <td class="text-end fw-black text-success">@item.TotalAmount.ToString("C2")</td>
+                            <td class="text-end fw-black">
+                                @if (item.EffectiveTotal < item.OriginalTotal)
+                                {
+                                    <span class="text-muted text-decoration-line-through small me-1">@item.OriginalTotal.ToString("C2")</span>
+                                    <span class="text-success">@item.EffectiveTotal.ToString("C2")</span>
+                                    <div class="mt-1"><span class="badge bg-danger rounded-pill" style="font-size: 0.65rem;">REFUNDED</span></div>
+                                }
+                                else
+                                {
+                                    <span class="text-success">@item.TotalAmount.ToString("C2")</span>
+                                }
+                            </td>
                             <td class="text-center">
                                 @if (item.PaymentStatus == Inventory.Domain.Entities.PaymentStatus.Paid)
                                 {

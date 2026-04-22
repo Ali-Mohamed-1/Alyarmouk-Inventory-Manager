@@ -977,6 +977,8 @@ namespace Inventory.Infrastructure.Services
                 ManufacturingTaxAmount = o.ManufacturingTaxAmount,
                 ReceiptExpenses = o.ReceiptExpenses,
                 TotalAmount = o.TotalAmount,
+                OriginalTotal = o.TotalAmount,
+                EffectiveTotal = o.EffectiveTotal,
                 RefundedAmount = o.RefundedAmount,
                 Note = o.Note,
                 IsHistorical = o.IsHistorical,
