@@ -143,6 +143,30 @@
                     </div>
                 </div>
             }
+
+            <div id="refund-history-container" style="display: none;">
+                <div class="neo-card p-0 overflow-hidden mb-4 border-4 border-danger">
+                    <div class="p-3 bg-danger text-white">
+                        <h5 class="mb-0 fw-black text-uppercase small">Refund History</h5>
+                    </div>
+                    <div class="p-0 bg-white">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead class="bg-danger text-white small text-uppercase fw-black">
+                                    <tr>
+                                        <th class="ps-4">DATE/TIME</th>
+                                        <th>TYPE</th>
+                                        <th class="text-end">AMOUNT</th>
+                                        <th>ITEMS & IMPACT</th>
+                                        <th class="pe-4">PROCESSED BY</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detail-refunds-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Sidebar Info -->
@@ -645,6 +669,70 @@
 
 @section Scripts {
     <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadRefundHistory();
+        });
+
+        function formatCurrency(val) {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val || 0);
+        }
+
+        function formatDate(d) {
+            if (!d) return '-';
+            const dt = new Date(d);
+            return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        async function loadRefundHistory() {
+            const id = @Model.Id;
+            try {
+                const r = await fetch(`/api/purchase-orders/${id}/refunds`);
+                if (!r.ok) return;
+                const refunds = await r.json();
+                const container = document.getElementById('refund-history-container');
+                const body = document.getElementById('detail-refunds-body');
+                
+                if (refunds && refunds.length > 0) {
+                    container.style.display = 'block';
+                    body.innerHTML = refunds.map(r => `
+                        <tr>
+                            <td class="ps-4">
+                                <div class="fw-bold small text-uppercase">${formatDate(r.processedUtc)}</div>
+                                <div class="text-muted" style="font-size: 0.7rem;">${new Date(r.processedUtc).toLocaleTimeString()}</div>
+                            </td>
+                            <td>
+                                <span class="badge ${r.refundCategory === 'Both' ? 'bg-danger' : 'bg-warning text-dark'} small">
+                                    ${r.refundCategory}
+                                </span>
+                                ${r.reason ? `<div class="small text-muted mt-1 italic">"${escapeHtmlPo(r.reason)}"</div>` : ''}
+                            </td>
+                            <td class="text-end fw-black text-danger">
+                                ${formatCurrency(r.amount)}
+                            </td>
+                            <td>
+                                ${r.lines && r.lines.length > 0 ? r.lines.map(rl => `
+                                    <div class="d-flex justify-content-between border-bottom border-light pb-1 mb-1">
+                                        <div class="small">
+                                            <span class="fw-bold text-uppercase" style="font-size: 0.75rem;">${escapeHtmlPo(rl.productName)}</span>
+                                            ${rl.batchNumber ? `<code class="ms-1" style="font-size: 0.7rem;">${escapeHtmlPo(rl.batchNumber)}</code>` : ''}
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge bg-light text-dark border me-1">${rl.quantity} QTY</span>
+                                            <span class="fw-bold text-danger">-${formatCurrency(rl.lineRefundAmount)}</span>
+                                        </div>
+                                    </div>
+                                `).join('') : '<span class="text-muted small">No items affected</span>'}
+                                ${r.note ? `<div class="small bg-light p-1 mt-1 border-start border-danger border-3">${escapeHtmlPo(r.note)}</div>` : ''}
+                            </td>
+                            <td class="pe-4">
+                                <div class="fw-bold small text-uppercase">${escapeHtmlPo(r.processedByUserDisplayName)}</div>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) { console.error('Failed to load refunds:', e); }
+        }
+
         function escapeHtmlPo(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
         function openPoRefundModal() {

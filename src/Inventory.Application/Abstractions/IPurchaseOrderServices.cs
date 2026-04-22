@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Inventory.Application.DTOs;
 using Inventory.Application.DTOs.PurchaseOrder;
+using Inventory.Application.DTOs.Refunds;
 using Inventory.Domain.Entities;
 
 namespace Inventory.Application.Abstractions
@@ -53,5 +55,6 @@ namespace Inventory.Application.Abstractions
         /// Updates payment metadata for an existing purchase order.
         /// </summary>
         Task UpdatePaymentInfoAsync(long id, UpdatePurchaseOrderPaymentRequest req, UserContext user, CancellationToken ct = default);
+        Task<IReadOnlyList<RefundTransactionResponseDto>> GetRefundsAsync(long orderId, CancellationToken ct = default);
     }
 }

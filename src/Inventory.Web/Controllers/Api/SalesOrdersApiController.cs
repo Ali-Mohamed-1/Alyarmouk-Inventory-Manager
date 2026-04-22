@@ -36,7 +36,8 @@ public class SalesOrdersApiController : ControllerBase
         return Ok(order);
     }
 
-    [HttpPost("{id}/invoice")]
+
+    [HttpPost("{id}/invoice") ]
     public async Task<IActionResult> UploadInvoice(long id, IFormFile file, CancellationToken ct)
     {
         var validationError = ValidateFile(file);
@@ -200,6 +201,13 @@ public class SalesOrdersApiController : ControllerBase
         await _salesOrderServices.RefundAsync(request, user, ct);
         
         return Ok();
+    }
+
+    [HttpGet("{id}/refunds")]
+    public async Task<ActionResult<IReadOnlyList<Inventory.Application.DTOs.Refunds.RefundTransactionResponseDto>>> GetRefunds(long id, CancellationToken ct)
+    {
+        var refunds = await _salesOrderServices.GetRefundsAsync(id, ct);
+        return Ok(refunds);
     }
 
     [HttpPost("{id}/cancel")]

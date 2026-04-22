@@ -119,7 +119,7 @@
                 </div>
 
                 <h6 class="fw-black text-uppercase mb-3">Order Line Items</h6>
-                <div class="table-responsive neo-card p-0">
+                <div class="table-responsive neo-card p-0 mb-4">
                     <table class="table table-sm mb-0">
                         <thead class="table-dark text-white">
                             <tr>
@@ -132,6 +132,23 @@
                         </thead>
                         <tbody id="so-detail-lines"></tbody>
                     </table>
+                </div>
+
+                <div id="so-refund-history-container" style="display: none;">
+                    <h6 class="fw-black text-uppercase mb-3 text-danger">Refund History</h6>
+                    <div class="table-responsive neo-card p-0 border-danger">
+                        <table class="table table-sm mb-0">
+                            <thead class="bg-danger text-white">
+                                <tr>
+                                    <th>DATE/TIME</th>
+                                    <th>TYPE</th>
+                                    <th class="text-end">AMOUNT</th>
+                                    <th>ITEMS & IMPACT</th>
+                                </tr>
+                            </thead>
+                            <tbody id="so-detail-refunds-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -235,7 +252,7 @@
                 </div>
 
                 <h6 class="fw-black text-uppercase mb-3">Ordered Products</h6>
-                <div class="table-responsive neo-card p-0">
+                <div class="table-responsive neo-card p-0 mb-4">
                     <table class="table table-sm mb-0">
                         <thead class="table-dark text-white">
                             <tr>
@@ -248,6 +265,23 @@
                         </thead>
                         <tbody id="po-detail-lines"></tbody>
                     </table>
+                </div>
+
+                <div id="po-refund-history-container" style="display: none;">
+                    <h6 class="fw-black text-uppercase mb-3 text-danger">Refund History</h6>
+                    <div class="table-responsive neo-card p-0 border-danger">
+                        <table class="table table-sm mb-0">
+                            <thead class="bg-danger text-white">
+                                <tr>
+                                    <th>DATE/TIME</th>
+                                    <th>TYPE</th>
+                                    <th class="text-end">AMOUNT</th>
+                                    <th>ITEMS & IMPACT</th>
+                                </tr>
+                            </thead>
+                            <tbody id="po-detail-refunds-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1057,14 +1091,55 @@
 
                     // Lines
                     document.getElementById('so-detail-lines').innerHTML = o.lines.map(l => `
-                        <tr>
-                            <td><span class="fw-black text-uppercase small">${escapeHtml(l.productName)}</span></td>
-                            <td>${l.batchNumber ? `<code class="fw-bold">${escapeHtml(l.batchNumber)}</code>` : '-'}</td>
-                            <td class="text-center fw-bold">${l.quantity}</td>
-                            <td class="text-end fw-bold">${formatCurrency(l.unitPrice)}</td>
-                            <td class="text-end fw-black">${formatCurrency(l.lineTotal)}</td>
                         </tr>
                     `).join('');
+
+                    // Fetch and render refunds
+                    const refResp = await fetch(`/api/sales-orders/${id}/refunds`);
+                    if (refResp.ok) {
+                        const refunds = await refResp.json();
+                        const container = document.getElementById('so-refund-history-container');
+                        const body = document.getElementById('so-detail-refunds-body');
+                        
+                        if (refunds && refunds.length > 0) {
+                            container.style.display = 'block';
+                            body.innerHTML = refunds.map(r => `
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold small text-uppercase">${formatDate(r.processedUtc)}</div>
+                                        <div class="text-muted" style="font-size: 0.7rem;">${new Date(r.processedUtc).toLocaleTimeString()}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge ${r.refundCategory === 'Both' ? 'bg-danger' : 'bg-warning text-dark'} small">
+                                            ${r.refundCategory}
+                                        </span>
+                                        ${r.reason ? `<div class="small text-muted mt-1 italic">"${escapeHtml(r.reason)}"</div>` : ''}
+                                    </td>
+                                    <td class="text-end fw-black text-danger">
+                                        ${formatCurrency(r.amount)}
+                                    </td>
+                                    <td>
+                                        ${r.lines && r.lines.length > 0 ? r.lines.map(rl => `
+                                            <div class="d-flex justify-content-between border-bottom border-light pb-1 mb-1">
+                                                <div class="small">
+                                                    <span class="fw-bold">${escapeHtml(rl.productName)}</span>
+                                                    ${rl.batchNumber ? `<code class="ms-1">${escapeHtml(rl.batchNumber)}</code>` : ''}
+                                                </div>
+                                                <div class="text-end">
+                                                    <span class="badge bg-light text-dark border me-1">${rl.quantity} QTY</span>
+                                                    <span class="fw-bold text-danger">-${formatCurrency(rl.lineRefundAmount)}</span>
+                                                </div>
+                                            </div>
+                                        `).join('') : '<span class="text-muted small">No items affected</span>'}
+                                        ${r.note ? `<div class="small bg-light p-1 mt-1 border-start border-danger border-3">${escapeHtml(r.note)}</div>` : ''}
+                                    </td>
+                                </tr>
+                            `).join('');
+                        } else {
+                            container.style.display = 'none';
+                            body.innerHTML = '';
+                        }
+                    }
 
                 } catch(e) { if (window.appMessages) window.appMessages.showError('Details failed to load'); window.switchSoView('list'); }
             };
@@ -1158,6 +1233,53 @@
                             <td class="text-end fw-black">${formatCurrency(l.lineTotal)}</td>
                         </tr>
                     `).join('');
+
+                    // Fetch and render refunds
+                    const refResp = await fetch(`/api/purchase-orders/${id}/refunds`);
+                    if (refResp.ok) {
+                        const refunds = await refResp.json();
+                        const container = document.getElementById('po-refund-history-container');
+                        const body = document.getElementById('po-detail-refunds-body');
+                        
+                        if (refunds && refunds.length > 0) {
+                            container.style.display = 'block';
+                            body.innerHTML = refunds.map(r => `
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold small text-uppercase">${formatDate(r.processedUtc)}</div>
+                                        <div class="text-muted" style="font-size: 0.7rem;">${new Date(r.processedUtc).toLocaleTimeString()}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge ${r.refundCategory === 'Both' ? 'bg-danger' : 'bg-warning text-dark'} small">
+                                            ${r.refundCategory}
+                                        </span>
+                                        ${r.reason ? `<div class="small text-muted mt-1 italic">"${escapeHtml(r.reason)}"</div>` : ''}
+                                    </td>
+                                    <td class="text-end fw-black text-danger">
+                                        ${formatCurrency(r.amount)}
+                                    </td>
+                                    <td>
+                                        ${r.lines && r.lines.length > 0 ? r.lines.map(rl => `
+                                            <div class="d-flex justify-content-between border-bottom border-light pb-1 mb-1">
+                                                <div class="small">
+                                                    <span class="fw-bold">${escapeHtml(rl.productName)}</span>
+                                                    ${rl.batchNumber ? `<code class="ms-1">${escapeHtml(rl.batchNumber)}</code>` : ''}
+                                                </div>
+                                                <div class="text-end">
+                                                    <span class="badge bg-light text-dark border me-1">${rl.quantity} QTY</span>
+                                                    <span class="fw-bold text-danger">-${formatCurrency(rl.lineRefundAmount)}</span>
+                                                </div>
+                                            </div>
+                                        `).join('') : '<span class="text-muted small">No items affected</span>'}
+                                        ${r.note ? `<div class="small bg-light p-1 mt-1 border-start border-danger border-3">${escapeHtml(r.note)}</div>` : ''}
+                                    </td>
+                                </tr>
+                            `).join('');
+                        } else {
+                            container.style.display = 'none';
+                            body.innerHTML = '';
+                        }
+                    }
 
                 } catch(e) { if (window.appMessages) window.appMessages.showError('Details failed to load'); window.switchPoView('list'); }
             };
