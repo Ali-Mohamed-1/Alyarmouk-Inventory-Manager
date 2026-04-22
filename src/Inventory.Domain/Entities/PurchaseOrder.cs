@@ -172,6 +172,10 @@ public class PurchaseOrder
     /// </summary>
     public decimal EffectiveTotal { get; set; }
     
+    public decimal EffectiveSubtotal { get; set; }
+    public decimal EffectiveVatAmount { get; set; }
+    public decimal EffectiveManufacturingTaxAmount { get; set; }
+    
     public decimal RefundedAmount { get; set; }
     
     /// <summary>

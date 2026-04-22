@@ -11,6 +11,7 @@ using Inventory.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Inventory.Domain.Constants;
 using Inventory.Application.Exceptions;
+using Microsoft.Extensions.Logging;
 
 namespace Inventory.Infrastructure.Services
 {
@@ -21,17 +22,20 @@ namespace Inventory.Infrastructure.Services
         private readonly IInventoryServices _inventoryServices;
         private readonly IFinancialServices _financialServices;
         private readonly IReportingServices _reportingServices;
+        private readonly ILogger<SupplierSalesOrderServices> _logger;
 
         public SupplierSalesOrderServices(
             AppDbContext db,
             IInventoryServices inventoryServices,
             IFinancialServices financialServices,
-            IReportingServices reportingServices)
+            IReportingServices reportingServices,
+            ILogger<SupplierSalesOrderServices> logger)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
             _inventoryServices = inventoryServices ?? throw new ArgumentNullException(nameof(inventoryServices));
             _financialServices = financialServices ?? throw new ArgumentNullException(nameof(financialServices));
             _reportingServices = reportingServices ?? throw new ArgumentNullException(nameof(reportingServices));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<long> CreateAsync(CreateSupplierSalesOrderRequest req, UserContext user, CancellationToken ct = default)
@@ -235,50 +239,85 @@ namespace Inventory.Infrastructure.Services
 
         public async Task<SupplierSalesOrderResponseDto?> GetByIdAsync(long id, CancellationToken ct = default)
         {
-            return await _db.SupplierSalesOrders
-                .AsNoTracking()
+            var order = await _db.SupplierSalesOrders
                 .Include(o => o.Lines)
-                .Where(o => o.Id == id)
-                .Select(o => new SupplierSalesOrderResponseDto
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
+
+            if (order == null) return null;
+
+            // Check for backfill failure
+            var hasRefunds = await _db.RefundTransactions.AnyAsync(r => r.SupplierSalesOrderId == id, ct);
+            if (hasRefunds && order.EffectiveTotal == order.TotalAmount && order.EffectiveSubtotal == order.Subtotal)
+            {
+                _logger.LogWarning("Potential backfill failure detected for Supplier Sales Order {OrderNumber}. Re-calculating effective fields on-the-fly.", order.OrderNumber);
+                
+                var refunds = await _db.RefundTransactions
+                    .Include(r => r.Lines)
+                    .Where(r => r.SupplierSalesOrderId == id)
+                    .ToListAsync(ct);
+
+                var totalSubtotalRef = refunds.SelectMany(r => r.Lines).Sum(l => l.SubtotalRefunded);
+                var totalVatRef = refunds.SelectMany(r => r.Lines).Sum(l => l.VatRefunded);
+                var totalManTaxRef = refunds.SelectMany(r => r.Lines).Sum(l => l.ManTaxRefunded);
+
+                if (totalSubtotalRef > 0 || totalVatRef > 0)
                 {
-                    Id = o.Id,
-                    OrderNumber = o.OrderNumber,
-                    SupplierId = o.SupplierId,
-                    SupplierName = o.SupplierNameSnapshot,
-                    CreatedUtc = o.CreatedUtc,
-                    OrderDate = o.OrderDate,
-                    DueDate = o.DueDate,
-                    Status = o.Status,
-                    PaymentStatus = o.PaymentStatus,
-                    TotalAmount = o.TotalAmount,
-                    OriginalTotal = o.TotalAmount,
-                    EffectiveTotal = o.EffectiveTotal,
-                    Note = o.Note,
-                    IsTaxInclusive = o.IsTaxInclusive,
-                    ApplyVat = o.ApplyVat,
-                    ApplyManufacturingTax = o.ApplyManufacturingTax,
-                    Subtotal = o.Subtotal,
-                    VatAmount = o.VatAmount,
-                    ManufacturingTaxAmount = o.ManufacturingTaxAmount,
-                    IsHistorical = o.Status == SalesOrderStatus.Done, // Logic simplified
-                    Lines = o.Lines.Select(l => new SupplierSalesOrderLineResponseDto
-                    {
-                        Id = l.Id,
-                        ProductId = l.ProductId,
-                        ProductName = l.ProductNameSnapshot,
-                        Quantity = l.Quantity,
-                        Unit = l.UnitSnapshot,
-                        UnitPrice = l.UnitPrice,
-                        BatchNumber = l.BatchNumber,
-                        ProductBatchId = l.ProductBatchId,
-                        LineSubtotal = l.LineSubtotal,
-                        LineVatAmount = l.LineVatAmount,
-                        LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
-                        LineTotal = l.LineTotal,
-                        RefundedQuantity = l.RefundedQuantity
-                    }).ToList()
-                })
-                .SingleOrDefaultAsync(ct);
+                    order.EffectiveSubtotal = order.Subtotal - totalSubtotalRef;
+                    order.EffectiveVatAmount = order.VatAmount - totalVatRef;
+                    order.EffectiveManufacturingTaxAmount = order.ManufacturingTaxAmount - totalManTaxRef;
+                    order.EffectiveTotal = order.EffectiveSubtotal + order.EffectiveVatAmount - order.EffectiveManufacturingTaxAmount;
+                }
+            }
+
+            return MapToResponse(order);
+        }
+
+        private static SupplierSalesOrderResponseDto MapToResponse(SupplierSalesOrder o)
+        {
+            return new SupplierSalesOrderResponseDto
+            {
+                Id = o.Id,
+                OrderNumber = o.OrderNumber,
+                SupplierId = o.SupplierId,
+                SupplierName = o.SupplierNameSnapshot,
+                CreatedUtc = o.CreatedUtc,
+                OrderDate = o.OrderDate,
+                DueDate = o.DueDate,
+                Status = o.Status,
+                PaymentStatus = o.PaymentStatus,
+                TotalAmount = o.TotalAmount,
+                OriginalTotal = o.TotalAmount,
+                EffectiveTotal = o.EffectiveTotal == 0 && o.TotalAmount > 0 ? o.TotalAmount : o.EffectiveTotal,
+                Note = o.Note,
+                IsTaxInclusive = o.IsTaxInclusive,
+                ApplyVat = o.ApplyVat,
+                ApplyManufacturingTax = o.ApplyManufacturingTax,
+                Subtotal = o.Subtotal,
+                VatAmount = o.VatAmount,
+                ManufacturingTaxAmount = o.ManufacturingTaxAmount,
+                
+                EffectiveSubtotal = o.EffectiveSubtotal == 0 && o.Subtotal > 0 ? o.Subtotal : o.EffectiveSubtotal,
+                EffectiveVatAmount = o.EffectiveVatAmount == 0 && o.VatAmount > 0 ? o.VatAmount : o.EffectiveVatAmount,
+                EffectiveManufacturingTaxAmount = o.EffectiveManufacturingTaxAmount == 0 && o.ManufacturingTaxAmount > 0 ? o.ManufacturingTaxAmount : o.EffectiveManufacturingTaxAmount,
+                
+                IsHistorical = o.Status == SalesOrderStatus.Done,
+                Lines = o.Lines.Select(l => new SupplierSalesOrderLineResponseDto
+                {
+                    Id = l.Id,
+                    ProductId = l.ProductId,
+                    ProductName = l.ProductNameSnapshot,
+                    Quantity = l.Quantity,
+                    Unit = l.UnitSnapshot,
+                    UnitPrice = l.UnitPrice,
+                    BatchNumber = l.BatchNumber,
+                    ProductBatchId = l.ProductBatchId,
+                    LineSubtotal = l.LineSubtotal,
+                    LineVatAmount = l.LineVatAmount,
+                    LineManufacturingTaxAmount = l.LineManufacturingTaxAmount,
+                    LineTotal = l.LineTotal,
+                    RefundedQuantity = l.RefundedQuantity
+                }).ToList()
+            };
         }
 
         public async Task<IReadOnlyList<SupplierSalesOrderResponseDto>> GetRecentAsync(int take = 50, CancellationToken ct = default)

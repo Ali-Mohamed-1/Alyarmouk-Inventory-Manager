@@ -23,9 +23,14 @@ namespace Inventory.Application.DTOs.SupplierSalesOrder
         public bool IsTaxInclusive { get; init; }
         public bool ApplyVat { get; init; }
         public bool ApplyManufacturingTax { get; init; }
+        
         public decimal Subtotal { get; init; }
         public decimal VatAmount { get; init; }
         public decimal ManufacturingTaxAmount { get; init; }
+        
+        public decimal EffectiveSubtotal { get; init; }
+        public decimal EffectiveVatAmount { get; init; }
+        public decimal EffectiveManufacturingTaxAmount { get; init; }
         
         public bool IsHistorical { get; init; }
         public bool IsStockProcessed { get; init; }
