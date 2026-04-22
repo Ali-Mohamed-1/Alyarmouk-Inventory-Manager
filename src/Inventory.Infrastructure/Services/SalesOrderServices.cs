@@ -190,7 +190,8 @@ namespace Inventory.Infrastructure.Services
                     Note = req.Note,
                     IsTaxInclusive = req.IsTaxInclusive,
                     ApplyVat = req.ApplyVat,
-                    ApplyManufacturingTax = req.ApplyManufacturingTax
+                    ApplyManufacturingTax = req.ApplyManufacturingTax,
+                    EffectiveTotal = 0 // Will be updated below
                 };
 
                 _db.SalesOrders.Add(salesOrder);
@@ -292,6 +293,7 @@ namespace Inventory.Infrastructure.Services
                 salesOrder.VatAmount = totalVat;
                 salesOrder.ManufacturingTaxAmount = totalManTax;
                 salesOrder.TotalAmount = totalOrderAmount;
+                salesOrder.EffectiveTotal = totalOrderAmount;
 
                 // 4. Handle Historical Status
                 if (req.IsHistorical)
@@ -1177,8 +1179,16 @@ namespace Inventory.Infrastructure.Services
                         if (line.RefundedQuantity + refundItem.Quantity > line.Quantity)
                             throw new ValidationException($"Cannot refund {refundItem.Quantity} for product '{line.ProductNameSnapshot}'. Max refundable: {line.Quantity - line.RefundedQuantity}");
 
-                        // Update Line state
+                        // Calculate financial impact proportionally
+                        decimal ratio = refundItem.Quantity / line.Quantity;
+                        decimal lineRefundSubtotal = Math.Round(line.LineSubtotal * ratio, 2, MidpointRounding.AwayFromZero);
+                        decimal lineRefundVat = Math.Round(line.LineVatAmount * ratio, 2, MidpointRounding.AwayFromZero);
+                        decimal lineRefundManTax = Math.Round(line.LineManufacturingTaxAmount * ratio, 2, MidpointRounding.AwayFromZero);
+                        decimal lineRefundTotal = lineRefundSubtotal + lineRefundVat - lineRefundManTax;
+
+                        // Update Order and Line state
                         line.RefundedQuantity += refundItem.Quantity;
+                        order.EffectiveTotal -= lineRefundTotal;
 
                         // Add to Audit Transaction Lines
                         refundTx.Lines.Add(new RefundTransactionLine
@@ -1190,10 +1200,10 @@ namespace Inventory.Infrastructure.Services
                             BatchNumber = refundItem.BatchNumber ?? line.BatchNumber,
                             ProductBatchId = refundItem.ProductBatchId ?? line.ProductBatchId,
                             UnitPriceSnapshot = line.UnitPrice,
-                            // Estimate line refund amount derived from quantity * unit price?
-                            // Or leave it 0 if not explicitly tracked per line financially.
-                            // We will store value for reference.
-                            LineRefundAmount = refundItem.Quantity * line.UnitPrice 
+                            LineRefundAmount = lineRefundTotal,
+                            SubtotalRefunded = lineRefundSubtotal,
+                            VatRefunded = lineRefundVat,
+                            ManTaxRefunded = lineRefundManTax
                         });
                     }
 

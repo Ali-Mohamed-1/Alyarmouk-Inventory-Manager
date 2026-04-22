@@ -58,7 +58,7 @@ public class PurchaseOrder
         {
             PaymentStatus = PurchasePaymentStatus.Unpaid;
         }
-        else if (netCash < TotalAmount)
+        else if (netCash < EffectiveTotal)
         {
             PaymentStatus = PurchasePaymentStatus.PartiallyPaid;
         }
@@ -92,7 +92,7 @@ public class PurchaseOrder
     public decimal GetPendingAmount()
     {
         var net = GetNetCash();
-        return Math.Max(0, TotalAmount - net);
+        return Math.Max(0, EffectiveTotal - net);
     }
 
     /// <summary>
@@ -101,7 +101,7 @@ public class PurchaseOrder
     public decimal GetRefundDue()
     {
         var net = GetNetCash();
-        return Math.Max(0, net - TotalAmount);
+        return Math.Max(0, net - EffectiveTotal);
     }
 
     public bool IsOverdue() => DueDate.HasValue && DueDate.Value < DateTimeOffset.UtcNow && PaymentStatus != PurchasePaymentStatus.Paid;
@@ -166,6 +166,12 @@ public class PurchaseOrder
     public decimal ManufacturingTaxAmount { get; set; }
     public decimal ReceiptExpenses { get; set; } // Shipping, handling, etc.
     public decimal TotalAmount { get; set; }
+    
+    /// <summary>
+    /// Effective total after quantity refunds. Used for calculating debt.
+    /// </summary>
+    public decimal EffectiveTotal { get; set; }
+    
     public decimal RefundedAmount { get; set; }
     
     /// <summary>
