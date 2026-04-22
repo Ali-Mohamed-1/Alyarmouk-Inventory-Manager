@@ -38,13 +38,12 @@ namespace Inventory.Infrastructure.Services
         {
             if (productId <= 0) throw new ArgumentOutOfRangeException(nameof(productId), "Product ID must be positive.");
 
-            var snapshot = await _db.StockSnapshots
+            var onHand = await _db.ProductBatches
                 .AsNoTracking()
-                .Where(s => s.ProductId == productId)
-                .Select(s => s.OnHand)
-                .FirstOrDefaultAsync(ct);
+                .Where(b => b.ProductId == productId)
+                .SumAsync(b => b.OnHand, ct);
 
-            return snapshot; // Returns 0 if snapshot doesn't exist (default for decimal)
+            return onHand;
         }
 
         public async Task<StockSnapshotResponseDto?> GetStockAsync(int productId, CancellationToken ct = default)
