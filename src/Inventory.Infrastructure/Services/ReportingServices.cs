@@ -97,7 +97,7 @@ namespace Inventory.Infrastructure.Services
             var totalVolume = await _db.PurchaseOrders
                 .AsNoTracking()
                 .Where(po => po.SupplierId == supplierId)
-                .SumAsync(po => (decimal?)po.TotalAmount, ct) ?? 0m;
+                .SumAsync(po => (decimal?)po.EffectiveTotal, ct) ?? 0m;
 
             // ── Metric 2: NetOwedToSupplier (Pending) ──────────────────────────────
             //
@@ -115,7 +115,7 @@ namespace Inventory.Infrastructure.Services
                              po.Status != PurchaseOrderStatus.Cancelled)
                 .Select(po => new
                 {
-                    po.TotalAmount,
+                    po.EffectiveTotal,
                     po.PaymentStatus,
                     po.DueDate,
                     NetPaid = (po.Payments
@@ -127,8 +127,8 @@ namespace Inventory.Infrastructure.Services
                 })
                 .ToListAsync(ct);
 
-            // Remaining per PO = max(0, TotalAmount - NetPaid)
-            var totalPoRemaining = poData.Sum(po => Math.Max(0m, po.TotalAmount - po.NetPaid));
+            // Remaining per PO = max(0, EffectiveTotal - NetPaid)
+            var totalPoRemaining = poData.Sum(po => Math.Max(0m, po.EffectiveTotal - po.NetPaid));
 
             // Step B: Sum all Active (non-Cancelled) SSO amounts.
             // These are permanent debt reductions — PaymentStatus is irrelevant.
@@ -136,7 +136,7 @@ namespace Inventory.Infrastructure.Services
                 .AsNoTracking()
                 .Where(sso => sso.SupplierId == supplierId &&
                               sso.Status != SalesOrderStatus.Cancelled)
-                .SumAsync(sso => (decimal?)sso.TotalAmount, ct) ?? 0m;
+                .SumAsync(sso => (decimal?)sso.TotalAmount, ct) ?? 0m; // SSO TotalAmount is its contract value
 
             // NetOwedToSupplier: clamped to 0 minimum (can't have negative owed)
             var netOwedToSupplier = Math.Max(0m, totalPoRemaining - totalActiveSsoAmount);
@@ -187,7 +187,7 @@ namespace Inventory.Infrastructure.Services
                              po.DueDate.Value < asOf)
                 .Select(po => new
                 {
-                    po.TotalAmount,
+                    po.EffectiveTotal,
                     NetPaid = (po.Payments
                                    .Where(p => p.PaymentType == PaymentRecordType.Payment)
                                    .Sum(p => (decimal?)p.Amount) ?? 0m)
@@ -197,7 +197,7 @@ namespace Inventory.Infrastructure.Services
                 })
                 .ToListAsync(ct);
 
-            var overdue = overduePoData.Sum(po => Math.Max(0m, po.TotalAmount - po.NetPaid));
+            var overdue = overduePoData.Sum(po => Math.Max(0m, po.EffectiveTotal - po.NetPaid));
 
             return new SupplierBalanceResponseDto
             {
@@ -225,12 +225,12 @@ namespace Inventory.Infrastructure.Services
                            (o.PaymentStatus == PaymentStatus.Pending || o.PaymentStatus == PaymentStatus.PartiallyPaid));
 
             // Total Pending: sum of all unpaid/partially-paid orders remaining balances
-            var totalPending = await query.SumAsync(o => o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)), ct);
+            var totalPending = await query.SumAsync(o => o.EffectiveTotal - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)), ct);
 
             // Deserved: subset where due date has passed (overdue)
             var deserved = await query
                 .Where(o => o.DueDate < asOf)
-                .SumAsync(o => o.TotalAmount - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)), ct);
+                .SumAsync(o => o.EffectiveTotal - (o.Payments.Where(p => p.PaymentType == PaymentRecordType.Payment).Sum(p => p.Amount) - o.Payments.Where(p => p.PaymentType == PaymentRecordType.Refund).Sum(p => p.Amount)), ct);
 
             return new CustomerBalanceResponseDto
             {
@@ -285,7 +285,22 @@ namespace Inventory.Infrastructure.Services
                 revenueTransactionsWithOrder.Add((item.OrderId, item.TxAmount, item.OrderTotal));
             }
 
-            // 2. Sales Refunds (Aggregated by period)
+            // 2. Sales Refunds (Granular Line-Item Impact)
+            var refundLines = await (from rl in _db.RefundTransactionLines
+                                     join r in _db.RefundTransactions on rl.RefundTransactionId equals r.Id
+                                     where r.Type == RefundType.SalesOrder &&
+                                           r.ProcessedUtc >= fromUtc &&
+                                           r.ProcessedUtc <= toUtc
+                                     select new { rl.SubtotalRefunded, rl.VatRefunded, rl.ManTaxRefunded })
+                                    .AsNoTracking()
+                                    .ToListAsync(ct);
+
+            var refundSubtotal = refundLines.Sum(l => l.SubtotalRefunded);
+            var refundVat = refundLines.Sum(l => l.VatRefunded);
+            var refundManTax = refundLines.Sum(l => l.ManTaxRefunded);
+
+            // 2.1 Handle Monetary-only refunds (where no lines exist)
+            // We find the difference between RefundTransaction.Amount and Sum(Lines.LineRefundAmount)
             var salesRefundsTotal = await _db.RefundTransactions
                 .AsNoTracking()
                 .Where(r => r.Type == RefundType.SalesOrder &&
@@ -293,14 +308,29 @@ namespace Inventory.Infrastructure.Services
                             r.ProcessedUtc <= toUtc)
                 .SumAsync(r => (decimal?)r.Amount, ct) ?? 0m;
 
-            // Refund Base = Sum / (1 + VAT - ManTax)
-            decimal refundBaseDivisor = 1m + TaxConstants.VatRate - TaxConstants.ManufacturingTaxRate;
-            decimal refundBase = salesRefundsTotal / (refundBaseDivisor > 0 ? refundBaseDivisor : 1.13m);
+            decimal totalLineRefunds = await (from rl in _db.RefundTransactionLines
+                                              join r in _db.RefundTransactions on rl.RefundTransactionId equals r.Id
+                                              where r.Type == RefundType.SalesOrder &&
+                                                    r.ProcessedUtc >= fromUtc &&
+                                                    r.ProcessedUtc <= toUtc
+                                              select rl.LineRefundAmount)
+                                             .SumAsync(ct);
+
+            decimal monetaryOnlyRefund = Math.Max(0, salesRefundsTotal - totalLineRefunds);
+            if (monetaryOnlyRefund > 0)
+            {
+                // Fallback to estimated breakdown for monetary-only refunds
+                decimal divisor = 1m + TaxConstants.VatRate - TaxConstants.ManufacturingTaxRate;
+                decimal mBase = monetaryOnlyRefund / (divisor > 0 ? divisor : 1.13m);
+                refundSubtotal += mBase;
+                refundVat += mBase * TaxConstants.VatRate;
+                refundManTax += mBase * TaxConstants.ManufacturingTaxRate;
+            }
             
             // Adjust Sales Metrics for Refunds
-            var net_sales_subtotal = Math.Max(0, gross_sales_subtotal - refundBase);
-            sales_vat = Math.Max(0, sales_vat - (refundBase * TaxConstants.VatRate));
-            sales_man_tax = Math.Max(0, sales_man_tax - (refundBase * TaxConstants.ManufacturingTaxRate));
+            var net_sales_subtotal = Math.Max(0m, gross_sales_subtotal - refundSubtotal);
+            sales_vat = Math.Max(0m, sales_vat - refundVat);
+            sales_man_tax = Math.Max(0m, sales_man_tax - refundManTax);
 
             // 3. Purchase Side (Taxes + Receipt Expenses)
             var purchaseTransactions = await (from t in _db.FinancialTransactions
@@ -333,6 +363,20 @@ namespace Inventory.Infrastructure.Services
                 receipt_expenses += item.OrderExpenses * ratio;
             }
 
+            // 3.1 Purchase Refunds
+            var pRefundLines = await (from rl in _db.RefundTransactionLines
+                                      join r in _db.RefundTransactions on rl.RefundTransactionId equals r.Id
+                                      where r.Type == RefundType.PurchaseOrder &&
+                                            r.ProcessedUtc >= fromUtc &&
+                                            r.ProcessedUtc <= toUtc
+                                      select new { rl.SubtotalRefunded, rl.VatRefunded, rl.ManTaxRefunded })
+                                     .AsNoTracking()
+                                     .ToListAsync(ct);
+
+            var pRefundSubtotal = pRefundLines.Sum(l => l.SubtotalRefunded);
+            var pRefundVat = pRefundLines.Sum(l => l.VatRefunded);
+            var pRefundManTax = pRefundLines.Sum(l => l.ManTaxRefunded);
+
             var purchaseRefundsTotal = await _db.RefundTransactions
                 .AsNoTracking()
                 .Where(r => r.Type == RefundType.PurchaseOrder &&
@@ -340,9 +384,26 @@ namespace Inventory.Infrastructure.Services
                             r.ProcessedUtc <= toUtc)
                 .SumAsync(r => (decimal?)r.Amount, ct) ?? 0m;
 
-            decimal pRefBase = purchaseRefundsTotal / refundBaseDivisor;
-            purchase_vat = Math.Max(0, purchase_vat - (pRefBase * TaxConstants.VatRate));
-            purchase_man_tax = Math.Max(0, purchase_man_tax - (pRefBase * TaxConstants.ManufacturingTaxRate));
+            decimal pTotalLineRefunds = await (from rl in _db.RefundTransactionLines
+                                               join r in _db.RefundTransactions on rl.RefundTransactionId equals r.Id
+                                               where r.Type == RefundType.PurchaseOrder &&
+                                                     r.ProcessedUtc >= fromUtc &&
+                                                     r.ProcessedUtc <= toUtc
+                                               select rl.LineRefundAmount)
+                                              .SumAsync(ct);
+
+            decimal pMonetaryOnlyRefund = Math.Max(0m, purchaseRefundsTotal - pTotalLineRefunds);
+            if (pMonetaryOnlyRefund > 0)
+            {
+                decimal divisor = 1m + TaxConstants.VatRate - TaxConstants.ManufacturingTaxRate;
+                decimal mBase = pMonetaryOnlyRefund / divisor;
+                pRefundSubtotal += mBase;
+                pRefundVat += mBase * TaxConstants.VatRate;
+                pRefundManTax += mBase * TaxConstants.ManufacturingTaxRate;
+            }
+
+            purchase_vat = Math.Max(0m, purchase_vat - pRefundVat);
+            purchase_man_tax = Math.Max(0m, purchase_man_tax - pRefundManTax);
 
             // COGS Calculation
             var salesOrderIds = revenueTransactionsWithOrder.Select(x => x.SalesOrderId).Distinct().ToList();
@@ -363,10 +424,17 @@ namespace Inventory.Infrastructure.Services
                 calculatedCogs += totalOrderCost * ratio;
             }
 
-            // Purchase Refunds also reduce effective COGS of bought items if they were part of it
-            // but functionally, COGS is what was GONE. If it was returned, it didn't generate revenue.
-            // Simplified: subtract the Base of returned purchases from total inventory outflow.
-            var net_cogs = Math.Max(0, calculatedCogs - pRefBase);
+            // Net COGS = Gross COGS of sold items - COGS of returned items
+            var returnedCogs = await (from rl in _db.RefundTransactionLines
+                                      join r in _db.RefundTransactions on rl.RefundTransactionId equals r.Id
+                                      join sol in _db.SalesOrderLines on rl.SalesOrderLineId equals sol.Id
+                                      where r.Type == RefundType.SalesOrder &&
+                                            r.ProcessedUtc >= fromUtc &&
+                                            r.ProcessedUtc <= toUtc
+                                      select rl.Quantity * (sol.ProductBatch != null ? sol.ProductBatch.UnitCost : 0m))
+                                     .SumAsync(ct) ?? 0m;
+
+            var net_cogs = Math.Max(0m, calculatedCogs - returnedCogs);
 
             // CALCULATED FLOW
             var gross_profit = net_sales_subtotal - net_cogs;

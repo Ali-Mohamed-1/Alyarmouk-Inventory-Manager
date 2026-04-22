@@ -96,6 +96,7 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.VatAmount).HasPrecision(18, 2);
                 b.Property(x => x.ManufacturingTaxAmount).HasPrecision(18, 2);
                 b.Property(x => x.TotalAmount).HasPrecision(18, 2);
+                b.Property(x => x.EffectiveTotal).HasPrecision(18, 2);
                 b.Property(x => x.RefundedAmount).HasPrecision(18, 2);
                 b.HasIndex(x => x.CreatedUtc);
                 b.HasIndex(x => x.Status);
@@ -145,6 +146,7 @@ namespace Inventory.Infrastructure.Data
                 b.Property(o => o.VatAmount).HasPrecision(18, 2);
                 b.Property(o => o.ManufacturingTaxAmount).HasPrecision(18, 2);
                 b.Property(o => o.ReceiptExpenses).HasPrecision(18, 2);
+                b.Property(o => o.EffectiveTotal).HasPrecision(18, 2);
                 b.Property(o => o.OrderDate).IsRequired();
                 b.Property(o => o.RefundedAmount).HasPrecision(18, 2);
 
@@ -216,6 +218,9 @@ namespace Inventory.Infrastructure.Data
                 b.Property(x => x.Quantity).HasPrecision(18, 2);
                 b.Property(x => x.UnitPriceSnapshot).HasPrecision(18, 2);
                 b.Property(x => x.LineRefundAmount).HasPrecision(18, 2);
+                b.Property(x => x.SubtotalRefunded).HasPrecision(18, 2);
+                b.Property(x => x.VatRefunded).HasPrecision(18, 2);
+                b.Property(x => x.ManTaxRefunded).HasPrecision(18, 2);
                 b.Property(x => x.ProductNameSnapshot).HasMaxLength(200).IsRequired();
                 b.Property(x => x.BatchNumber).HasMaxLength(100);
                 b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);

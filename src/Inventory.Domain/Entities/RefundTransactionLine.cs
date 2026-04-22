@@ -29,4 +29,8 @@ public class RefundTransactionLine
     // Financial impact of this line refund (optional/calculated)
     public decimal UnitPriceSnapshot { get; set; }
     public decimal LineRefundAmount { get; set; }
+    
+    public decimal SubtotalRefunded { get; set; }
+    public decimal VatRefunded { get; set; }
+    public decimal ManTaxRefunded { get; set; }
 }

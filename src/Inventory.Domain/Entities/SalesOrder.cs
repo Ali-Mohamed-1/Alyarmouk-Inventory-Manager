@@ -81,11 +81,11 @@ public  class SalesOrder
         {
             PaymentStatus = PaymentStatus.Pending;
         }
-        else if (netCash < TotalAmount)
+        else if (netCash < EffectiveTotal)
         {
             PaymentStatus = PaymentStatus.PartiallyPaid;
         }
-        else // netCash >= TotalAmount
+        else // netCash >= EffectiveTotal
         {
             PaymentStatus = PaymentStatus.Paid;
         }
@@ -115,7 +115,7 @@ public  class SalesOrder
     public decimal GetPendingAmount()
     {
         var net = GetNetCash();
-        return Math.Max(0, TotalAmount - net);
+        return Math.Max(0, EffectiveTotal - net);
     }
 
     /// <summary>
@@ -124,7 +124,7 @@ public  class SalesOrder
     public decimal GetRefundDue()
     {
         var net = GetNetCash();
-        return Math.Max(0, net - TotalAmount);
+        return Math.Max(0, net - EffectiveTotal);
     }
 
     public bool IsOverdue() => DueDate < DateTimeOffset.UtcNow && PaymentStatus != PaymentStatus.Paid;
@@ -198,6 +198,11 @@ public  class SalesOrder
     public decimal VatAmount { get; set; }
     public decimal ManufacturingTaxAmount { get; set; }
     public decimal TotalAmount { get; set; }
+    
+    /// <summary>
+    /// Effective total after quantity refunds. Used for calculating debt.
+    /// </summary>
+    public decimal EffectiveTotal { get; set; }
     
     /// <summary>
     /// Total amount that has been refunded for this order.
